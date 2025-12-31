@@ -1,114 +1,190 @@
-# Getting Started Guide
+# Getting Started with Private Chat Hub
 
-Welcome! This guide will help you customize this Android Flutter template for your new app from scratch.
+Welcome! This guide will help you set up and start using Private Chat Hub - your private AI chat application.
 
-## 📋 Prerequisites
+## 📋 What You'll Need
 
-Before starting, ensure you have:
+### For Users (Running the App)
+
+- ✅ Android device (Android 5.0+) or emulator
+- ✅ Ollama server running on your network ([Get Ollama](https://ollama.ai))
+- ✅ At least one AI model downloaded (e.g., `ollama pull llama3`)
+- ✅ Network connection between your device and Ollama server
+
+### For Developers (Building from Source)
 
 - ✅ Flutter SDK 3.10.1+ ([Install Guide](https://docs.flutter.dev/get-started/install))
 - ✅ Dart 3.10.1+
 - ✅ Java 17+ (for Android builds)
-- ✅ Android Studio (for Android development)
+- ✅ Android Studio or Android SDK
 - ✅ Git
-- ✅ VS Code with GitHub Copilot (recommended for AI assistance)
+- ✅ VS Code with Flutter extension (recommended)
 
-Verify your setup:
+Verify your development setup:
 ```bash
 flutter doctor -v
 java -version  # Should show version 17+
 ```
 
-## 🚀 Quick Start Checklist
+## 🚀 Quick Start for Users
 
-Follow these steps in order to customize the template for your app:
+### Step 1: Set Up Ollama Server
 
-### Step 1: Clone and Setup
+1. **Install Ollama** on your computer or server:
+   ```bash
+   # Visit https://ollama.ai to download for your OS
+   # Or use package manager:
+   # macOS: brew install ollama
+   # Linux: curl https://ollama.ai/install.sh | sh
+   ```
+
+2. **Start Ollama server**:
+   ```bash
+   ollama serve
+   ```
+   
+   The server will start on `http://localhost:11434` by default.
+
+3. **Download a model**:
+   ```bash
+   # Download Llama 3 (recommended for general use)
+   ollama pull llama3
+   
+   # Or try other models:
+   ollama pull mistral    # Faster, good for quick responses
+   ollama pull gemma      # Google's model
+   ollama pull llava      # Vision-capable model (can analyze images)
+   ```
+
+4. **Verify Ollama is working**:
+   ```bash
+   ollama list  # Should show your downloaded models
+   curl http://localhost:11434/api/tags  # Should return JSON with models
+   ```
+
+### Step 2: Install Private Chat Hub
+
+#### Option A: Download APK (Easiest)
+
+1. Go to [Releases](https://github.com/yourusername/private-chat-hub/releases)
+2. Download the latest `app-release.apk`
+3. Install on your Android device
+   - You may need to enable "Install from unknown sources" in Settings
+
+#### Option B: Build from Source
 
 ```bash
-# Clone this template
-git clone https://github.com/yourusername/your-repo-name.git
-cd your-repo-name
+# Clone the repository
+git clone https://github.com/yourusername/private-chat-hub.git
+cd private-chat-hub
 
 # Get dependencies
 flutter pub get
 
-# Verify everything works
-flutter test
-flutter analyze
+# Connect your Android device or start emulator
+# Then run:
+flutter run
+
+# Or build release APK
+flutter build apk --release
+# APK will be at: build/app/outputs/flutter-apk/app-release.apk
 ```
 
-### Step 2: Rename Your App and Package
+### Step 3: Connect to Your Ollama Server
 
-⚠️ **CRITICAL**: Failure to rename the package will cause app launch issues on Android!
+1. **Open Private Chat Hub** on your Android device
 
-**See [PACKAGE_RENAME_GUIDE.md](PACKAGE_RENAME_GUIDE.md) for detailed instructions.**
+2. **Go to Settings** (tap the gear icon in the bottom navigation)
 
-#### Quick Rename (Using AI - Recommended):
+3. **Configure Connection**:
+   - **Host**: Enter your Ollama server IP address
+     - Same device: `localhost` or `127.0.0.1`
+     - Local network: Your computer's IP (e.g., `192.168.1.100`)
+     - Remote: Your server's IP or domain
+   - **Port**: `11434` (default)
+   - **Use HTTPS**: Enable if using SSL/TLS
 
-```
-@flutter-developer Please rename this app from "private_chat_hub" 
-to "my_awesome_app" with package "com.mycompany.my_awesome_app". 
-Follow PACKAGE_RENAME_GUIDE.md
-```
+4. **Test Connection**:
+   - Tap "Test Connection"
+   - You should see "✓ Connected successfully"
+   - If connection fails, see [Troubleshooting](#troubleshooting) below
 
-#### Manual Rename (Essential Files):
+### Step 4: Start Chatting!
 
-1. **`pubspec.yaml`**:
-   ```yaml
-   name: your_app_name  # Change from private_chat_hub
-   description: "Your app description"
-   ```
+1. **Select a Model**:
+   - Tap "Models" in the bottom navigation
+   - You'll see all models available on your Ollama server
+   - Tap a model to set it as active
 
-2. **`android/app/build.gradle.kts`** (MUST MATCH):
-   ```kotlin
-   namespace = "com.yourcompany.yourapp"  // Change this
-   applicationId = "com.yourcompany.yourapp"  // Change this (must match namespace)
-   ```
+2. **Start a Conversation**:
+   - Tap "Chats" in the bottom navigation
+   - Tap the "+" button to create a new conversation
+   - Enter your message and hit send!
 
-3. **`android/app/src/main/kotlin/.../MainActivity.kt`** (Package and file path):
-   ```kotlin
-   package com.yourcompany.yourapp  // Change package declaration
-   ```
-   Then move file to match package structure: `kotlin/com/yourcompany/yourapp/MainActivity.kt`
+3. **Organize with Projects** (Optional):
+   - Tap "Projects" to create workspaces
+   - Group related conversations by topic
+   - Example: "Work", "Learning", "Creative Writing"
 
-4. **`test/widget_test.dart`**:
-   ```dart
-   import 'package:your_app_name/main.dart';
-   ```
+## 🎓 Key Features Guide
 
-5. **`android/app/src/main/AndroidManifest.xml`**:
-   ```xml
-   android:label="Your App Name"
-   ```
+### Managing Conversations
 
+**Create a New Conversation**:
+- Go to Chats → Tap "+" button
+- Optionally assign to a project
 
-After renaming, run:
-```bash
-flutter clean
-flutter pub get
-flutter run  # Test on Android to verify package name is correct
-```
+**View Conversation History**:
+- All messages are saved locally
+- Swipe down to scroll through history
+- Long-press a message for options
 
-6. **iOS Bundle Identifier**:
-   - Open `ios/Runner.xcodeproj` in Xcode
-   - Select Runner → General → Bundle Identifier
-   - Change to `com.yourcompany.yourapp`
+**Export Conversations**:
+- Open a conversation
+- Tap the menu (⋮) → Export
+- Choose format (JSON, Markdown, or Plain Text)
+- Share or save to your device
 
-7. **macOS Bundle Identifier**:
-   - Open `macos/Runner.xcodeproj` in Xcode
-   - Update bundle identifier similarly
+### Working with Models
 
+**Switch Models Mid-Conversation**:
+- Tap the current model name at the top
+- Select a different model
+- Continue chatting with the new model
 
-#### Using AI to Rename
+**Model Information**:
+- Tap and hold on a model in the Models screen
+- View size, parameters, and capabilities
 
-Ask your AI agent:
-```
-Please rename this Flutter app from "private_chat_hub" to "my_awesome_app" 
-and update the package name from "com.cmwen.private_chat_hub" to "com.mycompany.my_awesome_app". 
-Update all necessary files including pubspec.yaml, build.gradle.kts, AndroidManifest.xml, 
-and Dart imports.
-```
+### Using Vision Models
+
+1. **Select a Vision-Capable Model**:
+   - Examples: `llava`, `bakllava`, `llava-phi3`
+   
+2. **Add an Image**:
+   - In the chat, tap the image icon (📷)
+   - Choose from gallery or take a photo
+   - Image will be attached to your next message
+
+3. **Ask About the Image**:
+   - Type your question (e.g., "What's in this image?")
+   - The vision model will analyze and respond
+
+### Projects & Organization
+
+**Create a Project**:
+- Go to Projects → Tap "+"
+- Give it a name and description
+- Example: "Python Learning" for coding questions
+
+**Assign Conversations to Projects**:
+- When creating a conversation, select a project
+- Or edit an existing conversation to move it
+
+**Benefits**:
+- Keep conversations organized by topic
+- Quickly find related discussions
+- Better context management
 
 ### Step 3: Create App Icon
 
@@ -172,164 +248,233 @@ MaterialApp(
 
 ### Step 5: Set Up GitHub Repository
 
-1. **Create new repository** on GitHub
+## 🔧 Troubleshooting
 
-2. **Update remote**:
+### Cannot Connect to Ollama
+
+**Problem**: "Connection failed" when testing connection
+
+**Solutions**:
+
+1. **Verify Ollama is running**:
    ```bash
-   git remote set-url origin https://github.com/yourusername/your-repo-name.git
+   # Check if Ollama is running
+   ps aux | grep ollama
+   # Or test with curl
+   curl http://localhost:11434/api/tags
    ```
 
-3. **Configure signing** (choose one option):
+2. **Check firewall settings**:
+   - Ensure port 11434 is open on your server
+   - On Windows: Add firewall rule for port 11434
+   - On macOS: System Preferences → Security & Privacy → Firewall
 
-   #### Option A: Auto-Generate (Recommended for Beginners)
-   
-   Just run the release workflow! It will automatically generate a keystore.
-   After the first release:
-   1. Download the `signing-credentials` artifact from the workflow run
-   2. Run the persistence script:
-      ```bash
-      ./scripts/signing/persist-credentials.sh ./signing-credentials.json
-      ```
-   3. Delete the downloaded credentials file
-   
-   #### Option B: Generate Locally (Interactive)
-   
-   Use the provided script for a guided setup:
+3. **Find correct IP address**:
    ```bash
-   ./scripts/signing/generate-keystore.sh
+   # macOS/Linux
+   ifconfig | grep "inet "
+   # Windows
+   ipconfig
    ```
-   This will create a keystore and optionally upload it to GitHub Secrets.
-   
-   #### Option C: Manual Setup (Advanced)
-   
-   Generate keystore manually:
-   ```bash
-   keytool -genkey -v -keystore release-keystore.jks \
-     -keyalg RSA -keysize 2048 -validity 10000 \
-     -alias release
-   ```
-   
-   Add GitHub Secrets:
-   - `ANDROID_KEYSTORE_BASE64`: `base64 -w 0 release-keystore.jks`
-   - `ANDROID_KEYSTORE_PASSWORD`: Your keystore password
-   - `ANDROID_KEY_ALIAS`: `release`
-   - `ANDROID_KEY_PASSWORD`: Your key password
+   - Use the local network IP (usually 192.168.x.x or 10.0.x.x)
+   - NOT the loopback (127.0.0.1) unless on same device
 
-4. **Push to GitHub**:
+4. **Test connection manually**:
    ```bash
-   git add .
-   git commit -m "Initial setup with custom app name"
-   git push -u origin main
+   # Replace with your server IP
+   curl http://192.168.1.100:11434/api/tags
    ```
 
-### Step 6: Test Your Setup
+### App Crashes on Startup
+
+**Solutions**:
+
+1. **Clear app data**:
+   - Settings → Apps → Private Chat Hub → Storage → Clear Data
+
+2. **Reinstall the app**:
+   ```bash
+   flutter clean
+   flutter pub get
+   flutter run
+   ```
+
+3. **Check Android version**:
+   - Ensure Android 5.0 (API 21) or higher
+
+### Slow Response Times
+
+**Causes & Solutions**:
+
+1. **Model too large for hardware**:
+   - Try a smaller model (e.g., `mistral` instead of `llama3:70b`)
+   - Check available RAM with `ollama show <model> --modelfile`
+
+2. **Network latency**:
+   - Ensure good WiFi connection
+   - Consider running Ollama on the same device (if possible)
+
+3. **Ollama server overloaded**:
+   - Check CPU/RAM usage on server
+   - Reduce model size or upgrade hardware
+
+### Images Not Working with Vision Models
+
+**Solutions**:
+
+1. **Verify model supports vision**:
+   - Not all models support images
+   - Use: `llava`, `bakllava`, or `llava-phi3`
+
+2. **Check image size**:
+   - Large images may be slow or fail
+   - Try compressing the image first
+
+3. **Check permissions**:
+   - Ensure camera/storage permissions are granted
+   - Settings → Apps → Private Chat Hub → Permissions
+
+## 👨‍💻 Developer Guide
+
+### Project Setup for Development
 
 ```bash
-# Run on Android
-flutter run -d android     # Android (connected device/emulator)
+# Clone the repository
+git clone https://github.com/yourusername/private-chat-hub.git
+cd private-chat-hub
 
-# Build release
-flutter build apk --release
+# Install dependencies
+flutter pub get
 
 # Run tests
 flutter test
-flutter analyze
+
+# Run the app
+flutter run
+
+# Run with specific device
+flutter devices  # List available devices
+flutter run -d <device-id>
 ```
 
-## 🤖 Using AI Agents for Development
+### Project Structure
 
-This template includes custom GitHub Copilot agents to accelerate development:
+```
+lib/
+├── main.dart                      # App entry point
+├── models/                        # Data models
+│   ├── conversation.dart
+│   ├── message.dart
+│   ├── connection.dart
+│   └── project.dart
+├── screens/                       # UI screens
+│   ├── chat_screen.dart          # Main chat interface
+│   ├── conversation_list_screen.dart
+│   ├── models_screen.dart         # Model selection
+│   ├── projects_screen.dart       # Project management
+│   ├── project_detail_screen.dart
+│   ├── search_screen.dart
+│   └── settings_screen.dart       # App settings
+├── services/                      # Business logic
+│   ├── chat_service.dart         # Chat management
+│   ├── ollama_service.dart       # Ollama API client
+│   ├── storage_service.dart      # Local persistence
+│   ├── connection_service.dart   # Connection management
+│   └── project_service.dart      # Project management
+├── widgets/                       # Reusable UI components
+└── utils/                         # Helper functions
+```
 
-### Available Agents
+### Running Tests
 
-1. **@product-owner** - Define features and requirements
-   ```
-   @product-owner I need a login screen with email/password authentication
-   ```
+```bash
+# Run all tests
+flutter test
 
-2. **@experience-designer** - Design user flows and interfaces
-   ```
-   @experience-designer Design a user flow for the login and registration process
-   ```
+# Run specific test file
+flutter test test/services/chat_service_test.dart
 
-3. **@architect** - Plan technical architecture
-   ```
-   @architect What's the best way to implement authentication with JWT tokens?
-   ```
+# Run with coverage
+flutter test --coverage
+```
 
-4. **@researcher** - Research dependencies and best practices
-   ```
-   @researcher Find the best Flutter packages for local storage and authentication
-   ```
+### Building for Production
 
-5. **@flutter-developer** - Implement features
-   ```
-   @flutter-developer Implement the login screen with form validation
-   ```
+```bash
+# Build release APK
+flutter build apk --release
 
-6. **@doc-writer** - Create documentation
-   ```
-   @doc-writer Document the authentication flow and API endpoints
-   ```
+# Build release App Bundle (for Play Store)
+flutter build appbundle --release
 
-### Example Workflow
+# Build with specific target
+flutter build apk --target lib/main_prod.dart --release
+```
 
-1. **Define requirements**:
-   ```
-   @product-owner I want to build a note-taking app with categories, 
-   search, and local storage. Create user stories with acceptance criteria.
-   ```
+### Using GitHub Copilot Agents
 
-2. **Design UX**:
-   ```
-   @experience-designer Based on the product requirements, design the 
-   information architecture and main user flows for the note-taking app.
-   ```
+This project includes specialized AI agents to accelerate development:
 
-3. **Research dependencies**:
+1. **@product-owner** - Define features:
    ```
-   @researcher What are the best packages for local database, 
-   state management, and markdown rendering in Flutter?
-   ```
-
-4. **Plan architecture**:
-   ```
-   @architect Design the app architecture including data models, 
-   repositories, and state management for the note-taking app.
-   ```
-
-5. **Implement features**:
-   ```
-   @flutter-developer Implement the note list screen with 
-   category filtering and search functionality.
+   @product-owner Plan conversation search feature with fuzzy matching
    ```
 
-6. **Document**:
+2. **@experience-designer** - Design UX:
    ```
-   @doc-writer Create API documentation for the note repository 
-   and usage examples.
+   @experience-designer Improve the chat bubble design for better readability
    ```
 
-## 📚 Key Documentation
+3. **@architect** - Technical decisions:
+   ```
+   @architect Should we add state management with Riverpod or Bloc?
+   ```
 
-After setup, familiarize yourself with:
+4. **@researcher** - Find solutions:
+   ```
+   @researcher Best practices for optimizing markdown rendering in Flutter
+   ```
 
-- [BUILD_OPTIMIZATION.md](BUILD_OPTIMIZATION.md) - Build performance tips
-- [AGENTS.md](AGENTS.md) - AI agent configuration details
-- [AI_PROMPTING_GUIDE.md](AI_PROMPTING_GUIDE.md) - AI prompting best practices
-- [TESTING.md](TESTING.md) - Testing guide
-- [CONTRIBUTING.md](CONTRIBUTING.md) - Contributing guidelines
+5. **@flutter-developer** - Implement features:
+   ```
+   @flutter-developer Add conversation export to Markdown format
+   ```
 
-## 🎯 Next Steps
+6. **@doc-writer** - Documentation:
+   ```
+   @doc-writer Update architecture documentation with new service layer
+   ```
 
-Once setup is complete:
+**See [AGENTS.md](AGENTS.md) for detailed agent capabilities.**
 
-1. **Plan your features** with @product-owner
-2. **Design your UI** with @experience-designer
-3. **Set up state management** (Provider, Riverpod, Bloc)
-4. **Implement your first feature** with @flutter-developer
-5. **Write tests** for your features
-6. **Deploy** your first release
+## 📚 Additional Resources
+
+### Documentation
+- [ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md) - Technical architecture
+- [PRODUCT_VISION.md](docs/PRODUCT_VISION.md) - Product roadmap
+- [UX_DESIGN.md](docs/UX_DESIGN.md) - Design decisions
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues
+
+### External Resources
+- [Ollama Documentation](https://github.com/ollama/ollama/blob/main/docs/api.md) - API reference
+- [Flutter Documentation](https://docs.flutter.dev/)
+- [Material Design 3](https://m3.material.io/)
+
+## 🆘 Getting Help
+
+- 🐛 [Report Issues](https://github.com/yourusername/private-chat-hub/issues)
+- 💬 [Discussions](https://github.com/yourusername/private-chat-hub/discussions)
+- 📧 Email: your-email@example.com
+
+## 🎉 You're All Set!
+
+Now you're ready to:
+- Chat privately with AI models
+- Organize conversations in projects
+- Experiment with different models
+- Contribute to the project
+
+**Happy chatting! 🚀**
 
 ## 🐛 Troubleshooting
 

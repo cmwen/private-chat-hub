@@ -1,6 +1,6 @@
-# 🤖 AI Prompting Guide for Flutter App Development
+# 🤖 AI Prompting Guide for Private Chat Hub Development
 
-> **Learn how to effectively use AI assistants (like ChatGPT, Claude, GitHub Copilot, etc.) to build Flutter apps with this template**
+> **Learn how to effectively use AI assistants (GitHub Copilot, ChatGPT, Claude, etc.) to contribute to and customize Private Chat Hub**
 
 ## 📚 Table of Contents
 
@@ -14,81 +14,82 @@
 
 ## Who Is This Guide For?
 
-This guide helps **anyone** use AI to build Flutter apps, regardless of technical background:
+This guide helps **developers and contributors** use AI effectively when working on Private Chat Hub:
 
-- 🌱 **Complete Beginners**: Never coded before but have an app idea
-- 🎓 **Developers New to Flutter**: Know programming but not Flutter/Dart
-- 🚀 **Experienced Flutter Developers**: Want to accelerate development with AI
-- 💡 **Entrepreneurs & Product Managers**: Need to prototype quickly
+- 🌱 **New Contributors**: First time contributing to the project
+- 🎓 **Flutter Developers**: Know Flutter but new to this codebase
+- 🚀 **Experienced Contributors**: Want to accelerate development with AI
+- 💡 **Feature Developers**: Adding new capabilities to Private Chat Hub
 
 ---
 
 ## Quick Start by Experience Level
 
-### 🌱 I'm a Complete Beginner
+### 🌱 I'm New to Contributing
 **Start here**: [Beginner's Guide to AI-Assisted Flutter Development](./docs/AI_BEGINNER_GUIDE.md)
 
 **You'll learn**:
-- What Flutter development is
-- How to describe your app idea to AI
-- Step-by-step instructions with AI prompts
-- Common questions and troubleshooting
+- Understanding the Private Chat Hub architecture
+- How to work with the existing codebase
+- Step-by-step contribution workflow with AI
+- Common patterns in the project
 
 **First prompt to try**:
 ```
-I want to build a Flutter app but I'm a complete beginner. I'm using the 
-private-chat-hub. Can you explain what files I need to understand 
-and walk me through how to customize this template for my app idea?
+I want to contribute to Private Chat Hub but I'm new to the project. 
+Can you explain:
+1. The overall architecture and key components
+2. How the chat service interacts with Ollama
+3. Where I should look to implement [feature idea]
 
-My app idea: [Describe your app in 2-3 sentences]
+Feature I want to add: [Describe your feature idea]
 ```
 
 ---
 
-### 🎓 I Know Programming But Not Flutter
+### 🎓 I Know Flutter But New to This Project
 **Start here**: [Intermediate Guide for Developers](./docs/AI_INTERMEDIATE_GUIDE.md)
 
 **You'll learn**:
-- Flutter-specific concepts and terminology
-- How to structure effective prompts for Flutter development
-- Best practices for working with Flutter/Dart
-- How to leverage your existing programming knowledge
+- Project-specific patterns and conventions
+- Service layer architecture
+- State management approach
+- How to extend existing features
 
 **First prompt to try**:
 ```
-I'm an experienced [your language/platform] developer new to Flutter. 
-Using the private-chat-hub, I want to build [your app idea].
+I'm an experienced Flutter developer new to Private Chat Hub.
+I want to add [your feature].
 
 Can you:
-1. Explain the Flutter-specific concepts I need to know
-2. Show me the equivalent Flutter patterns for [specific pattern you know]
-3. Guide me through implementing [specific feature]
+1. Show me which services and models I'll need to work with
+2. Explain the data flow for similar existing features
+3. Suggest the best approach for implementing this
 
-Background: [Brief description of your experience]
+Feature details: [Specific requirements]
 ```
 
 ---
 
-### 🚀 I'm an Experienced Flutter Developer
+### 🚀 I'm an Experienced Contributor
 **Start here**: [Advanced Guide for Flutter Developers](./docs/AI_ADVANCED_GUIDE.md)
 
 **You'll learn**:
-- Advanced AI techniques for code generation and refactoring
-- How to use AI for architecture decisions
-- Optimizing AI for complex Flutter scenarios
-- Testing and CI/CD with AI assistance
+- Advanced architectural decisions
+- Performance optimization techniques
+- Complex feature implementation
+- Testing strategies
 
 **First prompt to try**:
 ```
-I'm building [your app] with min-android-template. I need to implement 
-[specific advanced feature] following [architectural pattern].
+I'm implementing [advanced feature] for Private Chat Hub.
 
 Requirements:
 - [Technical requirement 1]
 - [Technical requirement 2]
-- Must work on Android
+- Must integrate with existing [service/component]
 
-Please provide implementation with best practices.
+Please provide implementation following project conventions.
 ```
 
 ---
@@ -97,7 +98,7 @@ Please provide implementation with best practices.
 
 ### ✅ What AI Can Help You Do
 
-1. **Code Generation**: Write widgets, screens, and business logic
+1. **Code Generation**: Write screens, services, and UI components
 2. **Debugging**: Identify and fix errors in your code
 3. **Learning**: Explain Flutter concepts and APIs
 4. **Refactoring**: Improve code structure and quality

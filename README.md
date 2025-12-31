@@ -1,135 +1,113 @@
-# Minimal Android App Template
+# Private Chat Hub 🤖
 
-A production-ready Android Flutter template with **AI-powered development workflow**, optimized build system, and comprehensive documentation. Start building your Android app in minutes, not hours.
+A privacy-first Android app for chatting with self-hosted AI models via Ollama. Keep your conversations private, switch between models instantly, and organize chats in projects - all with a beautiful Material Design 3 interface.
 
-## ✨ What Makes This Template Special
+## ✨ Key Features
 
-- 🤖 **AI-First Development**: 6 custom GitHub Copilot agents (product owner, UX designer, architect, developer, researcher, doc writer)
-- ⚡ **Optimized Build System**: Java 17, parallel builds, multi-level caching - builds 60% faster
-- 🚀 **Production CI/CD**: GitHub Actions workflows with caching, testing, and signed releases
-- 📱 **Android Focused**: Clean, minimal Android-only configuration
-- 🎨 **Material Design 3**: Beautiful, accessible UI out of the box
-- 📚 **Extensive Documentation**: Step-by-step guides for first-time users
-- 🧪 **Testing Framework**: Unit, widget, and integration testing ready
-- 🔧 **VS Code Optimized**: Agents configured with terminal, debugger, and VS Code API access
+- 🔒 **Privacy First**: All conversations stay on your devices and infrastructure
+- 🤖 **Multiple AI Models**: Connect to any Ollama model (Llama, Mistral, Gemma, etc.)
+- 💬 **Conversation Management**: Organize chats, view history, export conversations
+- 📁 **Project Workspaces**: Group related conversations by topic or context
+- 🖼️ **Vision Support**: Share images with vision-capable models
+- 📱 **Native Android**: Built with Flutter, optimized for Android
+- 🎨 **Material Design 3**: Beautiful, accessible UI
+- 🔄 **Auto-sync**: Seamless connection to your Ollama server
 
-## 🚀 Quick Start (5 Minutes)
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- ✅ Flutter SDK 3.10.1+
-- ✅ Dart 3.10.1+
-- ✅ Java 17+ (for Android)
-- ✅ VS Code + GitHub Copilot (recommended)
+**For Users:**
+- Android device (5.0+)
+- Ollama server running on your network ([Get Ollama](https://ollama.ai))
+- At least one model downloaded on Ollama (e.g., `ollama pull llama3`)
+
+**For Developers:**
+- Flutter SDK 3.10.1+
+- Dart 3.10.1+
+- Java 17+
+- Android SDK
 
 Verify: `flutter doctor -v && java -version`
 
-> 📖 **New to development?** See [PREREQUISITES.md](PREREQUISITES.md) for detailed installation instructions.
+### Installation
 
-### Option 1: Automated Setup (Recommended)
+#### Option 1: Download APK (Coming Soon)
+Download the latest release from [GitHub Releases](https://github.com/yourusername/private-chat-hub/releases)
 
-```bash
-# Clone this template
-git clone https://github.com/yourusername/your-repo-name.git
-cd your-repo-name
-
-# Run the quick start script
-./scripts/setup/quick-start.sh
-```
-
-The script will guide you through naming your app and make all necessary changes automatically!
-
-### Option 2: Manual Setup
+#### Option 2: Build from Source
 
 ```bash
-# Clone this template
-git clone https://github.com/yourusername/your-repo-name.git
-cd your-repo-name
+# Clone the repository
+git clone https://github.com/yourusername/private-chat-hub.git
+cd private-chat-hub
 
 # Get dependencies
 flutter pub get
 
-# Verify everything works
-flutter test && flutter analyze
+# Run on Android device/emulator
+flutter run
+
+# Or build release APK
+flutter build apk --release
 ```
 
-### 2. Customize Your App (CRITICAL!)
+### First-Time Setup
 
-⚠️ **IMPORTANT**: You MUST rename the package before running the app. See [PACKAGE_RENAME_GUIDE.md](PACKAGE_RENAME_GUIDE.md)
+1. **Start Ollama Server**
+   ```bash
+   ollama serve
+   ```
 
-Then customize using AI:
-```
-@flutter-developer Please rename this app from "private_chat_hub" 
-to "my_awesome_app" with package "com.mycompany.my_awesome_app"
-```
+2. **Open Private Chat Hub**
+   - Launch the app on your Android device
 
-### Option 3: GitHub Codespaces (No Installation!)
+3. **Connect to Ollama**
+   - Go to Settings → Connection
+   - Enter your Ollama server IP and port (default: http://localhost:11434)
+   - Tap "Test Connection"
 
-1. Click **"Use this template"** → **"Create a new repository"**
-2. In your new repo, click **Code** → **Codespaces** → **"Create codespace on main"**
-3. Everything is pre-configured - start coding immediately!
+4. **Select a Model**
+   - Go to Models tab
+   - Choose from available models
+   - Start chatting!
 
-**See [GETTING_STARTED.md](GETTING_STARTED.md) for complete setup guide.**
+**See [GETTING_STARTED.md](GETTING_STARTED.md) for detailed setup guide.**
 
-### Generate App Icon
+## 🎯 Use Cases
 
-```
-@icon-generation.prompt.md Create an app icon for my [describe app] 
-with primary color #3B82F6 in minimal style
-```
+### Privacy-Conscious Users
+- Keep sensitive conversations completely private
+- No data sent to cloud services
+- Full control over your AI infrastructure
+- Export and backup your chat history
 
-### Build and Run
+### AI Enthusiasts & Developers
+- Test and compare different models locally
+- Experiment with vision models and multimodal AI
+- Develop and test AI integrations
+- Learn about LLMs in a safe environment
 
-```bash
-flutter run -d android     # Android (connected device/emulator)
-flutter build apk          # Release APK
-```
+### Power Users
+- Organize conversations by project or topic
+- Switch models based on task requirements
+- Access chat history for context and reference
+- Integrate with other local services
 
-**Full customization guide: [APP_CUSTOMIZATION.md](APP_CUSTOMIZATION.md)**
+## 🤖 Developer Workflow with AI Agents
 
-## 🤖 AI-Powered Development
+This project includes 6 specialized GitHub Copilot agents to accelerate development:
 
-### Meet Your AI Team
+| Agent | Purpose | Example |
+|-------|---------|-------|
+| **@product-owner** | Define features | `@product-owner Plan conversation export feature` |
+| **@experience-designer** | Design UX | `@experience-designer Improve chat bubble design` |
+| **@architect** | Technical planning | `@architect How should we handle model switching?` |
+| **@researcher** | Find solutions | `@researcher Best practices for markdown rendering` |
+| **@flutter-developer** | Implementation | `@flutter-developer Add image attachment support` |
+| **@doc-writer** | Documentation | `@doc-writer Update API documentation` |
 
-This template includes 6 specialized AI agents for VS Code:
-
-| Agent | Purpose | Example Usage |
-|-------|---------|---------------|
-| **@product-owner** | Define features & requirements | `@product-owner Create user stories for a note-taking app` |
-| **@experience-designer** | Design UX & user flows | `@experience-designer Design the login and onboarding flow` |
-| **@architect** | Plan technical architecture | `@architect How should I structure authentication?` |
-| **@researcher** | Find packages & best practices | `@researcher Best packages for local database in Flutter` |
-| **@flutter-developer** | Implement features & fix bugs | `@flutter-developer Implement login screen with validation` |
-| **@doc-writer** | Write documentation | `@doc-writer Document the authentication API` |
-
-### Example Workflow
-
-```bash
-# 1. Define your app concept
-@product-owner I want to build a recipe app with categories, 
-search, and favorites. Create user stories and MVP scope.
-
-# 2. Design the experience
-@experience-designer Based on the requirements, design the 
-information architecture and main user flows.
-
-# 3. Research dependencies
-@researcher What packages do I need for local storage, 
-images, and JSON parsing?
-
-# 4. Plan architecture
-@architect Design the app architecture with Riverpod state management 
-and repository pattern for recipes.
-
-# 5. Implement features
-@flutter-developer Implement the recipe list screen with 
-category filtering and search.
-
-# 6. Write documentation
-@doc-writer Document the recipe repository API and usage examples.
-```
-
-**All agents have access to VS Code terminal, debugger, and test runner!**
+**See [AGENTS.md](AGENTS.md) for detailed agent documentation.**
 
 ## ⚡ Build Performance
 
@@ -179,72 +157,130 @@ keytool -genkey -v -keystore release.jks -keyalg RSA -keysize 2048 -validity 100
 git tag v1.0.0 && git push --tags
 ```
 
-## Project Structure
+## 📂 Project Structure
 
 ```
-├── lib/main.dart         # App entry point
-├── test/                 # Tests
-├── android/              # Android configuration
-├── astro/                # GitHub Pages website
-├── docs/                 # AI prompting guides
-└── pubspec.yaml          # Dependencies
+├── lib/
+│   ├── main.dart              # App entry point
+│   ├── models/                # Data models (Conversation, Message, etc.)
+│   ├── screens/               # UI screens
+│   │   ├── chat_screen.dart   # Main chat interface
+│   │   ├── conversation_list_screen.dart
+│   │   ├── models_screen.dart # Model selection
+│   │   ├── projects_screen.dart
+│   │   └── settings_screen.dart
+│   ├── services/              # Business logic
+│   │   ├── chat_service.dart  # Chat management
+│   │   ├── ollama_service.dart # Ollama API client
+│   │   ├── storage_service.dart # Local persistence
+│   │   └── connection_service.dart
+│   ├── widgets/               # Reusable UI components
+│   └── utils/                 # Helper functions
+├── test/                      # Unit & widget tests
+├── android/                   # Android platform files
+├── docs/                      # Documentation
+└── pubspec.yaml               # Dependencies
 ```
 
 ## 📚 Documentation
 
-### Getting Started
-- **[GETTING_STARTED.md](GETTING_STARTED.md)** - Complete setup guide for first-time users ⭐
-- **[APP_CUSTOMIZATION.md](APP_CUSTOMIZATION.md)** - Comprehensive customization checklist & AI prompts ⭐
-- **[PREREQUISITES.md](PREREQUISITES.md)** - Installation requirements for all platforms
-
-### Development
-- [AI_PROMPTING_GUIDE.md](AI_PROMPTING_GUIDE.md) - AI agent best practices
-- [AGENTS.md](AGENTS.md) - AI agent configuration reference
-- [BUILD_OPTIMIZATION.md](BUILD_OPTIMIZATION.md) - Build performance details
-- [TESTING.md](TESTING.md) - Testing guide
-- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
-
-### Help
+### User Guides
+- **[GETTING_STARTED.md](GETTING_STARTED.md)** - Setup guide for first-time users ⭐
+- [PREREQUISITES.md](PREREQUISITES.md) - System requirements
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues and solutions
 
-### Prompts
-- `.github/prompts/icon-generation.prompt.md` - Icon generation guide
+### Technical Documentation
+- [docs/ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md) - Architecture overview
+- [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md) - Product vision and roadmap
+- [docs/UX_DESIGN.md](docs/UX_DESIGN.md) - Design decisions
+- [TESTING.md](TESTING.md) - Testing guide
 
-## 💡 Pro Tips
+### Development
+- [AGENTS.md](AGENTS.md) - AI agent configuration reference
+- [AI_PROMPTING_GUIDE.md](AI_PROMPTING_GUIDE.md) - AI agent best practices
+- [BUILD_OPTIMIZATION.md](BUILD_OPTIMIZATION.md) - Build performance details
+- [CONTRIBUTING.md](CONTRIBUTING.md) - How to contribute
+- [SIGNING.md](SIGNING.md) - App signing guide
 
-1. **Start with @product-owner** - Define clear requirements before coding
-2. **Use @experience-designer** - Plan UX before implementing screens
-3. **Let @researcher find packages** - Don't waste time searching pub.dev
-4. **@flutter-developer has terminal access** - Can run tests, format, build
-5. **Save documentation to docs/** - AI agents reference prior decisions
-6. **Use pre-release workflow** - Test builds before production releases
+## �️ Roadmap
 
-## 🎓 Learning Path
+### Current Version (1.0.0)
+- ✅ Connect to Ollama server
+- ✅ Chat with any Ollama model
+- ✅ Conversation management
+- ✅ Project workspaces
+- ✅ Vision model support (image input)
+- ✅ Export conversations
+- ✅ Connection settings
 
-### For Beginners
-1. Read [GETTING_STARTED.md](GETTING_STARTED.md)
-2. Follow the customization checklist
-3. Ask `@flutter-developer` questions as you learn
-4. Start with simple features
+### Planned Features
+- 🔄 Multi-server support
+- 📎 File attachments
+- 🎯 Custom agents/personas
+- 🔍 Advanced search
+- 📊 Conversation analytics
+- 🔗 Context chaining
+- 🌐 Network discovery
+- 📱 Tablet/landscape optimization
 
-### For Intermediate Developers
-1. Review [BUILD_OPTIMIZATION.md](BUILD_OPTIMIZATION.md) 
-2. Set up CI/CD workflows
-3. Use AI agents to accelerate development
-4. Implement advanced features with @architect guidance
+**See [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md) for full roadmap.**
 
-### For Teams
-1. Review [AGENTS.md](AGENTS.md) for agent roles
-2. Set up shared documentation in docs/
-3. Use @product-owner for requirement alignment
-4. Leverage @doc-writer for team documentation
+## 💡 Tips & Best Practices
 
-## Resources
+### For Users
+1. **Organize with Projects** - Group related conversations
+2. **Try Different Models** - Switch models for different tasks
+3. **Export Regularly** - Back up important conversations
+4. **Use Vision Models** - Share images for visual tasks
 
-- [Flutter Documentation](https://docs.flutter.dev/)
-- [Dart Language](https://dart.dev/)
-- [Flutter Packages](https://pub.dev/)
+### For Developers
+1. **Follow Architecture** - Review [ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md)
+2. **Use AI Agents** - Leverage GitHub Copilot agents for development
+3. **Write Tests** - Maintain test coverage
+4. **Document Changes** - Update docs when adding features
 
-## License
+## 🛠️ Technology Stack
+
+- **Framework**: Flutter 3.10.1+
+- **Language**: Dart 3.10.1+
+- **Platform**: Android (iOS support planned)
+- **State Management**: Manual state management (Riverpod planned)
+- **Storage**: shared_preferences (SQLite planned)
+- **HTTP Client**: http package
+- **Markdown**: flutter_markdown
+- **Image Picker**: image_picker
+- **File Picker**: file_picker
+
+## 🤝 Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Quick Start for Contributors
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Write/update tests
+5. Run tests: `flutter test`
+6. Commit changes (`git commit -m 'Add amazing feature'`)
+7. Push to branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
+
+## 📄 License
 
 MIT License - see [LICENSE](LICENSE)
+
+## 🙏 Acknowledgments
+
+- [Ollama](https://ollama.ai) - Local LLM runtime
+- Flutter team for the amazing framework
+- All contributors and users
+
+## 📞 Support
+
+- 🐛 [Report Issues](https://github.com/yourusername/private-chat-hub/issues)
+- 💬 [Discussions](https://github.com/yourusername/private-chat-hub/discussions)
+- 📧 Email: your-email@example.com
+
+---
+
+**Built with ❤️ for privacy-conscious AI enthusiasts**
