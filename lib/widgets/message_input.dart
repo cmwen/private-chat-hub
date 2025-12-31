@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:private_chat_hub/models/message.dart';
@@ -69,6 +72,16 @@ class _MessageInputState extends State<MessageInput> {
     });
   }
 
+  /// Supported text file extensions for context attachments.
+  static const List<String> _supportedTextExtensions = [
+    'txt', 'md', 'py', 'js', 'ts', 'java', 'kt', 'dart',
+    'json', 'yaml', 'yml', 'xml', 'html', 'css', 'c', 'cpp',
+    'h', 'hpp', 'cs', 'go', 'rb', 'php', 'swift', 'rs', 'sh',
+  ];
+
+  /// Maximum file size for text attachments (5 MB).
+  static const int _maxTextFileSize = 5 * 1024 * 1024;
+
   Future<void> _showAttachmentOptions() async {
     showModalBottomSheet(
       context: context,
@@ -79,6 +92,7 @@ class _MessageInputState extends State<MessageInput> {
             ListTile(
               leading: const Icon(Icons.photo_library),
               title: const Text('Photo from Gallery'),
+              subtitle: const Text('For vision models'),
               onTap: () {
                 Navigator.pop(sheetContext);
                 _pickImageFromGallery();
@@ -87,15 +101,146 @@ class _MessageInputState extends State<MessageInput> {
             ListTile(
               leading: const Icon(Icons.camera_alt),
               title: const Text('Take Photo'),
+              subtitle: const Text('For vision models'),
               onTap: () {
                 Navigator.pop(sheetContext);
                 _takePhoto();
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.insert_drive_file),
+              title: const Text('File'),
+              subtitle: const Text('Code, text, markdown files'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _pickFile();
               },
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _pickFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: _supportedTextExtensions,
+        allowMultiple: true,
+        withData: true,
+      );
+
+      if (result != null) {
+        for (final file in result.files) {
+          await _addFileAttachment(file);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to pick file: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _addFileAttachment(PlatformFile file) async {
+    // Validate file size
+    if (file.size > _maxTextFileSize) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${file.name} is too large (max 5 MB)'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Get file bytes
+    Uint8List? bytes = file.bytes;
+    if (bytes == null && file.path != null) {
+      bytes = await File(file.path!).readAsBytes();
+    }
+
+    if (bytes == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to read ${file.name}')),
+        );
+      }
+      return;
+    }
+
+    // Determine MIME type from extension
+    final extension = file.extension?.toLowerCase() ?? 'txt';
+    final mimeType = _getMimeType(extension);
+
+    setState(() {
+      _attachments.add(Attachment(
+        id: const Uuid().v4(),
+        name: file.name,
+        mimeType: mimeType,
+        data: bytes!,
+        size: bytes.length,
+      ));
+    });
+  }
+
+  String _getMimeType(String extension) {
+    switch (extension) {
+      case 'txt':
+        return 'text/plain';
+      case 'md':
+        return 'text/markdown';
+      case 'json':
+        return 'application/json';
+      case 'yaml':
+      case 'yml':
+        return 'text/yaml';
+      case 'xml':
+        return 'text/xml';
+      case 'html':
+        return 'text/html';
+      case 'css':
+        return 'text/css';
+      case 'py':
+        return 'text/x-python';
+      case 'js':
+      case 'ts':
+        return 'text/javascript';
+      case 'java':
+        return 'text/x-java';
+      case 'kt':
+        return 'text/x-kotlin';
+      case 'dart':
+        return 'text/x-dart';
+      case 'c':
+      case 'h':
+        return 'text/x-c';
+      case 'cpp':
+      case 'hpp':
+        return 'text/x-c++';
+      case 'cs':
+        return 'text/x-csharp';
+      case 'go':
+        return 'text/x-go';
+      case 'rb':
+        return 'text/x-ruby';
+      case 'php':
+        return 'text/x-php';
+      case 'swift':
+        return 'text/x-swift';
+      case 'rs':
+        return 'text/x-rust';
+      case 'sh':
+        return 'text/x-shellscript';
+      default:
+        return 'text/plain';
+    }
   }
 
   Future<void> _pickImageFromGallery() async {
@@ -265,6 +410,67 @@ class _AttachmentPreview extends StatelessWidget {
     required this.onRemove,
   });
 
+  IconData _getFileIcon() {
+    final ext = attachment.name.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'py':
+        return Icons.code;
+      case 'js':
+      case 'ts':
+      case 'dart':
+      case 'java':
+      case 'kt':
+      case 'c':
+      case 'cpp':
+      case 'h':
+      case 'cs':
+      case 'go':
+      case 'rb':
+      case 'php':
+      case 'swift':
+      case 'rs':
+        return Icons.code;
+      case 'json':
+      case 'yaml':
+      case 'yml':
+      case 'xml':
+        return Icons.data_object;
+      case 'md':
+        return Icons.article;
+      case 'txt':
+        return Icons.description;
+      case 'html':
+      case 'css':
+        return Icons.web;
+      case 'sh':
+        return Icons.terminal;
+      default:
+        return Icons.insert_drive_file;
+    }
+  }
+
+  Color _getFileColor() {
+    final ext = attachment.name.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'py':
+        return Colors.blue;
+      case 'js':
+      case 'ts':
+        return Colors.yellow.shade700;
+      case 'dart':
+        return Colors.teal;
+      case 'java':
+      case 'kt':
+        return Colors.orange;
+      case 'json':
+        return Colors.green;
+      case 'md':
+        return Colors.purple;
+      default:
+        return Colors.grey.shade600;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -286,16 +492,25 @@ class _AttachmentPreview extends StatelessWidget {
                     width: 80,
                     height: 80,
                     color: Colors.grey[200],
+                    padding: const EdgeInsets.all(4),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.insert_drive_file),
+                        Icon(_getFileIcon(), color: _getFileColor(), size: 24),
                         const SizedBox(height: 4),
                         Text(
                           attachment.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 10),
+                          style: const TextStyle(fontSize: 9),
+                          textAlign: TextAlign.center,
+                        ),
+                        Text(
+                          attachment.formattedSize,
+                          style: TextStyle(
+                            fontSize: 8,
+                            color: Colors.grey[600],
+                          ),
                         ),
                       ],
                     ),

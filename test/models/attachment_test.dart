@@ -187,4 +187,168 @@ void main() {
       expect(copy.attachments.length, 2);
     });
   });
+
+  group('Text file attachments', () {
+    test('should identify text file attachments', () {
+      final textData = Uint8List.fromList('Hello World'.codeUnits);
+      final attachment = Attachment(
+        id: 'att-txt',
+        name: 'hello.txt',
+        mimeType: 'text/plain',
+        data: textData,
+        size: textData.length,
+      );
+
+      expect(attachment.isImage, false);
+      expect(attachment.isTextFile, true);
+      expect(attachment.textContent, 'Hello World');
+    });
+
+    test('should identify code file attachments', () {
+      final codeData = Uint8List.fromList('print("Hello")'.codeUnits);
+      final attachment = Attachment(
+        id: 'att-py',
+        name: 'script.py',
+        mimeType: 'text/x-python',
+        data: codeData,
+        size: codeData.length,
+      );
+
+      expect(attachment.isImage, false);
+      expect(attachment.isTextFile, true);
+      expect(attachment.textContent, 'print("Hello")');
+    });
+
+    test('should identify JSON file as text file', () {
+      final jsonData = Uint8List.fromList('{"key": "value"}'.codeUnits);
+      final attachment = Attachment(
+        id: 'att-json',
+        name: 'data.json',
+        mimeType: 'application/json',
+        data: jsonData,
+        size: jsonData.length,
+      );
+
+      expect(attachment.isImage, false);
+      expect(attachment.isTextFile, true);
+      expect(attachment.textContent, '{"key": "value"}');
+    });
+
+    test('should identify markdown files as text files', () {
+      final mdData = Uint8List.fromList('# Header\n\nContent'.codeUnits);
+      final attachment = Attachment(
+        id: 'att-md',
+        name: 'readme.md',
+        mimeType: 'text/markdown',
+        data: mdData,
+        size: mdData.length,
+      );
+
+      expect(attachment.isTextFile, true);
+      expect(attachment.textContent, '# Header\n\nContent');
+    });
+
+    test('should not identify binary files as text files', () {
+      final binaryData = Uint8List.fromList([0x89, 0x50, 0x4E, 0x47]); // PNG magic
+      final attachment = Attachment(
+        id: 'att-bin',
+        name: 'image.png',
+        mimeType: 'image/png',
+        data: binaryData,
+        size: binaryData.length,
+      );
+
+      expect(attachment.isImage, true);
+      expect(attachment.isTextFile, false);
+    });
+
+    test('should create message with text file attachments', () {
+      final textData = Uint8List.fromList('def main():\n    pass'.codeUnits);
+      final attachment = Attachment(
+        id: 'att-py',
+        name: 'main.py',
+        mimeType: 'text/x-python',
+        data: textData,
+        size: textData.length,
+      );
+
+      final message = Message.user(
+        id: 'msg-file',
+        text: 'Review this code',
+        timestamp: DateTime.now(),
+        attachments: [attachment],
+      );
+
+      expect(message.hasTextFiles, true);
+      expect(message.textFiles.length, 1);
+      expect(message.hasImages, false);
+    });
+
+    test('should include text file content in Ollama message', () {
+      final codeContent = 'def hello():\n    print("Hello")';
+      final textData = Uint8List.fromList(codeContent.codeUnits);
+      final attachment = Attachment(
+        id: 'att-py',
+        name: 'hello.py',
+        mimeType: 'text/x-python',
+        data: textData,
+        size: textData.length,
+      );
+
+      final message = Message.user(
+        id: 'msg-code',
+        text: 'What does this code do?',
+        timestamp: DateTime.now(),
+        attachments: [attachment],
+      );
+
+      final ollamaMessage = message.toOllamaMessage();
+
+      expect(ollamaMessage['role'], 'user');
+      // Content should include the file content
+      expect(ollamaMessage['content'], contains('What does this code do?'));
+      expect(ollamaMessage['content'], contains('hello.py'));
+      expect(ollamaMessage['content'], contains('def hello()'));
+      expect(ollamaMessage['content'], contains('print("Hello")'));
+      // Should NOT have images array for text files
+      expect(ollamaMessage['images'], isNull);
+    });
+
+    test('should handle mixed image and text file attachments', () {
+      final imageData = Uint8List.fromList([0xFF, 0xD8, 0xFF]);
+      final imageAttachment = Attachment(
+        id: 'att-img',
+        name: 'screenshot.jpg',
+        mimeType: 'image/jpeg',
+        data: imageData,
+        size: imageData.length,
+      );
+
+      final textData = Uint8List.fromList('# README'.codeUnits);
+      final textAttachment = Attachment(
+        id: 'att-md',
+        name: 'README.md',
+        mimeType: 'text/markdown',
+        data: textData,
+        size: textData.length,
+      );
+
+      final message = Message.user(
+        id: 'msg-mixed',
+        text: 'Check both',
+        timestamp: DateTime.now(),
+        attachments: [imageAttachment, textAttachment],
+      );
+
+      expect(message.hasImages, true);
+      expect(message.hasTextFiles, true);
+      expect(message.images.length, 1);
+      expect(message.textFiles.length, 1);
+
+      final ollamaMessage = message.toOllamaMessage();
+      expect(ollamaMessage['images'], isNotNull);
+      expect(ollamaMessage['content'], contains('README.md'));
+      expect(ollamaMessage['content'], contains('# README'));
+    });
+  });
 }

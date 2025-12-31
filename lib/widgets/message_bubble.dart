@@ -68,6 +68,8 @@ class MessageBubble extends StatelessWidget {
                   children: [
                     // Display image attachments if present
                     if (message.hasImages) _buildImageAttachments(context),
+                    // Display text file attachments if present
+                    if (message.hasTextFiles) _buildFileAttachments(context),
                     Text(
                       message.text,
                       style: TextStyle(
@@ -120,6 +122,172 @@ class MessageBubble extends StatelessWidget {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildFileAttachments(BuildContext context) {
+    final files = message.textFiles;
+    if (files.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: files.map((attachment) {
+          return GestureDetector(
+            onTap: () => _showFileContent(context, attachment),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: message.isMe
+                    ? Colors.white.withValues(alpha: 0.2)
+                    : Colors.grey.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _getFileIcon(attachment.name),
+                    size: 16,
+                    color: message.isMe ? Colors.white : Colors.grey[700],
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          attachment.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: message.isMe ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                        Text(
+                          attachment.formattedSize,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: message.isMe ? Colors.white70 : Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  IconData _getFileIcon(String fileName) {
+    final ext = fileName.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'py':
+      case 'js':
+      case 'ts':
+      case 'dart':
+      case 'java':
+      case 'kt':
+      case 'c':
+      case 'cpp':
+      case 'h':
+      case 'cs':
+      case 'go':
+      case 'rb':
+      case 'php':
+      case 'swift':
+      case 'rs':
+        return Icons.code;
+      case 'json':
+      case 'yaml':
+      case 'yml':
+      case 'xml':
+        return Icons.data_object;
+      case 'md':
+        return Icons.article;
+      case 'txt':
+        return Icons.description;
+      case 'html':
+      case 'css':
+        return Icons.web;
+      case 'sh':
+        return Icons.terminal;
+      default:
+        return Icons.insert_drive_file;
+    }
+  }
+
+  void _showFileContent(BuildContext context, Attachment attachment) {
+    final content = attachment.textContent ?? 'Unable to read file content';
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.3,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (_, scrollController) => Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(_getFileIcon(attachment.name)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      attachment.name,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(sheetContext),
+                  ),
+                ],
+              ),
+              Text(
+                attachment.formattedSize,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+              const Divider(height: 24),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: SelectableText(
+                      content,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

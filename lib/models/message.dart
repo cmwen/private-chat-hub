@@ -27,6 +27,22 @@ class Attachment {
   /// Whether this is an image attachment.
   bool get isImage => mimeType.startsWith('image/');
 
+  /// Whether this attachment is a text file.
+  bool get isTextFile => !isImage && (
+    mimeType.startsWith('text/') ||
+    mimeType == 'application/json'
+  );
+
+  /// Gets the text content of this attachment (if it's a text file).
+  String? get textContent {
+    if (!isTextFile) return null;
+    try {
+      return utf8.decode(data);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Creates an Attachment from JSON.
   factory Attachment.fromJson(Map<String, dynamic> json) {
     return Attachment(
@@ -84,8 +100,14 @@ class Message {
   /// Whether this message has image attachments.
   bool get hasImages => attachments.any((a) => a.isImage);
 
+  /// Whether this message has text file attachments.
+  bool get hasTextFiles => attachments.any((a) => a.isTextFile);
+
   /// Gets all image attachments.
   List<Attachment> get images => attachments.where((a) => a.isImage).toList();
+
+  /// Gets all text file attachments.
+  List<Attachment> get textFiles => attachments.where((a) => a.isTextFile).toList();
 
   /// Creates a user message.
   factory Message.user({
@@ -191,9 +213,28 @@ class Message {
 
   /// Converts to Ollama API message format.
   Map<String, dynamic> toOllamaMessage() {
+    // Build content with text files included
+    var content = text;
+    
+    // Append text file contents to the message
+    if (hasTextFiles) {
+      final buffer = StringBuffer(text);
+      for (final file in textFiles) {
+        final fileContent = file.textContent;
+        if (fileContent != null) {
+          buffer.writeln();
+          buffer.writeln();
+          buffer.writeln('--- File: ${file.name} ---');
+          buffer.writeln(fileContent);
+          buffer.writeln('--- End of ${file.name} ---');
+        }
+      }
+      content = buffer.toString();
+    }
+    
     final msg = <String, dynamic>{
       'role': role.name,
-      'content': text,
+      'content': content,
     };
     
     // Add images for vision models
