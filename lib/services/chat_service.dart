@@ -2,22 +2,36 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
+import 'package:private_chat_hub/models/tool.dart';
 import 'package:private_chat_hub/services/ollama_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
+import 'package:private_chat_hub/services/web_search_service.dart';
 import 'package:uuid/uuid.dart';
 
 /// Service for managing chat conversations and sending messages to Ollama.
 class ChatService {
   final OllamaService _ollama;
   final StorageService _storage;
+  final WebSearchService _webSearch;
   static const String _conversationsKey = 'conversations';
   static const String _currentConversationKey = 'current_conversation_id';
+  static const String _webSearchEnabledKey = 'web_search_enabled';
   
   // Track active message generation streams
   final Map<String, StreamController<Conversation>> _activeStreams = {};
   final Map<String, StreamSubscription> _activeSubscriptions = {};
 
-  ChatService(this._ollama, this._storage);
+  ChatService(this._ollama, this._storage, this._webSearch);
+
+  /// Gets whether web search is enabled.
+  bool getWebSearchEnabled() {
+    return _storage.getBool(_webSearchEnabledKey) ?? true; // Enabled by default
+  }
+
+  /// Sets whether web search is enabled.
+  Future<void> setWebSearchEnabled(bool enabled) async {
+    await _storage.setBool(_webSearchEnabledKey, enabled);
+  }
 
   /// Gets all saved conversations.
   List<Conversation> getConversations({String? projectId, bool excludeProjectConversations = false}) {
@@ -296,21 +310,54 @@ class ChatService {
         }
       }
 
-      // Stream the response with model parameters
+      // Prepare tools if web search is enabled
+      final tools = getWebSearchEnabled() ? [WebSearchTool().toOllamaFormat()] : null;
+
+      // Stream the response with model parameters and tools
       final buffer = StringBuffer();
+      final toolCallsBuffer = <ToolCall>[];
+      
       final subscription = _ollama.sendChatStream(
         model: conversation.modelName,
         messages: ollamaMessages,
         options: conversation.parameters.toOllamaOptions(),
+        tools: tools,
       ).listen(
-        (chunk) async {
+        (data) async {
           if (streamController.isClosed) return;
           
-          buffer.write(chunk);
+          final message = data['message'] as Map<String, dynamic>?;
+          if (message == null) return;
+          
+          // Handle regular content
+          final content = message['content'] as String?;
+          if (content != null && content.isNotEmpty) {
+            buffer.write(content);
+          }
+          
+          // Handle tool calls
+          final toolCallsData = message['tool_calls'] as List<dynamic>?;
+          if (toolCallsData != null) {
+            for (final tcData in toolCallsData) {
+              if (tcData is Map<String, dynamic>) {
+                final id = tcData['id'] as String? ?? '';
+                final function = tcData['function'] as Map<String, dynamic>?;
+                if (function != null) {
+                  final name = function['name'] as String? ?? '';
+                  final args = function['arguments'] as Map<String, dynamic>? ?? {};
+                  
+                  if (id.isNotEmpty && name.isNotEmpty) {
+                    toolCallsBuffer.add(ToolCall(id: id, name: name, arguments: args));
+                  }
+                }
+              }
+            }
+          }
           
           // Update the assistant message with accumulated text
           assistantMessage = assistantMessage.copyWith(
             text: buffer.toString(),
+            toolCalls: toolCallsBuffer.isNotEmpty ? toolCallsBuffer : null,
           );
 
           // Update the conversation with the updated message
@@ -362,23 +409,36 @@ class ChatService {
           
           // Mark streaming as complete
           assistantMessage = assistantMessage.copyWith(isStreaming: false);
-          final finalMessages = conversation.messages.map((m) {
-            if (m.id == assistantMessageId) return assistantMessage;
-            return m;
-          }).toList();
+          
+          // Check if we have tool calls to execute
+          if (assistantMessage.hasToolCalls) {
+            // Execute tool calls
+            await _executeToolCalls(
+              conversationId,
+              conversation,
+              assistantMessage,
+              streamController,
+            );
+          } else {
+            // No tool calls, just finalize the message
+            final finalMessages = conversation.messages.map((m) {
+              if (m.id == assistantMessageId) return assistantMessage;
+              return m;
+            }).toList();
 
-          conversation = conversation.copyWith(
-            messages: finalMessages,
-            updatedAt: DateTime.now(),
-          );
-          await updateConversation(conversation);
-          
-          if (!streamController.isClosed) {
-            streamController.add(conversation);
+            conversation = conversation.copyWith(
+              messages: finalMessages,
+              updatedAt: DateTime.now(),
+            );
+            await updateConversation(conversation);
+            
+            if (!streamController.isClosed) {
+              streamController.add(conversation);
+            }
+            
+            _cleanupStream(conversationId);
+            await streamController.close();
           }
-          
-          _cleanupStream(conversationId);
-          await streamController.close();
         },
         cancelOnError: true,
       );
@@ -404,6 +464,117 @@ class ChatService {
         messages: errorMessages,
         updatedAt: DateTime.now(),
       );
+      await updateConversation(conversation);
+      
+      if (!streamController.isClosed) {
+        streamController.add(conversation);
+      }
+      
+      _cleanupStream(conversationId);
+      await streamController.close();
+    }
+  }
+
+  /// Executes tool calls and continues the conversation
+  Future<void> _executeToolCalls(
+    String conversationId,
+    Conversation conversation,
+    Message assistantMessage,
+    StreamController<Conversation> streamController,
+  ) async {
+    if (!assistantMessage.hasToolCalls) return;
+    
+    try {
+      // Update conversation with the assistant message containing tool calls
+      var updatedMessages = conversation.messages.map((m) {
+        if (m.id == assistantMessage.id) return assistantMessage;
+        return m;
+      }).toList();
+      
+      conversation = conversation.copyWith(
+        messages: updatedMessages,
+        updatedAt: DateTime.now(),
+      );
+      await updateConversation(conversation);
+      
+      if (!streamController.isClosed) {
+        streamController.add(conversation);
+      }
+      
+      // Execute each tool call
+      for (final toolCall in assistantMessage.toolCalls!) {
+        if (toolCall.name == 'web_search') {
+          final query = toolCall.arguments['query'] as String?;
+          if (query != null && query.isNotEmpty) {
+            // Perform web search
+            try {
+              final searchResults = await _webSearch.search(query);
+              
+              // Add tool result message
+              final toolResultMessage = Message.toolResult(
+                id: const Uuid().v4(),
+                toolCallId: toolCall.id,
+                content: searchResults,
+                timestamp: DateTime.now(),
+              );
+              
+              conversation = await addMessage(conversationId, toolResultMessage);
+              
+              if (!streamController.isClosed) {
+                streamController.add(conversation);
+              }
+            } catch (e) {
+              // Add error result
+              final errorResult = Message.toolResult(
+                id: const Uuid().v4(),
+                toolCallId: toolCall.id,
+                content: 'Error performing web search: $e',
+                timestamp: DateTime.now(),
+              );
+              
+              conversation = await addMessage(conversationId, errorResult);
+              
+              if (!streamController.isClosed) {
+                streamController.add(conversation);
+              }
+            }
+          }
+        }
+      }
+      
+      // Continue the conversation with tool results
+      final newAssistantMessageId = const Uuid().v4();
+      final newAssistantMessage = Message.assistant(
+        id: newAssistantMessageId,
+        text: '',
+        timestamp: DateTime.now(),
+        isStreaming: true,
+      );
+      
+      conversation = await addMessage(conversationId, newAssistantMessage);
+      
+      if (!streamController.isClosed) {
+        streamController.add(conversation);
+      }
+      
+      // Recursively generate the next response with tool results
+      await _generateMessageInBackground(
+        conversationId,
+        conversation,
+        newAssistantMessageId,
+        streamController,
+      );
+      
+    } catch (e) {
+      if (streamController.isClosed) return;
+      
+      final errorMessage = Message.error(
+        id: const Uuid().v4(),
+        errorMessage: 'Error executing tools: $e',
+        timestamp: DateTime.now(),
+      );
+      
+      conversation = await addMessage(conversationId, errorMessage);
       await updateConversation(conversation);
       
       if (!streamController.isClosed) {

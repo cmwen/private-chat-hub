@@ -6,6 +6,7 @@ A privacy-first Android app for chatting with self-hosted AI models via Ollama. 
 
 - 🔒 **Privacy First**: All conversations stay on your devices and infrastructure
 - 🤖 **Multiple AI Models**: Connect to any Ollama model (Llama, Mistral, Gemma, etc.)
+- 🔍 **Web Search**: LLMs can search the internet for current information (tool calling)
 - 💬 **Conversation Management**: Organize chats, view history, export conversations
 - 📁 **Project Workspaces**: Group related conversations by topic or context
 - 🖼️ **Vision Support**: Share images with vision-capable models
@@ -186,6 +187,7 @@ git tag v1.0.0 && git push --tags
 
 ### User Guides
 - **[GETTING_STARTED.md](GETTING_STARTED.md)** - Setup guide for first-time users ⭐
+- **[WEB_SEARCH_FEATURE.md](WEB_SEARCH_FEATURE.md)** - Web search and tool calling guide 🔍
 - [PREREQUISITES.md](PREREQUISITES.md) - System requirements
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues and solutions
 

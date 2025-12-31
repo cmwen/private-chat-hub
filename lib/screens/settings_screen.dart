@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:private_chat_hub/models/connection.dart';
+import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/network_discovery_service.dart';
 import 'package:private_chat_hub/services/ollama_service.dart';
@@ -8,11 +9,13 @@ import 'package:private_chat_hub/services/ollama_service.dart';
 class SettingsScreen extends StatefulWidget {
   final ConnectionService connectionService;
   final OllamaService ollamaService;
+  final ChatService? chatService;
 
   const SettingsScreen({
     super.key,
     required this.connectionService,
     required this.ollamaService,
+    this.chatService,
   });
 
   @override
@@ -200,6 +203,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 const SizedBox(height: 32),
                 const Divider(),
+                if (widget.chatService != null) ...[
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'AI Features',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  SwitchListTile(
+                    secondary: const Icon(Icons.search),
+                    title: const Text('Web Search'),
+                    subtitle: const Text(
+                      'Allow AI to search the internet for current information',
+                    ),
+                    value: widget.chatService!.getWebSearchEnabled(),
+                    onChanged: (value) {
+                      setState(() {
+                        widget.chatService!.setWebSearchEnabled(value);
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            value
+                                ? 'Web search enabled'
+                                : 'Web search disabled',
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(),
+                ],
                 ListTile(
                   leading: const Icon(Icons.info_outline),
                   title: const Text('About'),

@@ -193,21 +193,26 @@ class OllamaService {
   /// Sends a chat message and returns the complete response.
   ///
   /// Use [sendChatStream] for streaming responses.
+  /// Supports tool calling when [tools] is provided.
   Future<String> sendChat({
     required String model,
     required List<Map<String, dynamic>> messages,
     Map<String, dynamic>? options,
+    List<Map<String, dynamic>>? tools,
   }) async {
     try {
+      final body = {
+        'model': model,
+        'messages': messages,
+        'stream': false,
+        if (options != null) 'options': options,
+        if (tools != null && tools.isNotEmpty) 'tools': tools,
+      };
+      
       final response = await _client.post(
         Uri.parse('$_baseUrl/api/chat'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'model': model,
-          'messages': messages,
-          'stream': false,
-          if (options != null) 'options': options,
-        }),
+        body: jsonEncode(body),
       );
 
       if (response.statusCode == 200) {
@@ -226,20 +231,26 @@ class OllamaService {
   ///
   /// Each chunk contains partial content that should be appended
   /// to build the complete response.
-  Stream<String> sendChatStream({
+  /// Supports tool calling when [tools] is provided.
+  Stream<Map<String, dynamic>> sendChatStream({
     required String model,
     required List<Map<String, dynamic>> messages,
     Map<String, dynamic>? options,
+    List<Map<String, dynamic>>? tools,
   }) async* {
     try {
       final request = http.Request('POST', Uri.parse('$_baseUrl/api/chat'));
       request.headers['Content-Type'] = 'application/json';
-      request.body = jsonEncode({
+      
+      final body = {
         'model': model,
         'messages': messages,
         'stream': true,
         if (options != null) 'options': options,
-      });
+        if (tools != null && tools.isNotEmpty) 'tools': tools,
+      };
+      
+      request.body = jsonEncode(body);
 
       final streamedResponse = await _client.send(request);
 
@@ -255,12 +266,7 @@ class OllamaService {
         for (final line in lines) {
           try {
             final data = jsonDecode(line) as Map<String, dynamic>;
-            final message = data['message'] as Map<String, dynamic>?;
-            final content = message?['content'] as String?;
-
-            if (content != null && content.isNotEmpty) {
-              yield content;
-            }
+            yield data;
 
             // Check if this is the final message
             if (data['done'] == true) {

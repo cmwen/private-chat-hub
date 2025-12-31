@@ -10,6 +10,7 @@ import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/ollama_service.dart';
 import 'package:private_chat_hub/services/project_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
+import 'package:private_chat_hub/services/web_search_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,6 +54,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late final OllamaService _ollamaService;
   late final ConnectionService _connectionService;
+  late final WebSearchService _webSearchService;
   late final ChatService _chatService;
   late final ProjectService _projectService;
 
@@ -64,7 +66,8 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _ollamaService = OllamaService();
     _connectionService = ConnectionService(widget.storageService);
-    _chatService = ChatService(_ollamaService, widget.storageService);
+    _webSearchService = WebSearchService();
+    _chatService = ChatService(_ollamaService, widget.storageService, _webSearchService);
     _projectService = ProjectService(widget.storageService);
 
     // Set up Ollama connection if one exists
@@ -85,6 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _ollamaService.dispose();
+    _webSearchService.dispose();
     super.dispose();
   }
 
@@ -138,6 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
           SettingsScreen(
             connectionService: _connectionService,
             ollamaService: _ollamaService,
+            chatService: _chatService,
           ),
         ],
       ),
