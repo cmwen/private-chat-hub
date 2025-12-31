@@ -1014,38 +1014,15 @@ class _ChatScreenState extends State<ChatScreen> {
     
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Edit Message'),
-        content: TextField(
-          controller: controller,
-          maxLines: 5,
-          decoration: const InputDecoration(
-            hintText: 'Edit your message...',
-            border: OutlineInputBorder(),
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              controller.dispose();
-            },
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              final newText = controller.text.trim();
-              if (newText.isNotEmpty && newText != message.text) {
-                // Send as a new message (preserving history)
-                _handleSendMessage(newText);
-              }
-              controller.dispose();
-            },
-            child: const Text('Send'),
-          ),
-        ],
+      builder: (dialogContext) => _EditMessageDialog(
+        controller: controller,
+        message: message,
+        onSend: (newText) {
+          if (newText.isNotEmpty && newText != message.text) {
+            // Send as a new message (preserving history)
+            _handleSendMessage(newText);
+          }
+        },
       ),
     );
   }
@@ -1427,6 +1404,63 @@ class _ParameterSlider extends StatelessWidget {
         Text(
           description,
           style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+        ),
+      ],
+    );
+  }
+}
+
+/// Dialog for editing a message before resending.
+class _EditMessageDialog extends StatefulWidget {
+  final TextEditingController controller;
+  final Message message;
+  final Function(String) onSend;
+
+  const _EditMessageDialog({
+    required this.controller,
+    required this.message,
+    required this.onSend,
+  });
+
+  @override
+  State<_EditMessageDialog> createState() => _EditMessageDialogState();
+}
+
+class _EditMessageDialogState extends State<_EditMessageDialog> {
+  @override
+  void dispose() {
+    // Properly dispose the controller when dialog is disposed
+    widget.controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit Message'),
+      content: TextField(
+        controller: widget.controller,
+        maxLines: 5,
+        decoration: const InputDecoration(
+          hintText: 'Edit your message...',
+          border: OutlineInputBorder(),
+        ),
+        autofocus: true,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final newText = widget.controller.text.trim();
+            Navigator.pop(context);
+            widget.onSend(newText);
+          },
+          child: const Text('Send'),
         ),
       ],
     );
