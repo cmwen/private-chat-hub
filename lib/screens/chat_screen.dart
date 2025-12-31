@@ -51,14 +51,65 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    // Don't cancel the stream - let it continue in the background
     _streamSubscription?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Check if there's an active stream we can reconnect to
+    if (widget.chatService != null && _conversation != null) {
+      final activeStream = widget.chatService!.getActiveStream(_conversation!.id);
+      if (activeStream != null && _streamSubscription == null) {
+        // Reconnect to the active stream
+        _reconnectToActiveStream();
+      }
+    }
+  }
+
+  void _reconnectToActiveStream() {
+    if (widget.chatService == null || _conversation == null) return;
+    
+    final activeStream = widget.chatService!.getActiveStream(_conversation!.id);
+    if (activeStream != null) {
+      setState(() => _isLoading = true);
+      _streamSubscription = activeStream.listen(
+        (updatedConversation) {
+          if (!mounted) return;
+          setState(() {
+            _conversation = updatedConversation;
+            _messages = List.from(updatedConversation.messages);
+          });
+          _scrollToBottom();
+        },
+        onError: (error) {
+          if (!mounted) return;
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $error'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        },
+        onDone: () {
+          if (!mounted) return;
+          setState(() => _isLoading = false);
+        },
+      );
+    }
   }
 
   void _loadMessages() {
     if (_conversation != null) {
       setState(() {
         _messages = List.from(_conversation!.messages);
+        // Check if there's an active generation
+        if (widget.chatService != null) {
+          _isLoading = widget.chatService!.isGenerating(_conversation!.id);
+        }
       });
       _scrollToBottom();
     } else {
@@ -101,14 +152,16 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Cancel any existing stream
+      // Cancel existing subscription (but not the underlying stream)
       await _streamSubscription?.cancel();
+      _streamSubscription = null;
 
       // Start streaming response
       _streamSubscription = widget.chatService!
           .sendMessage(_conversation!.id, text)
           .listen(
         (updatedConversation) {
+          if (!mounted) return;
           setState(() {
             _conversation = updatedConversation;
             _messages = List.from(updatedConversation.messages);
@@ -116,8 +169,8 @@ class _ChatScreenState extends State<ChatScreen> {
           _scrollToBottom();
         },
         onError: (error) {
-          setState(() => _isLoading = false);
           if (!mounted) return;
+          setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error: $error'),
@@ -126,12 +179,13 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         },
         onDone: () {
+          if (!mounted) return;
           setState(() => _isLoading = false);
         },
       );
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
@@ -149,6 +203,7 @@ class _ChatScreenState extends State<ChatScreen> {
       timestamp: DateTime.now(),
     );
 
+    if (!mounted) return;
     setState(() {
       _messages.add(userMessage);
     });
@@ -156,6 +211,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // Simulate AI response
     Future.delayed(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
       final aiMessage = Message.assistant(
         id: (DateTime.now().millisecondsSinceEpoch + 1).toString(),
         text: _getDemoResponse(text),
@@ -214,6 +270,7 @@ class _ChatScreenState extends State<ChatScreen> {
       attachments: attachments,
     );
 
+    if (!mounted) return;
     setState(() {
       _messages.add(userMessage);
     });
@@ -221,6 +278,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // Simulate AI response
     Future.delayed(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
       String response;
       if (attachments.any((a) => a.isImage)) {
         response = 'I can see you\'ve attached ${attachments.length} image(s). '
@@ -247,7 +305,9 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Cancel existing subscription (but not the underlying stream)
       await _streamSubscription?.cancel();
+      _streamSubscription = null;
 
       // Create user message with attachments
       final userMessage = Message.user(
@@ -259,6 +319,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       // Add user message to conversation
       var conversation = await widget.chatService!.addMessage(_conversation!.id, userMessage);
+      if (!mounted) return;
       setState(() {
         _conversation = conversation;
         _messages = List.from(conversation.messages);
@@ -270,6 +331,7 @@ class _ChatScreenState extends State<ChatScreen> {
           .sendMessageWithContext(_conversation!.id)
           .listen(
         (updatedConversation) {
+          if (!mounted) return;
           setState(() {
             _conversation = updatedConversation;
             _messages = List.from(updatedConversation.messages);
@@ -277,8 +339,8 @@ class _ChatScreenState extends State<ChatScreen> {
           _scrollToBottom();
         },
         onError: (error) {
-          setState(() => _isLoading = false);
           if (!mounted) return;
+          setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error: $error'),
@@ -287,12 +349,13 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         },
         onDone: () {
+          if (!mounted) return;
           setState(() => _isLoading = false);
         },
       );
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
@@ -731,6 +794,19 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
+          if (_isLoading && widget.chatService != null && _conversation != null)
+            IconButton(
+              icon: const Icon(Icons.stop_circle_outlined),
+              onPressed: () async {
+                await widget.chatService!.cancelMessageGeneration(_conversation!.id);
+                if (!mounted) return;
+                setState(() {
+                  _isLoading = false;
+                  _loadMessages(); // Reload to show the cancelled state
+                });
+              },
+              tooltip: 'Cancel generation',
+            ),
           if (_conversation != null)
             IconButton(
               icon: const Icon(Icons.info_outline),
@@ -865,8 +941,10 @@ class _ChatScreenState extends State<ChatScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
+              if (!mounted) return;
               if (_conversation != null && widget.chatService != null) {
                 await widget.chatService!.clearConversation(_conversation!.id);
+                if (!mounted) return;
                 _conversation = widget.chatService!.getConversation(_conversation!.id);
                 _loadMessages();
               } else {
@@ -907,6 +985,7 @@ class _ChatScreenState extends State<ChatScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(dialogContext);
+              if (!mounted) return;
               setState(() {
                 _messages.removeWhere((m) => m.id == message.id);
               });

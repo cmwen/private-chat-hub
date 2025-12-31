@@ -3,10 +3,12 @@ import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/screens/chat_screen.dart';
 import 'package:private_chat_hub/screens/conversation_list_screen.dart';
 import 'package:private_chat_hub/screens/models_screen.dart';
+import 'package:private_chat_hub/screens/projects_screen.dart';
 import 'package:private_chat_hub/screens/settings_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/ollama_service.dart';
+import 'package:private_chat_hub/services/project_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 
 void main() async {
@@ -52,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final OllamaService _ollamaService;
   late final ConnectionService _connectionService;
   late final ChatService _chatService;
+  late final ProjectService _projectService;
 
   int _currentIndex = 0;
   Conversation? _selectedConversation;
@@ -62,6 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _ollamaService = OllamaService();
     _connectionService = ConnectionService(widget.storageService);
     _chatService = ChatService(_ollamaService, widget.storageService);
+    _projectService = ProjectService(widget.storageService);
 
     // Set up Ollama connection if one exists
     _setupConnection();
@@ -120,6 +124,13 @@ class _HomeScreenState extends State<HomeScreen> {
             onConversationSelected: _onConversationSelected,
             onNewConversation: () {},
           ),
+          ProjectsScreen(
+            projectService: _projectService,
+            chatService: _chatService,
+            connectionService: _connectionService,
+            ollamaService: _ollamaService,
+            onConversationSelected: _onConversationSelected,
+          ),
           ModelsScreen(
             ollamaService: _ollamaService,
             connectionService: _connectionService,
@@ -137,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _currentIndex = index;
           });
           // Refresh connection when switching tabs
-          if (index == 0 || index == 1) {
+          if (index == 0 || index == 1 || index == 2) {
             _setupConnection();
           }
         },
@@ -146,6 +157,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.chat_bubble_outline),
             selectedIcon: Icon(Icons.chat_bubble),
             label: 'Chats',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.folder_outlined),
+            selectedIcon: Icon(Icons.folder),
+            label: 'Projects',
           ),
           NavigationDestination(
             icon: Icon(Icons.psychology_outlined),

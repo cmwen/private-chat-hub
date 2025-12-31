@@ -12,19 +12,31 @@ class ChatService {
   final StorageService _storage;
   static const String _conversationsKey = 'conversations';
   static const String _currentConversationKey = 'current_conversation_id';
+  
+  // Track active message generation streams
+  final Map<String, StreamController<Conversation>> _activeStreams = {};
+  final Map<String, StreamSubscription> _activeSubscriptions = {};
 
   ChatService(this._ollama, this._storage);
 
   /// Gets all saved conversations.
-  List<Conversation> getConversations() {
+  List<Conversation> getConversations({String? projectId, bool excludeProjectConversations = false}) {
     final jsonString = _storage.getString(_conversationsKey);
     if (jsonString == null) return [];
 
     try {
       final List<dynamic> jsonList = jsonDecode(jsonString);
-      final conversations = jsonList
+      var conversations = jsonList
           .map((json) => Conversation.fromJson(json as Map<String, dynamic>))
           .toList();
+      
+      // Filter by project if specified
+      if (projectId != null) {
+        conversations = conversations.where((c) => c.projectId == projectId).toList();
+      } else if (excludeProjectConversations) {
+        // Only show standalone conversations (not in any project)
+        conversations = conversations.where((c) => c.projectId == null).toList();
+      }
       
       // Sort by updated date, most recent first
       conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
@@ -32,6 +44,16 @@ class ChatService {
     } catch (e) {
       return [];
     }
+  }
+
+  /// Gets conversations for a specific project.
+  List<Conversation> getProjectConversations(String projectId) {
+    return getConversations(projectId: projectId);
+  }
+
+  /// Gets the count of conversations in a project.
+  int getProjectConversationCount(String projectId) {
+    return getProjectConversations(projectId).length;
   }
 
   /// Saves conversations to storage.
@@ -46,6 +68,7 @@ class ChatService {
     required String modelName,
     String? title,
     String? systemPrompt,
+    String? projectId,
   }) async {
     final conversation = Conversation(
       id: const Uuid().v4(),
@@ -54,6 +77,7 @@ class ChatService {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
       systemPrompt: systemPrompt,
+      projectId: projectId,
     );
 
     final conversations = getConversations();
@@ -62,6 +86,28 @@ class ChatService {
     await setCurrentConversation(conversation.id);
 
     return conversation;
+  }
+
+  /// Deletes all conversations in a project.
+  Future<void> deleteProjectConversations(String projectId) async {
+    final conversations = getConversations();
+    final updatedConversations = conversations.where((c) => c.projectId != projectId).toList();
+    await _saveConversations(updatedConversations);
+  }
+
+  /// Moves a conversation to a project.
+  Future<void> moveConversationToProject(String conversationId, String? projectId) async {
+    final conversations = getConversations();
+    final index = conversations.indexWhere((c) => c.id == conversationId);
+    
+    if (index != -1) {
+      conversations[index] = conversations[index].copyWith(
+        projectId: projectId,
+        clearProjectId: projectId == null,
+        updatedAt: DateTime.now(),
+      );
+      await _saveConversations(conversations);
+    }
   }
 
   /// Gets a conversation by ID.
@@ -171,10 +217,14 @@ class ChatService {
   /// Sends a message and gets a streaming response from Ollama.
   ///
   /// Returns a stream of updated conversations as the response streams in.
+  /// The stream continues in the background even if the listener is cancelled.
   Stream<Conversation> sendMessage(
     String conversationId,
     String text,
   ) async* {
+    // Cancel any existing stream for this conversation
+    await cancelMessageGeneration(conversationId);
+
     // Get the conversation
     final initialConversation = getConversation(conversationId);
     if (initialConversation == null) {
@@ -188,6 +238,13 @@ class ChatService {
       timestamp: DateTime.now(),
     );
     var conversation = await addMessage(conversationId, userMessage);
+    
+    // Create a broadcast stream controller for this conversation
+    final streamController = StreamController<Conversation>.broadcast();
+    _activeStreams[conversationId] = streamController;
+    
+    // Yield initial state with user message
+    streamController.add(conversation);
     yield conversation;
 
     // Create a placeholder for the assistant response
@@ -199,8 +256,27 @@ class ChatService {
       isStreaming: true,
     );
     conversation = await addMessage(conversationId, assistantMessage);
+    streamController.add(conversation);
     yield conversation;
 
+    // Start the background generation process
+    _generateMessageInBackground(conversationId, conversation, assistantMessageId, streamController);
+    
+    // Listen to the broadcast stream and yield updates
+    await for (final updatedConversation in streamController.stream) {
+      yield updatedConversation;
+    }
+  }
+
+  /// Internal method to generate message in background
+  Future<void> _generateMessageInBackground(
+    String conversationId,
+    Conversation conversation,
+    String assistantMessageId,
+    StreamController<Conversation> streamController,
+  ) async {
+    var assistantMessage = conversation.messages.firstWhere((m) => m.id == assistantMessageId);
+    
     try {
       // Prepare messages for Ollama API
       final ollamaMessages = <Map<String, dynamic>>[];
@@ -222,47 +298,96 @@ class ChatService {
 
       // Stream the response with model parameters
       final buffer = StringBuffer();
-      await for (final chunk in _ollama.sendChatStream(
+      final subscription = _ollama.sendChatStream(
         model: conversation.modelName,
         messages: ollamaMessages,
         options: conversation.parameters.toOllamaOptions(),
-      )) {
-        buffer.write(chunk);
-        
-        // Update the assistant message with accumulated text
-        assistantMessage = assistantMessage.copyWith(
-          text: buffer.toString(),
-        );
+      ).listen(
+        (chunk) async {
+          if (streamController.isClosed) return;
+          
+          buffer.write(chunk);
+          
+          // Update the assistant message with accumulated text
+          assistantMessage = assistantMessage.copyWith(
+            text: buffer.toString(),
+          );
 
-        // Update the conversation with the updated message
-        final messages = conversation.messages.map((m) {
-          if (m.id == assistantMessageId) return assistantMessage;
-          return m;
-        }).toList();
+          // Update the conversation with the updated message
+          final messages = conversation.messages.map((m) {
+            if (m.id == assistantMessageId) return assistantMessage;
+            return m;
+          }).toList();
 
-        conversation = conversation.copyWith(
-          messages: messages,
-          updatedAt: DateTime.now(),
-        );
-        await updateConversation(conversation);
-        yield conversation;
-      }
+          conversation = conversation.copyWith(
+            messages: messages,
+            updatedAt: DateTime.now(),
+          );
+          await updateConversation(conversation);
+          
+          if (!streamController.isClosed) {
+            streamController.add(conversation);
+          }
+        },
+        onError: (error) async {
+          if (streamController.isClosed) return;
+          
+          // Update the assistant message to show error
+          assistantMessage = Message.error(
+            id: assistantMessageId,
+            errorMessage: error.toString(),
+            timestamp: DateTime.now(),
+          );
 
-      // Mark streaming as complete
-      assistantMessage = assistantMessage.copyWith(isStreaming: false);
-      final finalMessages = conversation.messages.map((m) {
-        if (m.id == assistantMessageId) return assistantMessage;
-        return m;
-      }).toList();
+          final errorMessages = conversation.messages.map((m) {
+            if (m.id == assistantMessageId) return assistantMessage;
+            return m;
+          }).toList();
 
-      conversation = conversation.copyWith(
-        messages: finalMessages,
-        updatedAt: DateTime.now(),
+          conversation = conversation.copyWith(
+            messages: errorMessages,
+            updatedAt: DateTime.now(),
+          );
+          await updateConversation(conversation);
+          
+          if (!streamController.isClosed) {
+            streamController.add(conversation);
+          }
+          
+          _cleanupStream(conversationId);
+          await streamController.close();
+        },
+        onDone: () async {
+          if (streamController.isClosed) return;
+          
+          // Mark streaming as complete
+          assistantMessage = assistantMessage.copyWith(isStreaming: false);
+          final finalMessages = conversation.messages.map((m) {
+            if (m.id == assistantMessageId) return assistantMessage;
+            return m;
+          }).toList();
+
+          conversation = conversation.copyWith(
+            messages: finalMessages,
+            updatedAt: DateTime.now(),
+          );
+          await updateConversation(conversation);
+          
+          if (!streamController.isClosed) {
+            streamController.add(conversation);
+          }
+          
+          _cleanupStream(conversationId);
+          await streamController.close();
+        },
+        cancelOnError: true,
       );
-      await updateConversation(conversation);
-      yield conversation;
+      
+      _activeSubscriptions[conversationId] = subscription;
 
     } catch (e) {
+      if (streamController.isClosed) return;
+      
       // Update the assistant message to show error
       assistantMessage = Message.error(
         id: assistantMessageId,
@@ -280,8 +405,79 @@ class ChatService {
         updatedAt: DateTime.now(),
       );
       await updateConversation(conversation);
-      yield conversation;
+      
+      if (!streamController.isClosed) {
+        streamController.add(conversation);
+      }
+      
+      _cleanupStream(conversationId);
+      await streamController.close();
     }
+  }
+
+  /// Cleanup stream resources
+  void _cleanupStream(String conversationId) {
+    _activeSubscriptions.remove(conversationId)?.cancel();
+    _activeStreams.remove(conversationId);
+  }
+
+  /// Check if a message is currently being generated for a conversation
+  bool isGenerating(String conversationId) {
+    return _activeStreams.containsKey(conversationId);
+  }
+
+  /// Cancel ongoing message generation for a conversation
+  Future<void> cancelMessageGeneration(String conversationId) async {
+    final subscription = _activeSubscriptions.remove(conversationId);
+    await subscription?.cancel();
+    
+    final controller = _activeStreams.remove(conversationId);
+    if (controller != null && !controller.isClosed) {
+      await controller.close();
+    }
+    
+    // Mark any streaming messages as incomplete/cancelled
+    final conversation = getConversation(conversationId);
+    if (conversation != null) {
+      final hasStreamingMessage = conversation.messages.any((m) => m.isStreaming);
+      if (hasStreamingMessage) {
+        final updatedMessages = conversation.messages.map((m) {
+          if (m.isStreaming) {
+            return m.copyWith(
+              isStreaming: false,
+              text: m.text.isEmpty ? '[Generation cancelled]' : m.text,
+            );
+          }
+          return m;
+        }).toList();
+        
+        final updatedConversation = conversation.copyWith(
+          messages: updatedMessages,
+          updatedAt: DateTime.now(),
+        );
+        await updateConversation(updatedConversation);
+      }
+    }
+  }
+
+  /// Get active stream for a conversation (allows reconnecting)
+  Stream<Conversation>? getActiveStream(String conversationId) {
+    return _activeStreams[conversationId]?.stream;
+  }
+
+  /// Dispose of all resources
+  void dispose() {
+    for (final subscription in _activeSubscriptions.values) {
+      subscription.cancel();
+    }
+    _activeSubscriptions.clear();
+    
+    for (final controller in _activeStreams.values) {
+      if (!controller.isClosed) {
+        controller.close();
+      }
+    }
+    _activeStreams.clear();
   }
 
   /// Sends a message and gets a non-streaming response from Ollama.
@@ -357,12 +553,19 @@ class ChatService {
   /// This is used when messages (with attachments) have already been added
   /// and we just need to get the AI response.
   Stream<Conversation> sendMessageWithContext(String conversationId) async* {
+    // Cancel any existing stream for this conversation
+    await cancelMessageGeneration(conversationId);
+
     final initialConversation = getConversation(conversationId);
     if (initialConversation == null) {
       throw Exception('Conversation not found');
     }
 
     var conversation = initialConversation;
+
+    // Create a broadcast stream controller for this conversation
+    final streamController = StreamController<Conversation>.broadcast();
+    _activeStreams[conversationId] = streamController;
 
     // Create a placeholder for the assistant response
     final assistantMessageId = const Uuid().v4();
@@ -373,88 +576,15 @@ class ChatService {
       isStreaming: true,
     );
     conversation = await addMessage(conversationId, assistantMessage);
+    streamController.add(conversation);
     yield conversation;
 
-    try {
-      // Prepare messages for Ollama API
-      final ollamaMessages = <Map<String, dynamic>>[];
-
-      // Add system prompt if present
-      if (conversation.systemPrompt != null) {
-        ollamaMessages.add({
-          'role': 'system',
-          'content': conversation.systemPrompt,
-        });
-      }
-
-      // Add conversation history (excluding the streaming placeholder)
-      for (final msg in conversation.messages) {
-        if (msg.id != assistantMessageId && !msg.isError) {
-          ollamaMessages.add(msg.toOllamaMessage());
-        }
-      }
-
-      // Stream the response with model parameters
-      final buffer = StringBuffer();
-      await for (final chunk in _ollama.sendChatStream(
-        model: conversation.modelName,
-        messages: ollamaMessages,
-        options: conversation.parameters.toOllamaOptions(),
-      )) {
-        buffer.write(chunk);
-        
-        // Update the assistant message with accumulated text
-        assistantMessage = assistantMessage.copyWith(
-          text: buffer.toString(),
-        );
-
-        // Update the conversation with the updated message
-        final messages = conversation.messages.map((m) {
-          if (m.id == assistantMessageId) return assistantMessage;
-          return m;
-        }).toList();
-
-        conversation = conversation.copyWith(
-          messages: messages,
-          updatedAt: DateTime.now(),
-        );
-        await updateConversation(conversation);
-        yield conversation;
-      }
-
-      // Mark streaming as complete
-      assistantMessage = assistantMessage.copyWith(isStreaming: false);
-      final finalMessages = conversation.messages.map((m) {
-        if (m.id == assistantMessageId) return assistantMessage;
-        return m;
-      }).toList();
-
-      conversation = conversation.copyWith(
-        messages: finalMessages,
-        updatedAt: DateTime.now(),
-      );
-      await updateConversation(conversation);
-      yield conversation;
-
-    } catch (e) {
-      // Update the assistant message to show error
-      assistantMessage = Message.error(
-        id: assistantMessageId,
-        errorMessage: e.toString(),
-        timestamp: DateTime.now(),
-      );
-
-      final errorMessages = conversation.messages.map((m) {
-        if (m.id == assistantMessageId) return assistantMessage;
-        return m;
-      }).toList();
-
-      conversation = conversation.copyWith(
-        messages: errorMessages,
-        updatedAt: DateTime.now(),
-      );
-      await updateConversation(conversation);
-      yield conversation;
+    // Start the background generation process
+    _generateMessageInBackground(conversationId, conversation, assistantMessageId, streamController);
+    
+    // Listen to the broadcast stream and yield updates
+    await for (final updatedConversation in streamController.stream) {
+      yield updatedConversation;
     }
   }
 }

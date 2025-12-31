@@ -94,6 +94,7 @@ class Conversation {
   final DateTime updatedAt;
   final String? systemPrompt;
   final ModelParameters parameters;
+  final String? projectId;
 
   const Conversation({
     required this.id,
@@ -104,7 +105,11 @@ class Conversation {
     required this.updatedAt,
     this.systemPrompt,
     this.parameters = const ModelParameters(),
+    this.projectId,
   });
+
+  /// Whether this conversation belongs to a project.
+  bool get hasProject => projectId != null;
 
   /// Creates a Conversation from JSON map.
   factory Conversation.fromJson(Map<String, dynamic> json) {
@@ -122,6 +127,7 @@ class Conversation {
       parameters: json['parameters'] != null
           ? ModelParameters.fromJson(json['parameters'] as Map<String, dynamic>)
           : const ModelParameters(),
+      projectId: json['projectId'] as String?,
     );
   }
 
@@ -136,6 +142,7 @@ class Conversation {
       'updatedAt': updatedAt.toIso8601String(),
       'systemPrompt': systemPrompt,
       'parameters': parameters.toJson(),
+      'projectId': projectId,
     };
   }
 
@@ -163,6 +170,8 @@ class Conversation {
     DateTime? updatedAt,
     String? systemPrompt,
     ModelParameters? parameters,
+    String? projectId,
+    bool clearProjectId = false,
   }) {
     return Conversation(
       id: id ?? this.id,
@@ -173,6 +182,7 @@ class Conversation {
       updatedAt: updatedAt ?? this.updatedAt,
       systemPrompt: systemPrompt ?? this.systemPrompt,
       parameters: parameters ?? this.parameters,
+      projectId: clearProjectId ? null : (projectId ?? this.projectId),
     );
   }
 

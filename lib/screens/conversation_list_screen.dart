@@ -43,7 +43,8 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
-    _conversations = widget.chatService.getConversations();
+    // Only show standalone conversations (not in projects) in the main list
+    _conversations = widget.chatService.getConversations(excludeProjectConversations: true);
     _selectedModel = widget.connectionService.getSelectedModel();
 
     // Try to load models from Ollama
@@ -259,6 +260,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
               ],
             ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'conversation_list_fab',
         onPressed: _createNewConversation,
         icon: const Icon(Icons.add),
         label: const Text('New Chat'),

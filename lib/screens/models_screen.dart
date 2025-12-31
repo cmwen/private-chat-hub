@@ -227,6 +227,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
       ),
       body: _buildBody(),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'models_fab',
         onPressed: _showPullModelDialog,
         icon: const Icon(Icons.download),
         label: const Text('Pull Model'),
