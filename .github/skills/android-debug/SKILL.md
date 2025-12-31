@@ -206,13 +206,13 @@ adb pull /sdcard/screen.png
 adb shell screenrecord /sdcard/demo.mp4
 
 # Get app info
-adb shell dumpsys package com.cmwen.min_flutter_template
+adb shell dumpsys package com.cmwen.private_chat_hub
 
 # Force stop app
-adb shell am force-stop com.cmwen.min_flutter_template
+adb shell am force-stop com.cmwen.private_chat_hub
 
 # Clear app data
-adb shell pm clear com.cmwen.min_flutter_template
+adb shell pm clear com.cmwen.private_chat_hub
 
 # Monitor CPU usage
 adb shell top | grep flutter

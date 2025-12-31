@@ -47,7 +47,7 @@ flutter analyze
 #### Quick Rename (Using AI - Recommended):
 
 ```
-@flutter-developer Please rename this app from "min_flutter_template" 
+@flutter-developer Please rename this app from "private_chat_hub" 
 to "my_awesome_app" with package "com.mycompany.my_awesome_app". 
 Follow PACKAGE_RENAME_GUIDE.md
 ```
@@ -56,7 +56,7 @@ Follow PACKAGE_RENAME_GUIDE.md
 
 1. **`pubspec.yaml`**:
    ```yaml
-   name: your_app_name  # Change from min_flutter_template
+   name: your_app_name  # Change from private_chat_hub
    description: "Your app description"
    ```
 
@@ -104,8 +104,8 @@ flutter run  # Test on Android to verify package name is correct
 
 Ask your AI agent:
 ```
-Please rename this Flutter app from "min_flutter_template" to "my_awesome_app" 
-and update the package name from "com.cmwen.min_flutter_template" to "com.mycompany.my_awesome_app". 
+Please rename this Flutter app from "private_chat_hub" to "my_awesome_app" 
+and update the package name from "com.cmwen.private_chat_hub" to "com.mycompany.my_awesome_app". 
 Update all necessary files including pubspec.yaml, build.gradle.kts, AndroidManifest.xml, 
 and Dart imports.
 ```

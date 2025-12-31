@@ -69,7 +69,7 @@ Example:
 ```dart
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:min_flutter_template/main.dart';
+import 'package:private_chat_hub/main.dart';
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
@@ -105,7 +105,7 @@ Example:
 ```dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:min_flutter_template/main.dart' as app;
+import 'package:private_chat_hub/main.dart' as app;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();

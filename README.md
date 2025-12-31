@@ -59,7 +59,7 @@ flutter test && flutter analyze
 
 Then customize using AI:
 ```
-@flutter-developer Please rename this app from "min_flutter_template" 
+@flutter-developer Please rename this app from "private_chat_hub" 
 to "my_awesome_app" with package "com.mycompany.my_awesome_app"
 ```
 

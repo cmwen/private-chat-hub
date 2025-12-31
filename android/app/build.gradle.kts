@@ -35,7 +35,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     // TODO: Change namespace to match your package name (e.g., "com.yourcompany.yourapp")
-    namespace = "com.cmwen.min_flutter_template"
+    namespace = "com.cmwen.private_chat_hub"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -51,7 +51,7 @@ android {
     defaultConfig {
         // TODO: Change applicationId to match your package name (e.g., "com.yourcompany.yourapp")
         // IMPORTANT: This MUST match the package in MainActivity.kt and namespace above
-        applicationId = "com.cmwen.min_flutter_template"
+        applicationId = "com.cmwen.private_chat_hub"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

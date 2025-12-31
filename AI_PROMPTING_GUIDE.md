@@ -37,7 +37,7 @@ This guide helps **anyone** use AI to build Flutter apps, regardless of technica
 **First prompt to try**:
 ```
 I want to build a Flutter app but I'm a complete beginner. I'm using the 
-min-flutter-template. Can you explain what files I need to understand 
+private-chat-hub. Can you explain what files I need to understand 
 and walk me through how to customize this template for my app idea?
 
 My app idea: [Describe your app in 2-3 sentences]
@@ -57,7 +57,7 @@ My app idea: [Describe your app in 2-3 sentences]
 **First prompt to try**:
 ```
 I'm an experienced [your language/platform] developer new to Flutter. 
-Using the min-flutter-template, I want to build [your app idea].
+Using the private-chat-hub, I want to build [your app idea].
 
 Can you:
 1. Explain the Flutter-specific concepts I need to know
@@ -129,7 +129,7 @@ Please provide implementation with best practices.
 ### 1. **Start with Context**
 
 ❌ **Bad**: "Add a button"
-✅ **Good**: "I'm using the min-flutter-template. I want to add a button to MyHomePage that navigates to a new screen."
+✅ **Good**: "I'm using the private-chat-hub. I want to add a button to MyHomePage that navigates to a new screen."
 
 ### 2. **Be Clear About Your Goal**
 
@@ -211,13 +211,13 @@ Main features:
 Target users: [Who will use this app]
 Key user flow: [Describe how users will interact with the app]
 
-I'm using the min-flutter-template. Where should I start?
+I'm using the private-chat-hub. Where should I start?
 ```
 
 ### Scenario 2: "I Want to Add a Specific Feature"
 
 ```
-Using min-flutter-template, I need to add [feature name] to my app.
+Using private-chat-hub, I need to add [feature name] to my app.
 
 Current state: [Brief description of what you have]
 Desired outcome: [What you want to achieve]

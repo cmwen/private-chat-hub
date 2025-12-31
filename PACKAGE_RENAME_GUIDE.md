@@ -1,6 +1,6 @@
 # Package Name Rename Guide
 
-**CRITICAL**: Before running your app, you MUST update the package name from the template default `com.cmwen.min_flutter_template` to your own package name. Failure to do so will cause app launch issues.
+**CRITICAL**: Before running your app, you MUST update the package name from the template default `com.cmwen.private_chat_hub` to your own package name. Failure to do so will cause app launch issues.
 
 ## Why This Matters
 
@@ -45,7 +45,7 @@ android {
 
 **CRITICAL**: `namespace` and `applicationId` MUST match exactly.
 
-#### File: `android/app/src/main/kotlin/com/cmwen/min_flutter_template/MainActivity.kt`
+#### File: `android/app/src/main/kotlin/com/cmwen/private_chat_hub/MainActivity.kt`
 
 1. Update the package declaration at the top:
 ```kotlin
@@ -56,7 +56,7 @@ package com.yourcompany.yourapp  // Change this
 ```bash
 # From terminal in android/app/src/main/kotlin/:
 mkdir -p com/yourcompany/yourapp
-mv com/cmwen/min_flutter_template/MainActivity.kt com/yourcompany/yourapp/
+mv com/cmwen/private_chat_hub/MainActivity.kt com/yourcompany/yourapp/
 rm -rf com/cmwen  # Clean up old package directory
 ```
 
@@ -110,8 +110,8 @@ flutter run
 Ask AI to rename the package for you:
 
 ```
-@flutter-developer Please rename this Flutter app from "min_flutter_template" to "my_awesome_app" 
-and update the package from "com.cmwen.min_flutter_template" to "com.mycompany.my_awesome_app".
+@flutter-developer Please rename this Flutter app from "private_chat_hub" to "my_awesome_app" 
+and update the package from "com.cmwen.private_chat_hub" to "com.mycompany.my_awesome_app".
 
 Update all files including:
 - pubspec.yaml (name, description)

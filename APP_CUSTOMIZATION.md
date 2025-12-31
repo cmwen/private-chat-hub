@@ -81,9 +81,9 @@ This guide provides a comprehensive checklist and AI prompts for customizing thi
 Ask your AI agent:
 ```
 @flutter-developer Please rename this Flutter app:
-- Current name: "min_flutter_template"
+- Current name: "private_chat_hub"
 - New name: "my_awesome_app"
-- Current package: "com.cmwen.min_flutter_template"
+- Current package: "com.cmwen.private_chat_hub"
 - New package: "com.mycompany.my_awesome_app"
 
 Update all necessary files including:

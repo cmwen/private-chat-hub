@@ -1,5 +1,5 @@
-name: min_flutter_template
-description: "A minimal Android Flutter application template - escape Android dependency hell!"
+name: private_chat_hub
+description: "A private, secure chat application for personal conversations"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -34,6 +34,9 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+
+  # Date formatting
+  intl: ^0.19.0
 
   # Opinionated defaults for storage
   # Simple key-value storage for user preferences and small data
