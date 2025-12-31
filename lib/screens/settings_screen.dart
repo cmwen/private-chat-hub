@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:private_chat_hub/models/connection.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
+import 'package:private_chat_hub/services/network_discovery_service.dart';
 import 'package:private_chat_hub/services/ollama_service.dart';
 
 /// Settings screen for managing Ollama connections.
@@ -385,6 +386,8 @@ class _AddConnectionDialogState extends State<AddConnectionDialog> {
   bool _useHttps = false;
   bool _isTesting = false;
   bool? _testResult;
+  bool _isDiscovering = false;
+  List<DiscoveredOllama> _discoveredInstances = [];
 
   @override
   void dispose() {
@@ -392,6 +395,39 @@ class _AddConnectionDialogState extends State<AddConnectionDialog> {
     _hostController.dispose();
     _portController.dispose();
     super.dispose();
+  }
+
+  Future<void> _autoDiscover() async {
+    setState(() {
+      _isDiscovering = true;
+      _discoveredInstances = [];
+    });
+
+    final discoveryService = NetworkDiscoveryService();
+
+    try {
+      await for (final instance in discoveryService.scanNetwork()) {
+        if (!mounted) break;
+        setState(() {
+          _discoveredInstances.add(instance);
+        });
+      }
+    } finally {
+      discoveryService.dispose();
+      if (mounted) {
+        setState(() => _isDiscovering = false);
+      }
+    }
+  }
+
+  void _selectDiscoveredInstance(DiscoveredOllama instance) {
+    setState(() {
+      _hostController.text = instance.host;
+      _portController.text = instance.port.toString();
+      if (instance.name != null) {
+        _nameController.text = instance.name!;
+      }
+    });
   }
 
   Future<void> _testConnection() async {
@@ -442,6 +478,77 @@ class _AddConnectionDialogState extends State<AddConnectionDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Auto-discover section
+              Card(
+                color: Colors.blue[50],
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.wifi_find, color: Colors.blue[700]),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Auto-Discover',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const Spacer(),
+                          if (_isDiscovering)
+                            const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          else
+                            TextButton(
+                              onPressed: _autoDiscover,
+                              child: const Text('Scan'),
+                            ),
+                        ],
+                      ),
+                      if (_discoveredInstances.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Found:',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 4),
+                        ...(_discoveredInstances.map((instance) => InkWell(
+                          onTap: () => _selectDiscoveredInstance(instance),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.cloud, size: 16),
+                                const SizedBox(width: 8),
+                                Text(instance.displayName),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '(${instance.address})',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ))),
+                      ] else if (_isDiscovering)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Scanning local network...',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(

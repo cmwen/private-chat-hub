@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:private_chat_hub/models/conversation.dart';
+import 'package:private_chat_hub/screens/search_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/ollama_service.dart';
@@ -138,6 +139,20 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     }
   }
 
+  void _openSearch() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => SearchScreen(
+          chatService: widget.chatService,
+          onResultSelected: (conversation, messageId) {
+            Navigator.pop(context); // Close search
+            widget.onConversationSelected(conversation);
+          },
+        ),
+      ),
+    );
+  }
+
   void _showModelSelector() {
     showModalBottomSheet(
       context: context,
@@ -166,6 +181,11 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: const Text('Conversations'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: _openSearch,
+            tooltip: 'Search',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadData,

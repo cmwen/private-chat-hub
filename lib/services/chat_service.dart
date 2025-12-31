@@ -220,11 +220,12 @@ class ChatService {
         }
       }
 
-      // Stream the response
+      // Stream the response with model parameters
       final buffer = StringBuffer();
       await for (final chunk in _ollama.sendChatStream(
         model: conversation.modelName,
         messages: ollamaMessages,
+        options: conversation.parameters.toOllamaOptions(),
       )) {
         buffer.write(chunk);
         
@@ -393,11 +394,12 @@ class ChatService {
         }
       }
 
-      // Stream the response
+      // Stream the response with model parameters
       final buffer = StringBuffer();
       await for (final chunk in _ollama.sendChatStream(
         model: conversation.modelName,
         messages: ollamaMessages,
+        options: conversation.parameters.toOllamaOptions(),
       )) {
         buffer.write(chunk);
         

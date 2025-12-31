@@ -1,5 +1,89 @@
 import 'package:private_chat_hub/models/message.dart';
 
+/// Model parameters for controlling AI behavior.
+class ModelParameters {
+  final double temperature;
+  final int topK;
+  final double topP;
+  final int maxTokens;
+
+  const ModelParameters({
+    this.temperature = 0.7,
+    this.topK = 40,
+    this.topP = 0.9,
+    this.maxTokens = 2048,
+  });
+
+  /// Default balanced parameters.
+  static const balanced = ModelParameters();
+
+  /// Creative parameters (more random, diverse outputs).
+  static const creative = ModelParameters(
+    temperature: 1.2,
+    topK: 60,
+    topP: 0.95,
+    maxTokens: 2048,
+  );
+
+  /// Precise parameters (more focused, deterministic outputs).
+  static const precise = ModelParameters(
+    temperature: 0.3,
+    topK: 20,
+    topP: 0.7,
+    maxTokens: 2048,
+  );
+
+  /// Code-optimized parameters.
+  static const code = ModelParameters(
+    temperature: 0.2,
+    topK: 10,
+    topP: 0.5,
+    maxTokens: 4096,
+  );
+
+  factory ModelParameters.fromJson(Map<String, dynamic> json) {
+    return ModelParameters(
+      temperature: (json['temperature'] as num?)?.toDouble() ?? 0.7,
+      topK: (json['topK'] as num?)?.toInt() ?? 40,
+      topP: (json['topP'] as num?)?.toDouble() ?? 0.9,
+      maxTokens: (json['maxTokens'] as num?)?.toInt() ?? 2048,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'temperature': temperature,
+      'topK': topK,
+      'topP': topP,
+      'maxTokens': maxTokens,
+    };
+  }
+
+  /// Converts to Ollama API options format.
+  Map<String, dynamic> toOllamaOptions() {
+    return {
+      'temperature': temperature,
+      'top_k': topK,
+      'top_p': topP,
+      'num_predict': maxTokens,
+    };
+  }
+
+  ModelParameters copyWith({
+    double? temperature,
+    int? topK,
+    double? topP,
+    int? maxTokens,
+  }) {
+    return ModelParameters(
+      temperature: temperature ?? this.temperature,
+      topK: topK ?? this.topK,
+      topP: topP ?? this.topP,
+      maxTokens: maxTokens ?? this.maxTokens,
+    );
+  }
+}
+
 /// Represents a conversation with an AI model.
 class Conversation {
   final String id;
@@ -9,6 +93,7 @@ class Conversation {
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? systemPrompt;
+  final ModelParameters parameters;
 
   const Conversation({
     required this.id,
@@ -18,6 +103,7 @@ class Conversation {
     required this.createdAt,
     required this.updatedAt,
     this.systemPrompt,
+    this.parameters = const ModelParameters(),
   });
 
   /// Creates a Conversation from JSON map.
@@ -33,6 +119,9 @@ class Conversation {
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       systemPrompt: json['systemPrompt'] as String?,
+      parameters: json['parameters'] != null
+          ? ModelParameters.fromJson(json['parameters'] as Map<String, dynamic>)
+          : const ModelParameters(),
     );
   }
 
@@ -46,6 +135,7 @@ class Conversation {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'systemPrompt': systemPrompt,
+      'parameters': parameters.toJson(),
     };
   }
 
@@ -72,6 +162,7 @@ class Conversation {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? systemPrompt,
+    ModelParameters? parameters,
   }) {
     return Conversation(
       id: id ?? this.id,
@@ -81,6 +172,7 @@ class Conversation {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       systemPrompt: systemPrompt ?? this.systemPrompt,
+      parameters: parameters ?? this.parameters,
     );
   }
 

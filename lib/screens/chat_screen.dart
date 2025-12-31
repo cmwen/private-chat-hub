@@ -386,7 +386,228 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
               const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Model Parameters',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.tune, size: 18),
+                    label: const Text('Adjust'),
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      _showModelParameters();
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _ParameterDisplay(
+                label: 'Temperature',
+                value: _conversation!.parameters.temperature.toStringAsFixed(1),
+                description: 'Creativity (0=focused, 2=random)',
+              ),
+              _ParameterDisplay(
+                label: 'Top-K',
+                value: '${_conversation!.parameters.topK}',
+                description: 'Token diversity',
+              ),
+              _ParameterDisplay(
+                label: 'Top-P',
+                value: _conversation!.parameters.topP.toStringAsFixed(2),
+                description: 'Nucleus sampling',
+              ),
+              _ParameterDisplay(
+                label: 'Max Tokens',
+                value: '${_conversation!.parameters.maxTokens}',
+                description: 'Response length limit',
+              ),
+              const SizedBox(height: 24),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showModelParameters() {
+    if (_conversation == null) return;
+
+    var params = _conversation!.parameters;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.4,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, scrollController) => Container(
+            padding: const EdgeInsets.all(24),
+            child: ListView(
+              controller: scrollController,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.tune),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Model Parameters',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(sheetContext),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24),
+                // Presets
+                const Text(
+                  'Quick Presets',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    _PresetChip(
+                      label: '⚖️ Balanced',
+                      isSelected: params.temperature == 0.7,
+                      onTap: () {
+                        setSheetState(() => params = ModelParameters.balanced);
+                      },
+                    ),
+                    _PresetChip(
+                      label: '🎨 Creative',
+                      isSelected: params.temperature == 1.2,
+                      onTap: () {
+                        setSheetState(() => params = ModelParameters.creative);
+                      },
+                    ),
+                    _PresetChip(
+                      label: '🎯 Precise',
+                      isSelected: params.temperature == 0.3,
+                      onTap: () {
+                        setSheetState(() => params = ModelParameters.precise);
+                      },
+                    ),
+                    _PresetChip(
+                      label: '💻 Code',
+                      isSelected: params.temperature == 0.2,
+                      onTap: () {
+                        setSheetState(() => params = ModelParameters.code);
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                // Temperature
+                _ParameterSlider(
+                  label: 'Temperature',
+                  value: params.temperature,
+                  min: 0.0,
+                  max: 2.0,
+                  divisions: 20,
+                  description: 'Controls randomness. Lower = more focused, Higher = more creative.',
+                  onChanged: (v) {
+                    setSheetState(() => params = params.copyWith(temperature: v));
+                  },
+                ),
+                const SizedBox(height: 16),
+                // Top-K
+                _ParameterSlider(
+                  label: 'Top-K',
+                  value: params.topK.toDouble(),
+                  min: 1,
+                  max: 100,
+                  divisions: 99,
+                  description: 'Limits vocabulary to top K tokens per step.',
+                  isInteger: true,
+                  onChanged: (v) {
+                    setSheetState(() => params = params.copyWith(topK: v.round()));
+                  },
+                ),
+                const SizedBox(height: 16),
+                // Top-P
+                _ParameterSlider(
+                  label: 'Top-P',
+                  value: params.topP,
+                  min: 0.0,
+                  max: 1.0,
+                  divisions: 20,
+                  description: 'Nucleus sampling. Lower = more focused.',
+                  onChanged: (v) {
+                    setSheetState(() => params = params.copyWith(topP: v));
+                  },
+                ),
+                const SizedBox(height: 16),
+                // Max Tokens
+                _ParameterSlider(
+                  label: 'Max Tokens',
+                  value: params.maxTokens.toDouble(),
+                  min: 100,
+                  max: 8000,
+                  divisions: 79,
+                  description: 'Maximum response length. ~750 words per 1000 tokens.',
+                  isInteger: true,
+                  onChanged: (v) {
+                    setSheetState(() => params = params.copyWith(maxTokens: v.round()));
+                  },
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          setSheetState(() => params = ModelParameters.balanced);
+                        },
+                        child: const Text('Reset'),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () async {
+                          Navigator.pop(sheetContext);
+                          if (widget.chatService != null && _conversation != null) {
+                            final updatedConversation = _conversation!.copyWith(
+                              parameters: params,
+                              updatedAt: DateTime.now(),
+                            );
+                            final messenger = ScaffoldMessenger.of(context);
+                            await widget.chatService!.updateConversation(updatedConversation);
+                            if (!mounted) return;
+                            setState(() {
+                              _conversation = updatedConversation;
+                            });
+                            messenger.showSnackBar(
+                              const SnackBar(content: Text('Parameters updated')),
+                            );
+                          }
+                        },
+                        child: const Text('Save'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),
@@ -708,6 +929,48 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _editMessage(Message message) {
+    // Show dialog with the message text for editing
+    final controller = TextEditingController(text: message.text);
+    
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit Message'),
+        content: TextField(
+          controller: controller,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            hintText: 'Edit your message...',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              controller.dispose();
+            },
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              final newText = controller.text.trim();
+              if (newText.isNotEmpty && newText != message.text) {
+                // Send as a new message (preserving history)
+                _handleSendMessage(newText);
+              }
+              controller.dispose();
+            },
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showMessageActions(Message message) {
     showModalBottomSheet(
       context: context,
@@ -723,6 +986,16 @@ class _ChatScreenState extends State<ChatScreen> {
                 _copyMessage(message);
               },
             ),
+            if (message.role == MessageRole.user)
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('Edit & Resend'),
+                subtitle: const Text('Creates a new message'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _editMessage(message);
+                },
+              ),
             if (message.role == MessageRole.user && message.isError)
               ListTile(
                 leading: const Icon(Icons.refresh),
@@ -958,6 +1231,125 @@ class _InfoRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ParameterDisplay extends StatelessWidget {
+  final String label;
+  final String value;
+  final String description;
+
+  const _ParameterDisplay({
+    required this.label,
+    required this.value,
+    required this.description,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              description,
+              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PresetChip extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _PresetChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionChip(
+      label: Text(label),
+      backgroundColor: isSelected 
+          ? Theme.of(context).colorScheme.primaryContainer
+          : null,
+      onPressed: onTap,
+    );
+  }
+}
+
+class _ParameterSlider extends StatelessWidget {
+  final String label;
+  final double value;
+  final double min;
+  final double max;
+  final int divisions;
+  final String description;
+  final bool isInteger;
+  final ValueChanged<double> onChanged;
+
+  const _ParameterSlider({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.divisions,
+    required this.description,
+    this.isInteger = false,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+            Text(
+              isInteger ? value.round().toString() : value.toStringAsFixed(2),
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        Slider(
+          value: value,
+          min: min,
+          max: max,
+          divisions: divisions,
+          onChanged: onChanged,
+        ),
+        Text(
+          description,
+          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+        ),
+      ],
     );
   }
 }
