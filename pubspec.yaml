@@ -38,11 +38,26 @@ dependencies:
   # Date formatting
   intl: ^0.19.0
 
+  # HTTP client for API requests
+  http: ^1.2.0
+
   # Opinionated defaults for storage
   # Simple key-value storage for user preferences and small data
   shared_preferences: ^2.5.4
   # Access to device file system paths (documents, cache, temp directories)
   path_provider: ^2.1.0
+  
+  # UUID generation for unique identifiers
+  uuid: ^4.5.1
+  
+  # Markdown rendering for AI responses
+  flutter_markdown: ^0.7.5+1
+  
+  # Image picker for photo attachments (vision models)
+  image_picker: ^1.0.7
+  
+  # File picker for document attachments
+  file_picker: ^6.1.1
 
 dev_dependencies:
   flutter_test:

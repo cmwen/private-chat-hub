@@ -66,6 +66,8 @@ class MessageBubble extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Display image attachments if present
+                    if (message.hasImages) _buildImageAttachments(context),
                     Text(
                       message.text,
                       style: TextStyle(
@@ -92,6 +94,60 @@ class MessageBubble extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildImageAttachments(BuildContext context) {
+    final images = message.images;
+    if (images.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        children: images.map((attachment) {
+          return GestureDetector(
+            onTap: () => _showImageFullscreen(context, attachment),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.memory(
+                attachment.data,
+                width: images.length == 1 ? 200 : 100,
+                height: images.length == 1 ? 200 : 100,
+                fit: BoxFit.cover,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  void _showImageFullscreen(BuildContext context, Attachment attachment) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Stack(
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.pop(dialogContext),
+              child: InteractiveViewer(
+                child: Image.memory(attachment.data),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.pop(dialogContext),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
