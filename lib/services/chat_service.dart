@@ -1,36 +1,110 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' show min;
 import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
-import 'package:private_chat_hub/models/tool.dart';
 import 'package:private_chat_hub/services/ollama_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
-import 'package:private_chat_hub/services/web_search_service.dart';
 import 'package:uuid/uuid.dart';
 
 /// Service for managing chat conversations and sending messages to Ollama.
 class ChatService {
   final OllamaService _ollama;
   final StorageService _storage;
-  final WebSearchService _webSearch;
   static const String _conversationsKey = 'conversations';
   static const String _currentConversationKey = 'current_conversation_id';
-  static const String _webSearchEnabledKey = 'web_search_enabled';
 
   // Track active message generation streams
   final Map<String, StreamController<Conversation>> _activeStreams = {};
   final Map<String, StreamSubscription> _activeSubscriptions = {};
+  
+  // Cache for model capabilities
+  final Map<String, bool> _modelCapabilitiesCache = {};
 
-  ChatService(this._ollama, this._storage, this._webSearch);
+  ChatService(this._ollama, this._storage);
 
-  /// Gets whether web search is enabled.
-  bool getWebSearchEnabled() {
-    return _storage.getBool(_webSearchEnabledKey) ?? true; // Enabled by default
+  /// Checks if a model supports tool calling by querying the Ollama API.
+  /// 
+  /// Fetches the model information from Ollama's /api/show endpoint and checks
+  /// the capabilities field. This is more reliable than hardcoding model names,
+  /// as it respects what the model actually supports.
+  /// 
+  /// Uses caching to avoid repeated API calls.
+  Future<bool> modelSupportsTools(String modelName) async {
+    final modelFamily = modelName.split(':').first.toLowerCase();
+    
+    // Check cache first
+    if (_modelCapabilitiesCache.containsKey(modelFamily)) {
+      print('[DEBUG] Model capabilities retrieved from cache: $modelFamily');
+      return _modelCapabilitiesCache[modelFamily] ?? false;
+    }
+    
+    print('[DEBUG] Fetching capabilities for model: $modelName');
+    
+    try {
+      final modelInfo = await _ollama.showModel(modelName);
+      
+      // The /api/show endpoint returns a "capabilities" array
+      // Example: "capabilities": ["completion", "vision", "tools"]
+      final capabilities = modelInfo['capabilities'] as List<dynamic>?;
+      
+      if (capabilities != null) {
+        final supportsTools = capabilities.contains('tools');
+        print('[DEBUG] Model $modelName capabilities: $capabilities');
+        print('[DEBUG] Model $modelName supports tools: $supportsTools');
+        
+        // Cache the result
+        _modelCapabilitiesCache[modelFamily] = supportsTools;
+        return supportsTools;
+      } else {
+        print('[DEBUG] No capabilities info found for model: $modelName');
+        // Fallback to hardcoded list if capabilities not available
+        return _modelSupportsFallback(modelFamily);
+      }
+    } catch (e) {
+      print('[DEBUG] Error checking model capabilities: $e');
+      // Fallback to hardcoded list on error
+      return _modelSupportsFallback(modelFamily);
+    }
   }
 
-  /// Sets whether web search is enabled.
-  Future<void> setWebSearchEnabled(bool enabled) async {
-    await _storage.setBool(_webSearchEnabledKey, enabled);
+  /// Fallback method that checks if a model supports tools based on hardcoded names.
+  /// 
+  /// This is used when the Ollama API doesn't return capabilities information.
+  /// Based on Ollama documentation:
+  /// - llama3.1+ have native function calling
+  /// - mistral-3 has native function calling
+  /// - mistral-nemo has function calling
+  /// - qwen2.5+ have tool support
+  /// - command-r models have tool support
+  bool _modelSupportsFallback(String modelFamily) {
+    print('[DEBUG] Using fallback hardcoded model detection for: $modelFamily');
+    
+    // llama3.1+ (but not llama3.0 or llama2)
+    if (modelFamily.startsWith('llama3.')) {
+      final versionMatch = RegExp(r'llama3\.(\d+)').firstMatch(modelFamily);
+      if (versionMatch != null) {
+        final minorVersion = int.tryParse(versionMatch.group(1) ?? '0') ?? 0;
+        return minorVersion >= 1;
+      }
+    }
+    
+    // Mistral models with tool support
+    if (modelFamily.startsWith('mistral-3') ||
+        modelFamily.startsWith('mistral-nemo') ||
+        modelFamily.startsWith('mistral-large')) {
+      return true;
+    }
+    
+    // Other known tool-capable models
+    if (modelFamily.startsWith('qwen2.5') ||
+        modelFamily.startsWith('qwen2.6') ||
+        modelFamily.startsWith('qwen3') ||
+        modelFamily.startsWith('command-r')) {
+      return true;
+    }
+    
+    return false;
   }
 
   /// Gets all saved conversations.
@@ -330,25 +404,26 @@ class ChatService {
       // Add conversation history
       for (final msg in conversation.messages) {
         if (msg.id != assistantMessageId && !msg.isError) {
-          ollamaMessages.add(msg.toOllamaMessage());
+          final ollamaMsg = msg.toOllamaMessage();
+          ollamaMessages.add(ollamaMsg);
+          print('[DEBUG] Adding message to history: role=${ollamaMsg['role']}');
         }
       }
 
-      // Prepare tools if web search is enabled
-      final tools = getWebSearchEnabled()
-          ? [WebSearchTool().toOllamaFormat()]
-          : null;
+      print('[DEBUG] Preparing message for model: ${conversation.modelName}');
 
-      // Stream the response with model parameters and tools
+      // Stream the response with model parameters
       final buffer = StringBuffer();
-      final toolCallsBuffer = <ToolCall>[];
+
+      print('[DEBUG] About to send chat to Ollama:');
+      print('[DEBUG]   Model: ${conversation.modelName}');
+      print('[DEBUG]   Messages: ${ollamaMessages.length}');
 
       final subscription = _ollama
           .sendChatStream(
             model: conversation.modelName,
             messages: ollamaMessages,
             options: conversation.parameters.toOllamaOptions(),
-            tools: tools,
           )
           .listen(
             (data) async {
@@ -357,39 +432,18 @@ class ChatService {
               final message = data['message'] as Map<String, dynamic>?;
               if (message == null) return;
 
+              print('[DEBUG] Stream event keys: ${message.keys.toList()}');
+
               // Handle regular content
               final content = message['content'] as String?;
               if (content != null && content.isNotEmpty) {
                 buffer.write(content);
+              } else {
+                print('[DEBUG] No tool_calls in stream message');
               }
-
-              // Handle tool calls
-              final toolCallsData = message['tool_calls'] as List<dynamic>?;
-              if (toolCallsData != null) {
-                for (final tcData in toolCallsData) {
-                  if (tcData is Map<String, dynamic>) {
-                    final id = tcData['id'] as String? ?? '';
-                    final function =
-                        tcData['function'] as Map<String, dynamic>?;
-                    if (function != null) {
-                      final name = function['name'] as String? ?? '';
-                      final args =
-                          function['arguments'] as Map<String, dynamic>? ?? {};
-
-                      if (id.isNotEmpty && name.isNotEmpty) {
-                        toolCallsBuffer.add(
-                          ToolCall(id: id, name: name, arguments: args),
-                        );
-                      }
-                    }
-                  }
-                }
-              }
-
               // Update the assistant message with accumulated text
               assistantMessage = assistantMessage.copyWith(
                 text: buffer.toString(),
-                toolCalls: toolCallsBuffer.isNotEmpty ? toolCallsBuffer : null,
               );
 
               // Update the conversation with the updated message
@@ -442,35 +496,29 @@ class ChatService {
               // Mark streaming as complete
               assistantMessage = assistantMessage.copyWith(isStreaming: false);
 
-              // Check if we have tool calls to execute
-              if (assistantMessage.hasToolCalls) {
-                // Execute tool calls
-                await _executeToolCalls(
-                  conversationId,
-                  conversation,
-                  assistantMessage,
-                  streamController,
-                );
-              } else {
-                // No tool calls, just finalize the message
-                final finalMessages = conversation.messages.map((m) {
-                  if (m.id == assistantMessageId) return assistantMessage;
-                  return m;
-                }).toList();
+              // Log the final assistant message state
+              print('[DEBUG] onDone - Final assistant message: text="${assistantMessage.text.substring(0, min(assistantMessage.text.length, 100))}"');
+              print('[DEBUG] onDone - Text length: ${assistantMessage.text.length}');
+              print('[DEBUG] onDone - Full response text: ${assistantMessage.text}');
 
-                conversation = conversation.copyWith(
-                  messages: finalMessages,
-                  updatedAt: DateTime.now(),
-                );
-                await updateConversation(conversation);
+              // Finalize the message
+              final finalMessages = conversation.messages.map((m) {
+                if (m.id == assistantMessageId) return assistantMessage;
+                return m;
+              }).toList();
 
-                if (!streamController.isClosed) {
-                  streamController.add(conversation);
-                }
+              conversation = conversation.copyWith(
+                messages: finalMessages,
+                updatedAt: DateTime.now(),
+              );
+              await updateConversation(conversation);
 
-                _cleanupStream(conversationId);
-                await streamController.close();
+              if (!streamController.isClosed) {
+                streamController.add(conversation);
               }
+
+              _cleanupStream(conversationId);
+              await streamController.close();
             },
             cancelOnError: true,
           );
@@ -507,118 +555,6 @@ class ChatService {
   }
 
   /// Executes tool calls and continues the conversation
-  Future<void> _executeToolCalls(
-    String conversationId,
-    Conversation conversation,
-    Message assistantMessage,
-    StreamController<Conversation> streamController,
-  ) async {
-    if (!assistantMessage.hasToolCalls) return;
-
-    try {
-      // Update conversation with the assistant message containing tool calls
-      var updatedMessages = conversation.messages.map((m) {
-        if (m.id == assistantMessage.id) return assistantMessage;
-        return m;
-      }).toList();
-
-      conversation = conversation.copyWith(
-        messages: updatedMessages,
-        updatedAt: DateTime.now(),
-      );
-      await updateConversation(conversation);
-
-      if (!streamController.isClosed) {
-        streamController.add(conversation);
-      }
-
-      // Execute each tool call
-      for (final toolCall in assistantMessage.toolCalls!) {
-        if (toolCall.name == 'web_search') {
-          final query = toolCall.arguments['query'] as String?;
-          if (query != null && query.isNotEmpty) {
-            // Perform web search
-            try {
-              final searchResults = await _webSearch.search(query);
-
-              // Add tool result message
-              final toolResultMessage = Message.toolResult(
-                id: const Uuid().v4(),
-                toolCallId: toolCall.id,
-                content: searchResults,
-                timestamp: DateTime.now(),
-              );
-
-              conversation = await addMessage(
-                conversationId,
-                toolResultMessage,
-              );
-
-              if (!streamController.isClosed) {
-                streamController.add(conversation);
-              }
-            } catch (e) {
-              // Add error result
-              final errorResult = Message.toolResult(
-                id: const Uuid().v4(),
-                toolCallId: toolCall.id,
-                content: 'Error performing web search: $e',
-                timestamp: DateTime.now(),
-              );
-
-              conversation = await addMessage(conversationId, errorResult);
-
-              if (!streamController.isClosed) {
-                streamController.add(conversation);
-              }
-            }
-          }
-        }
-      }
-
-      // Continue the conversation with tool results
-      final newAssistantMessageId = const Uuid().v4();
-      final newAssistantMessage = Message.assistant(
-        id: newAssistantMessageId,
-        text: '',
-        timestamp: DateTime.now(),
-        isStreaming: true,
-      );
-
-      conversation = await addMessage(conversationId, newAssistantMessage);
-
-      if (!streamController.isClosed) {
-        streamController.add(conversation);
-      }
-
-      // Recursively generate the next response with tool results
-      await _generateMessageInBackground(
-        conversationId,
-        conversation,
-        newAssistantMessageId,
-        streamController,
-      );
-    } catch (e) {
-      if (streamController.isClosed) return;
-
-      final errorMessage = Message.error(
-        id: const Uuid().v4(),
-        errorMessage: 'Error executing tools: $e',
-        timestamp: DateTime.now(),
-      );
-
-      conversation = await addMessage(conversationId, errorMessage);
-      await updateConversation(conversation);
-
-      if (!streamController.isClosed) {
-        streamController.add(conversation);
-      }
-
-      _cleanupStream(conversationId);
-      await streamController.close();
-    }
-  }
-
   /// Cleanup stream resources
   void _cleanupStream(String conversationId) {
     _activeSubscriptions.remove(conversationId)?.cancel();

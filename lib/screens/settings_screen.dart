@@ -211,28 +211,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
-                  SwitchListTile(
-                    secondary: const Icon(Icons.search),
-                    title: const Text('Web Search'),
-                    subtitle: const Text(
-                      'Allow AI to search the internet for current information',
-                    ),
-                    value: widget.chatService!.getWebSearchEnabled(),
-                    onChanged: (value) {
-                      setState(() {
-                        widget.chatService!.setWebSearchEnabled(value);
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            value
-                                ? 'Web search enabled'
-                                : 'Web search disabled',
-                          ),
-                        ),
-                      );
-                    },
-                  ),
                   const Divider(),
                 ],
                 ListTile(

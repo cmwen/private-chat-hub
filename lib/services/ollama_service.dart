@@ -47,6 +47,47 @@ class OllamaModel {
   String? get parameterCount {
     return details?['parameter_size'] as String?;
   }
+
+  /// Returns true if this model supports tool calling.
+  /// 
+  /// Based on model family name. Known tool-capable models:
+  /// - llama3.1 and newer (llama3.2, llama3.3, etc.)
+  /// - mistral-3 (native function calling)
+  /// - mistral-nemo (function calling support)
+  /// - mistral-large (may have tool support)
+  /// - qwen2.5 and newer
+  /// - command-r and command-r-plus (Cohere models)
+  /// - Other models with explicit function calling support
+  bool get supportsTools {
+    final modelFamily = family.toLowerCase();
+    
+    // llama3.1+ (but not llama3.0 or llama2)
+    if (modelFamily.startsWith('llama3.')) {
+      final versionMatch = RegExp(r'llama3\.(\d+)').firstMatch(modelFamily);
+      if (versionMatch != null) {
+        final minorVersion = int.tryParse(versionMatch.group(1) ?? '0') ?? 0;
+        return minorVersion >= 1; // llama3.1, llama3.2, etc.
+      }
+    }
+    
+    // Mistral models with tool support
+    if (modelFamily.startsWith('mistral-3') ||
+        modelFamily.startsWith('mistral-nemo') ||
+        modelFamily.startsWith('mistral-large')) {
+      return true;
+    }
+    
+    // Other known tool-capable models
+    if (modelFamily.startsWith('qwen2.5') ||
+        modelFamily.startsWith('qwen2.6') ||
+        modelFamily.startsWith('qwen3') ||
+        modelFamily.startsWith('command-r')) {
+      return true;
+    }
+    
+    // llama2 and earlier llama3 versions don't support tools
+    return false;
+  }
 }
 
 /// Represents the connection configuration for Ollama.

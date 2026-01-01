@@ -377,6 +377,26 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _stopGeneration() async {
+    if (widget.chatService == null || _conversation == null) return;
+
+    try {
+      await widget.chatService!.cancelMessageGeneration(_conversation!.id);
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _loadMessages();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error stopping generation: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   void _showConversationInfo() {
     if (_conversation == null) return;
 
@@ -816,21 +836,6 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
-          if (_isLoading && widget.chatService != null && _conversation != null)
-            IconButton(
-              icon: const Icon(Icons.stop_circle_outlined),
-              onPressed: () async {
-                await widget.chatService!.cancelMessageGeneration(
-                  _conversation!.id,
-                );
-                if (!mounted) return;
-                setState(() {
-                  _isLoading = false;
-                  _loadMessages(); // Reload to show the cancelled state
-                });
-              },
-              tooltip: 'Cancel generation',
-            ),
           if (_conversation != null)
             IconButton(
               icon: const Icon(Icons.info_outline),
@@ -914,6 +919,8 @@ class _ChatScreenState extends State<ChatScreen> {
           MessageInput(
             onSendMessage: _handleSendMessage,
             onSendMessageWithAttachments: _handleSendMessageWithAttachments,
+            isLoading: _isLoading,
+            onStopGeneration: _isLoading ? _stopGeneration : null,
           ),
         ],
       ),

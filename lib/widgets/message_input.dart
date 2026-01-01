@@ -15,12 +15,16 @@ class MessageInput extends StatefulWidget {
   final Function(String)? onSendMessage;
   final OnSendMessageWithAttachments? onSendMessageWithAttachments;
   final bool enableAttachments;
+  final bool isLoading;
+  final VoidCallback? onStopGeneration;
 
   const MessageInput({
     super.key,
     this.onSendMessage,
     this.onSendMessageWithAttachments,
     this.enableAttachments = true,
+    this.isLoading = false,
+    this.onStopGeneration,
   });
 
   @override
@@ -384,20 +388,44 @@ class _MessageInputState extends State<MessageInput> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                CircleAvatar(
-                  backgroundColor: _canSend
-                      ? colorScheme.primary
-                      : Colors.grey[300],
-                  child: IconButton(
-                    icon: Icon(
-                      _canSend ? Icons.send : Icons.mic,
-                      color: Colors.white,
-                      size: 20,
+                if (widget.isLoading)
+                  ElevatedButton(
+                    onPressed: widget.onStopGeneration,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red[400],
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
-                    onPressed: _canSend ? _handleSend : () {},
-                    tooltip: _canSend ? 'Send message' : 'Voice message',
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.stop, size: 18),
+                        SizedBox(width: 6),
+                        Text('Stop'),
+                      ],
+                    ),
+                  )
+                else
+                  CircleAvatar(
+                    backgroundColor: _canSend
+                        ? colorScheme.primary
+                        : Colors.grey[300],
+                    child: IconButton(
+                      icon: Icon(
+                        _canSend ? Icons.send : Icons.mic,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      onPressed: _canSend ? _handleSend : () {},
+                      tooltip: _canSend ? 'Send message' : 'Voice message',
+                    ),
                   ),
-                ),
               ],
             ),
           ],

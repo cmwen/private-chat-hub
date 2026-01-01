@@ -66,15 +66,10 @@ class MessageBubble extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Display tool calls if present
-                    if (message.hasToolCalls) _buildToolCallsIndicator(context),
                     // Display image attachments if present
                     if (message.hasImages) _buildImageAttachments(context),
                     // Display text file attachments if present
                     if (message.hasTextFiles) _buildFileAttachments(context),
-                    // Display tool result indicator if this is a tool message
-                    if (message.isToolResult)
-                      _buildToolResultIndicator(context),
                     Text(
                       message.text,
                       style: TextStyle(
@@ -337,87 +332,5 @@ class MessageBubble extends StatelessWidget {
     } else {
       return DateFormat('MMM d, y').format(timestamp);
     }
-  }
-
-  Widget _buildToolCallsIndicator(BuildContext context) {
-    if (!message.hasToolCalls) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: message.isMe
-              ? Colors.white.withValues(alpha: 0.2)
-              : Colors.blue.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: Colors.blue.withValues(alpha: 0.3),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.search,
-              size: 16,
-              color: message.isMe ? Colors.white : Colors.blue[700],
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                message.toolCalls!.length == 1
-                    ? 'Using web search...'
-                    : 'Using ${message.toolCalls!.length} tools...',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: message.isMe ? Colors.white : Colors.blue[700],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToolResultIndicator(BuildContext context) {
-    if (!message.isToolResult) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.green.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: Colors.green.withValues(alpha: 0.3),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.check_circle_outline,
-              size: 14,
-              color: Colors.green[700],
-            ),
-            const SizedBox(width: 6),
-            Text(
-              'Search results',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: Colors.green[700],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
