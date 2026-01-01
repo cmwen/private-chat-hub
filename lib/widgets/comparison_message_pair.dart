@@ -125,7 +125,7 @@ class _ComparisonMessagePairState extends State<ComparisonMessagePair> {
         width: isActive ? 24 : 8,
         height: 8,
         decoration: BoxDecoration(
-          color: isActive ? color : color.withOpacity(0.3),
+          color: isActive ? color : color.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(4),
         ),
       ),
@@ -164,7 +164,7 @@ class _ComparisonMessagePairState extends State<ComparisonMessagePair> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.1),
+              color: accentColor.withValues(alpha: 0.1),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: Row(
@@ -242,7 +242,7 @@ class _ComparisonMessagePairState extends State<ComparisonMessagePair> {
         child: Text(
           'Waiting for response...',
           style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.5),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -274,7 +274,7 @@ class _ComparisonMessagePairState extends State<ComparisonMessagePair> {
       return Text(
         'Generating...',
         style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onSurface.withOpacity(0.5),
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
           fontStyle: FontStyle.italic,
         ),
       );
@@ -289,7 +289,7 @@ class _ComparisonMessagePairState extends State<ComparisonMessagePair> {
           fontFamily: 'monospace',
         ),
         codeblockDecoration: BoxDecoration(
-          color: theme.colorScheme.surfaceVariant,
+          color: theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),
         ),
       ),

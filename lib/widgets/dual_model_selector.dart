@@ -66,7 +66,7 @@ class _DualModelSelectorState extends State<DualModelSelector> {
             Text(
               'Select two models to compare their responses side-by-side',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(height: 24),
@@ -145,7 +145,7 @@ class _DualModelSelectorState extends State<DualModelSelector> {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(
-          color: theme.colorScheme.outline.withOpacity(0.5),
+          color: theme.colorScheme.outline.withValues(alpha: 0.5),
         ),
         borderRadius: BorderRadius.circular(8),
       ),
@@ -172,15 +172,15 @@ class _DualModelSelectorState extends State<DualModelSelector> {
                           style: TextStyle(
                             fontWeight: FontWeight.w500,
                             color: isDisabled
-                                ? theme.colorScheme.onSurface.withOpacity(0.3)
+                                ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
                                 : null,
                           ),
                         ),
                         Text(
                           '${model.family} • ${model.sizeFormatted}',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withOpacity(
-                              isDisabled ? 0.2 : 0.6,
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: isDisabled ? 0.2 : 0.6,
                             ),
                           ),
                         ),
@@ -191,7 +191,7 @@ class _DualModelSelectorState extends State<DualModelSelector> {
                     Icon(
                       Icons.check_circle,
                       size: 20,
-                      color: theme.colorScheme.primary.withOpacity(0.5),
+                      color: theme.colorScheme.primary.withValues(alpha: 0.5),
                     ),
                 ],
               ),

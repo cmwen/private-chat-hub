@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math' show min;
 import 'package:private_chat_hub/models/comparison_conversation.dart';
 import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
@@ -36,11 +35,8 @@ class ChatService {
     
     // Check cache first
     if (_modelCapabilitiesCache.containsKey(modelFamily)) {
-      print('[DEBUG] Model capabilities retrieved from cache: $modelFamily');
       return _modelCapabilitiesCache[modelFamily] ?? false;
     }
-    
-    print('[DEBUG] Fetching capabilities for model: $modelName');
     
     try {
       final modelInfo = await _ollama.showModel(modelName);
@@ -51,19 +47,15 @@ class ChatService {
       
       if (capabilities != null) {
         final supportsTools = capabilities.contains('tools');
-        print('[DEBUG] Model $modelName capabilities: $capabilities');
-        print('[DEBUG] Model $modelName supports tools: $supportsTools');
         
         // Cache the result
         _modelCapabilitiesCache[modelFamily] = supportsTools;
         return supportsTools;
       } else {
-        print('[DEBUG] No capabilities info found for model: $modelName');
         // Fallback to hardcoded list if capabilities not available
         return _modelSupportsFallback(modelFamily);
       }
     } catch (e) {
-      print('[DEBUG] Error checking model capabilities: $e');
       // Fallback to hardcoded list on error
       return _modelSupportsFallback(modelFamily);
     }
@@ -79,7 +71,6 @@ class ChatService {
   /// - qwen2.5+ have tool support
   /// - command-r models have tool support
   bool _modelSupportsFallback(String modelFamily) {
-    print('[DEBUG] Using fallback hardcoded model detection for: $modelFamily');
     
     // llama3.1+ (but not llama3.0 or llama2)
     if (modelFamily.startsWith('llama3.')) {
@@ -676,18 +667,11 @@ class ChatService {
         if (msg.id != assistantMessageId && !msg.isError) {
           final ollamaMsg = msg.toOllamaMessage();
           ollamaMessages.add(ollamaMsg);
-          print('[DEBUG] Adding message to history: role=${ollamaMsg['role']}');
         }
       }
 
-      print('[DEBUG] Preparing message for model: ${conversation.modelName}');
-
       // Stream the response with model parameters
       final buffer = StringBuffer();
-
-      print('[DEBUG] About to send chat to Ollama:');
-      print('[DEBUG]   Model: ${conversation.modelName}');
-      print('[DEBUG]   Messages: ${ollamaMessages.length}');
 
       final subscription = _ollama
           .sendChatStream(
@@ -702,14 +686,10 @@ class ChatService {
               final message = data['message'] as Map<String, dynamic>?;
               if (message == null) return;
 
-              print('[DEBUG] Stream event keys: ${message.keys.toList()}');
-
               // Handle regular content
               final content = message['content'] as String?;
               if (content != null && content.isNotEmpty) {
                 buffer.write(content);
-              } else {
-                print('[DEBUG] No tool_calls in stream message');
               }
               // Update the assistant message with accumulated text
               assistantMessage = assistantMessage.copyWith(
@@ -766,11 +746,6 @@ class ChatService {
               // Mark streaming as complete
               assistantMessage = assistantMessage.copyWith(isStreaming: false);
 
-              // Log the final assistant message state
-              print('[DEBUG] onDone - Final assistant message: text="${assistantMessage.text.substring(0, min(assistantMessage.text.length, 100))}"');
-              print('[DEBUG] onDone - Text length: ${assistantMessage.text.length}');
-              print('[DEBUG] onDone - Full response text: ${assistantMessage.text}');
-
               // Finalize the message
               final finalMessages = conversation.messages.map((m) {
                 if (m.id == assistantMessageId) return assistantMessage;
@@ -824,7 +799,6 @@ class ChatService {
     }
   }
 
-  /// Executes tool calls and continues the conversation
   /// Cleanup stream resources
   void _cleanupStream(String conversationId) {
     _activeSubscriptions.remove(conversationId)?.cancel();

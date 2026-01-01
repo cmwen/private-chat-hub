@@ -114,11 +114,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_selectedConversation != null) {
       return PopScope(
         canPop: false,
-        onPopInvoked: (didPop) {
-          if (!didPop) {
-            // User pressed back button
-            _onBackFromChat();
-          }
+        // ignore: deprecated_member_use
+        onPopInvoked: (_) {
+          // User pressed back button
+          _onBackFromChat();
         },
         child: _selectedConversation is ComparisonConversation
             ? ComparisonChatScreen(
