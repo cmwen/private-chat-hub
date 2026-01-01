@@ -56,11 +56,13 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     final connection = widget.connectionService.getDefaultConnection();
     if (connection != null) {
       try {
-        widget.ollamaService.setConnection(OllamaConnection(
-          host: connection.host,
-          port: connection.port,
-          useHttps: connection.useHttps,
-        ));
+        widget.ollamaService.setConnection(
+          OllamaConnection(
+            host: connection.host,
+            port: connection.port,
+            useHttps: connection.useHttps,
+          ),
+        );
         _models = await widget.ollamaService.listModels();
       } catch (_) {
         _models = [];
@@ -102,7 +104,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
       if (_project.fullContext != null) {
         parts.add(_project.fullContext!);
       }
-      if (result['systemPrompt'] != null && result['systemPrompt']!.isNotEmpty) {
+      if (result['systemPrompt'] != null &&
+          result['systemPrompt']!.isNotEmpty) {
         parts.add('\n\nAdditional Instructions:\n${result['systemPrompt']}');
       }
       combinedPrompt = parts.join('\n');
@@ -171,9 +174,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
       widget.onProjectUpdated();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Project updated')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Project updated')));
       }
     }
   }
@@ -230,18 +233,22 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
               ),
               const Divider(height: 32),
               _InfoRow('Conversations', '${_conversations.length}'),
-              _InfoRow('Created', DateFormat('MMM d, y').format(_project.createdAt)),
-              _InfoRow('Last Updated', DateFormat('MMM d, y').format(_project.updatedAt)),
+              _InfoRow(
+                'Created',
+                DateFormat('MMM d, y').format(_project.createdAt),
+              ),
+              _InfoRow(
+                'Last Updated',
+                DateFormat('MMM d, y').format(_project.updatedAt),
+              ),
               const SizedBox(height: 16),
-              if (_project.systemPrompt != null || _project.instructions != null) ...[
+              if (_project.systemPrompt != null ||
+                  _project.instructions != null) ...[
                 const Divider(),
                 const SizedBox(height: 16),
                 const Text(
                   'Project Context',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -250,7 +257,10 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 ),
                 const SizedBox(height: 12),
                 if (_project.systemPrompt != null) ...[
-                  const Text('System Prompt:', style: TextStyle(fontWeight: FontWeight.w500)),
+                  const Text(
+                    'System Prompt:',
+                    style: TextStyle(fontWeight: FontWeight.w500),
+                  ),
                   const SizedBox(height: 4),
                   Container(
                     width: double.infinity,
@@ -267,7 +277,10 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                   const SizedBox(height: 12),
                 ],
                 if (_project.instructions != null) ...[
-                  const Text('Instructions:', style: TextStyle(fontWeight: FontWeight.w500)),
+                  const Text(
+                    'Instructions:',
+                    style: TextStyle(fontWeight: FontWeight.w500),
+                  ),
                   const SizedBox(height: 4),
                   Container(
                     width: double.infinity,
@@ -347,10 +360,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             Icon(_project.icon, size: 24),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                _project.name,
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: Text(_project.name, overflow: TextOverflow.ellipsis),
             ),
           ],
         ),
@@ -369,7 +379,10 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 // Context indicator
                 if (_project.fullContext != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     color: _project.color.withAlpha(30),
                     child: Row(
                       children: [
@@ -443,26 +456,16 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.chat_bubble_outline,
-              size: 64,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 24),
             const Text(
               'No conversations yet',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               'Start a new chat in this project\nto use the shared context',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
               textAlign: TextAlign.center,
             ),
           ],
@@ -486,10 +489,7 @@ class _InfoRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 120,
-            child: Text(
-              label,
-              style: TextStyle(color: Colors.grey[600]),
-            ),
+            child: Text(label, style: TextStyle(color: Colors.grey[600])),
           ),
           Expanded(child: Text(value)),
         ],
@@ -530,7 +530,9 @@ class _ConversationTile extends StatelessWidget {
         leading: CircleAvatar(
           backgroundColor: projectColor.withAlpha(60),
           child: Text(
-            conversation.title.isNotEmpty ? conversation.title[0].toUpperCase() : 'C',
+            conversation.title.isNotEmpty
+                ? conversation.title[0].toUpperCase()
+                : 'C',
             style: TextStyle(color: projectColor),
           ),
         ),
@@ -601,10 +603,12 @@ class _NewProjectConversationDialog extends StatefulWidget {
   });
 
   @override
-  State<_NewProjectConversationDialog> createState() => _NewProjectConversationDialogState();
+  State<_NewProjectConversationDialog> createState() =>
+      _NewProjectConversationDialogState();
 }
 
-class _NewProjectConversationDialogState extends State<_NewProjectConversationDialog> {
+class _NewProjectConversationDialogState
+    extends State<_NewProjectConversationDialog> {
   final _titleController = TextEditingController();
   final _systemPromptController = TextEditingController();
   bool _showAdvanced = false;
@@ -644,12 +648,19 @@ class _NewProjectConversationDialogState extends State<_NewProjectConversationDi
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.check_circle, size: 16, color: Colors.green[700]),
+                      Icon(
+                        Icons.check_circle,
+                        size: 16,
+                        color: Colors.green[700],
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Project context will be applied',
-                          style: TextStyle(fontSize: 12, color: Colors.green[700]),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.green[700],
+                          ),
                         ),
                       ),
                     ],
@@ -712,7 +723,9 @@ class _NewProjectConversationDialogState extends State<_NewProjectConversationDi
         FilledButton(
           onPressed: () {
             Navigator.pop(context, {
-              'title': _titleController.text.isEmpty ? null : _titleController.text.trim(),
+              'title': _titleController.text.isEmpty
+                  ? null
+                  : _titleController.text.trim(),
               'systemPrompt': _systemPromptController.text.isEmpty
                   ? null
                   : _systemPromptController.text.trim(),
@@ -746,9 +759,15 @@ class _EditProjectDialogState extends State<_EditProjectDialog> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.project.name);
-    _descriptionController = TextEditingController(text: widget.project.description ?? '');
-    _systemPromptController = TextEditingController(text: widget.project.systemPrompt ?? '');
-    _instructionsController = TextEditingController(text: widget.project.instructions ?? '');
+    _descriptionController = TextEditingController(
+      text: widget.project.description ?? '',
+    );
+    _systemPromptController = TextEditingController(
+      text: widget.project.systemPrompt ?? '',
+    );
+    _instructionsController = TextEditingController(
+      text: widget.project.instructions ?? '',
+    );
     _selectedColor = widget.project.colorValue;
     _selectedIcon = widget.project.iconName;
   }
@@ -787,14 +806,21 @@ class _EditProjectDialogState extends State<_EditProjectDialog> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text('Appearance', style: TextStyle(fontWeight: FontWeight.w500)),
+            const Text(
+              'Appearance',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
             const SizedBox(height: 8),
             Row(
               children: [
                 CircleAvatar(
                   radius: 20,
                   backgroundColor: Color(_selectedColor),
-                  child: Icon(_getIconData(_selectedIcon), color: Colors.white, size: 20),
+                  child: Icon(
+                    _getIconData(_selectedIcon),
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -824,12 +850,15 @@ class _EditProjectDialogState extends State<_EditProjectDialog> {
                         spacing: 6,
                         children: Project.availableIcons.map((iconName) {
                           return GestureDetector(
-                            onTap: () => setState(() => _selectedIcon = iconName),
+                            onTap: () =>
+                                setState(() => _selectedIcon = iconName),
                             child: Container(
                               width: 28,
                               height: 28,
                               decoration: BoxDecoration(
-                                color: iconName == _selectedIcon ? Colors.grey[300] : Colors.grey[100],
+                                color: iconName == _selectedIcon
+                                    ? Colors.grey[300]
+                                    : Colors.grey[100],
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Icon(_getIconData(iconName), size: 16),
@@ -845,7 +874,10 @@ class _EditProjectDialogState extends State<_EditProjectDialog> {
             const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 8),
-            const Text('Project Context', style: TextStyle(fontWeight: FontWeight.w500)),
+            const Text(
+              'Project Context',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
             const SizedBox(height: 4),
             Text(
               'Shared with all conversations in this project',
@@ -910,19 +942,32 @@ class _EditProjectDialogState extends State<_EditProjectDialog> {
 
   IconData _getIconData(String name) {
     switch (name) {
-      case 'folder': return Icons.folder;
-      case 'code': return Icons.code;
-      case 'work': return Icons.work;
-      case 'school': return Icons.school;
-      case 'science': return Icons.science;
-      case 'lightbulb': return Icons.lightbulb;
-      case 'chat': return Icons.chat;
-      case 'article': return Icons.article;
-      case 'build': return Icons.build;
-      case 'explore': return Icons.explore;
-      case 'favorite': return Icons.favorite;
-      case 'star': return Icons.star;
-      default: return Icons.folder;
+      case 'folder':
+        return Icons.folder;
+      case 'code':
+        return Icons.code;
+      case 'work':
+        return Icons.work;
+      case 'school':
+        return Icons.school;
+      case 'science':
+        return Icons.science;
+      case 'lightbulb':
+        return Icons.lightbulb;
+      case 'chat':
+        return Icons.chat;
+      case 'article':
+        return Icons.article;
+      case 'build':
+        return Icons.build;
+      case 'explore':
+        return Icons.explore;
+      case 'favorite':
+        return Icons.favorite;
+      case 'star':
+        return Icons.star;
+      default:
+        return Icons.folder;
     }
   }
 }

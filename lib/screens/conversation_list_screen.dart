@@ -44,7 +44,9 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     setState(() => _isLoading = true);
 
     // Only show standalone conversations (not in projects) in the main list
-    _conversations = widget.chatService.getConversations(excludeProjectConversations: true);
+    _conversations = widget.chatService.getConversations(
+      excludeProjectConversations: true,
+    );
     _selectedModel = widget.connectionService.getSelectedModel();
 
     // Try to load models from Ollama
@@ -60,11 +62,13 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     setState(() => _isLoadingModels = true);
 
     try {
-      widget.ollamaService.setConnection(OllamaConnection(
-        host: connection.host,
-        port: connection.port,
-        useHttps: connection.useHttps,
-      ));
+      widget.ollamaService.setConnection(
+        OllamaConnection(
+          host: connection.host,
+          port: connection.port,
+          useHttps: connection.useHttps,
+        ),
+      );
 
       _models = await widget.ollamaService.listModels();
 
@@ -95,9 +99,8 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     // Show dialog to optionally customize the conversation
     final result = await showDialog<Map<String, String?>>(
       context: context,
-      builder: (dialogContext) => _NewConversationDialog(
-        modelName: _selectedModel!,
-      ),
+      builder: (dialogContext) =>
+          _NewConversationDialog(modelName: _selectedModel!),
     );
 
     if (result == null) return; // User cancelled
@@ -251,8 +254,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                               conversation: conversation,
                               onTap: () =>
                                   widget.onConversationSelected(conversation),
-                              onDelete: () =>
-                                  _deleteConversation(conversation),
+                              onDelete: () => _deleteConversation(conversation),
                             );
                           },
                         ),
@@ -275,26 +277,16 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.chat_bubble_outline,
-              size: 80,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.chat_bubble_outline, size: 80, color: Colors.grey[400]),
             const SizedBox(height: 24),
             const Text(
               'No conversations yet',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               'Start a new chat with your AI assistant',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
@@ -378,26 +370,16 @@ class _ConversationTile extends StatelessWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                Icon(
-                  Icons.psychology,
-                  size: 12,
-                  color: Colors.grey[500],
-                ),
+                Icon(Icons.psychology, size: 12, color: Colors.grey[500]),
                 const SizedBox(width: 4),
                 Text(
                   conversation.modelName,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey[500],
-                  ),
+                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
                 ),
                 const Spacer(),
                 Text(
                   _formatDate(conversation.updatedAt),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey[500],
-                  ),
+                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
                 ),
               ],
             ),
@@ -407,10 +389,7 @@ class _ConversationTile extends StatelessWidget {
         onTap: onTap,
         trailing: Text(
           '${conversation.messageCount}',
-          style: TextStyle(
-            color: Colors.grey[500],
-            fontSize: 12,
-          ),
+          style: TextStyle(color: Colors.grey[500], fontSize: 12),
         ),
       ),
     );
@@ -457,10 +436,7 @@ class _ModelSelectorSheet extends StatelessWidget {
               children: [
                 const Text(
                   'Select Model',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
                 if (isLoading)
@@ -485,10 +461,7 @@ class _ModelSelectorSheet extends StatelessWidget {
                 children: [
                   Icon(Icons.warning_amber, size: 48, color: Colors.orange),
                   SizedBox(height: 16),
-                  Text(
-                    'No models found',
-                    style: TextStyle(fontSize: 16),
-                  ),
+                  Text('No models found', style: TextStyle(fontSize: 16)),
                   SizedBox(height: 8),
                   Text(
                     'Make sure Ollama is running and has models downloaded',
@@ -558,22 +531,26 @@ class _NewConversationDialogState extends State<_NewConversationDialog> {
     },
     {
       'name': 'Code Expert',
-      'prompt': 'You are an expert programmer. Provide clear, well-documented code examples. '
+      'prompt':
+          'You are an expert programmer. Provide clear, well-documented code examples. '
           'Explain your reasoning and suggest best practices.',
     },
     {
       'name': 'Creative Writer',
-      'prompt': 'You are a creative writing assistant. Help users craft compelling stories, '
+      'prompt':
+          'You are a creative writing assistant. Help users craft compelling stories, '
           'poems, and other creative content. Be imaginative and expressive.',
     },
     {
       'name': 'Tutor',
-      'prompt': 'You are a patient and encouraging tutor. Break down complex topics into '
+      'prompt':
+          'You are a patient and encouraging tutor. Break down complex topics into '
           'simple steps. Ask questions to check understanding and provide examples.',
     },
     {
       'name': 'Concise Mode',
-      'prompt': 'Be concise. Answer directly and briefly. Avoid unnecessary explanations.',
+      'prompt':
+          'Be concise. Answer directly and briefly. Avoid unnecessary explanations.',
     },
   ];
 
@@ -668,11 +645,11 @@ class _NewConversationDialogState extends State<_NewConversationDialog> {
         FilledButton(
           onPressed: () {
             Navigator.pop(context, {
-              'title': _titleController.text.isEmpty 
-                  ? null 
+              'title': _titleController.text.isEmpty
+                  ? null
                   : _titleController.text,
-              'systemPrompt': _systemPromptController.text.isEmpty 
-                  ? null 
+              'systemPrompt': _systemPromptController.text.isEmpty
+                  ? null
                   : _systemPromptController.text,
             });
           },

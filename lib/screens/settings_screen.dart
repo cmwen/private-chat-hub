@@ -94,9 +94,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await widget.connectionService.deleteConnection(connection.id);
       _loadConnections();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Connection deleted')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Connection deleted')));
       }
     }
   }
@@ -144,10 +144,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: EdgeInsets.all(16),
                   child: Text(
                     'Ollama Connections',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
                 if (_connections.isEmpty)
@@ -299,8 +296,10 @@ class _ConnectionCard extends StatelessWidget {
                 if (connection.isDefault) ...[
                   const SizedBox(width: 8),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.primary,
                       borderRadius: BorderRadius.circular(12),
@@ -366,18 +365,11 @@ class _ConnectionCard extends StatelessWidget {
               padding: const EdgeInsets.only(left: 72, right: 16, bottom: 12),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.check_circle,
-                    size: 14,
-                    color: Colors.green[600],
-                  ),
+                  Icon(Icons.check_circle, size: 14, color: Colors.green[600]),
                   const SizedBox(width: 4),
                   Text(
                     'Last connected: ${_formatDate(connection.lastConnectedAt!)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -403,7 +395,7 @@ class _ConnectionCard extends StatelessWidget {
 /// Dialog for adding a new Ollama connection.
 class AddConnectionDialog extends StatefulWidget {
   final Future<void> Function(String name, String host, int port, bool useHttps)
-      onAdd;
+  onAdd;
   final OllamaService ollamaService;
 
   const AddConnectionDialog({
@@ -553,27 +545,29 @@ class _AddConnectionDialogState extends State<AddConnectionDialog> {
                           style: TextStyle(fontSize: 12, color: Colors.grey),
                         ),
                         const SizedBox(height: 4),
-                        ...(_discoveredInstances.map((instance) => InkWell(
-                          onTap: () => _selectDiscoveredInstance(instance),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.cloud, size: 16),
-                                const SizedBox(width: 8),
-                                Text(instance.displayName),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '(${instance.address})',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[600],
+                        ...(_discoveredInstances.map(
+                          (instance) => InkWell(
+                            onTap: () => _selectDiscoveredInstance(instance),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.cloud, size: 16),
+                                  const SizedBox(width: 8),
+                                  Text(instance.displayName),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '(${instance.address})',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                        ))),
+                        )),
                       ] else if (_isDiscovering)
                         const Padding(
                           padding: EdgeInsets.only(top: 8),
@@ -686,10 +680,7 @@ class _AddConnectionDialogState extends State<AddConnectionDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
-        ElevatedButton(
-          onPressed: _save,
-          child: const Text('Save'),
-        ),
+        ElevatedButton(onPressed: _save, child: const Text('Save')),
       ],
     );
   }

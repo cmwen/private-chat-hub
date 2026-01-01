@@ -100,8 +100,10 @@ void main() {
         updatedAt: DateTime(2025, 1, 1),
       );
 
-      expect(conversation.lastMessagePreview,
-          'This is a response from the assistant');
+      expect(
+        conversation.lastMessagePreview,
+        'This is a response from the assistant',
+      );
     });
 
     test('should return "No messages yet" for empty conversation', () {

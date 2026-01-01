@@ -75,12 +75,7 @@ class OllamaConnection {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'host': host,
-      'port': port,
-      'useHttps': useHttps,
-      'name': name,
-    };
+    return {'host': host, 'port': port, 'useHttps': useHttps, 'name': name};
   }
 
   OllamaConnection copyWith({
@@ -208,7 +203,7 @@ class OllamaService {
         if (options != null) 'options': options,
         if (tools != null && tools.isNotEmpty) 'tools': tools,
       };
-      
+
       final response = await _client.post(
         Uri.parse('$_baseUrl/api/chat'),
         headers: {'Content-Type': 'application/json'},
@@ -241,7 +236,7 @@ class OllamaService {
     try {
       final request = http.Request('POST', Uri.parse('$_baseUrl/api/chat'));
       request.headers['Content-Type'] = 'application/json';
-      
+
       final body = {
         'model': model,
         'messages': messages,
@@ -249,17 +244,21 @@ class OllamaService {
         if (options != null) 'options': options,
         if (tools != null && tools.isNotEmpty) 'tools': tools,
       };
-      
+
       request.body = jsonEncode(body);
 
       final streamedResponse = await _client.send(request);
 
       if (streamedResponse.statusCode != 200) {
         throw OllamaException(
-            'Chat request failed', streamedResponse.statusCode);
+          'Chat request failed',
+          streamedResponse.statusCode,
+        );
       }
 
-      await for (final chunk in streamedResponse.stream.transform(utf8.decoder)) {
+      await for (final chunk in streamedResponse.stream.transform(
+        utf8.decoder,
+      )) {
         // Handle multiple JSON objects per chunk (newline-delimited)
         final lines = chunk.split('\n').where((line) => line.isNotEmpty);
 
@@ -327,10 +326,14 @@ class OllamaService {
 
       if (streamedResponse.statusCode != 200) {
         throw OllamaException(
-            'Pull request failed', streamedResponse.statusCode);
+          'Pull request failed',
+          streamedResponse.statusCode,
+        );
       }
 
-      await for (final chunk in streamedResponse.stream.transform(utf8.decoder)) {
+      await for (final chunk in streamedResponse.stream.transform(
+        utf8.decoder,
+      )) {
         final lines = chunk.split('\n').where((line) => line.isNotEmpty);
 
         for (final line in lines) {

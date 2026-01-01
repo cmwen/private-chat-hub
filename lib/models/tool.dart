@@ -31,11 +31,7 @@ class Tool {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'name': name,
-      'description': description,
-      'parameters': parameters,
-    };
+    return {'name': name, 'description': description, 'parameters': parameters};
   }
 }
 
@@ -60,11 +56,7 @@ class ToolCall {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'arguments': arguments,
-    };
+    return {'id': id, 'name': name, 'arguments': arguments};
   }
 }
 
@@ -89,40 +81,32 @@ class ToolResult {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'toolCallId': toolCallId,
-      'content': content,
-      'isError': isError,
-    };
+    return {'toolCallId': toolCallId, 'content': content, 'isError': isError};
   }
 
   /// Converts to Ollama API message format.
   Map<String, dynamic> toOllamaMessage() {
-    return {
-      'role': 'tool',
-      'content': content,
-      'tool_call_id': toolCallId,
-    };
+    return {'role': 'tool', 'content': content, 'tool_call_id': toolCallId};
   }
 }
 
 /// Web search tool definition.
 class WebSearchTool extends Tool {
   WebSearchTool()
-      : super(
-          name: 'web_search',
-          description:
-              'Search the internet for current information, news, facts, or answers to questions. Use this when you need up-to-date information or when the user asks about recent events.',
-          parameters: {
-            'type': 'object',
-            'properties': {
-              'query': {
-                'type': 'string',
-                'description':
-                    'The search query to look up on the internet. Be specific and clear.',
-              },
+    : super(
+        name: 'web_search',
+        description:
+            'Search the internet for current information, news, facts, or answers to questions. Use this when you need up-to-date information or when the user asks about recent events.',
+        parameters: {
+          'type': 'object',
+          'properties': {
+            'query': {
+              'type': 'string',
+              'description':
+                  'The search query to look up on the internet. Be specific and clear.',
             },
-            'required': ['query'],
           },
-        );
+          'required': ['query'],
+        },
+      );
 }

@@ -75,7 +75,7 @@ class ConnectionService {
   Future<void> updateConnection(Connection connection) async {
     final connections = getConnections();
     final index = connections.indexWhere((c) => c.id == connection.id);
-    
+
     if (index != -1) {
       connections[index] = connection;
       await _saveConnections(connections);
@@ -130,7 +130,7 @@ class ConnectionService {
   Future<void> updateLastConnected(String id) async {
     final connections = getConnections();
     final index = connections.indexWhere((c) => c.id == id);
-    
+
     if (index != -1) {
       connections[index] = connections[index].copyWith(
         lastConnectedAt: DateTime.now(),

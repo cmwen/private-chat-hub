@@ -13,11 +13,7 @@ import 'package:private_chat_hub/screens/chat_screen.dart';
 void main() {
   testWidgets('Chat screen smoke test', (WidgetTester tester) async {
     // Build the chat screen in demo mode (no services)
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: ChatScreen(),
-      ),
-    );
+    await tester.pumpWidget(const MaterialApp(home: ChatScreen()));
 
     // Verify chat screen loads with demo message
     expect(find.text('Chat'), findsOneWidget);
@@ -31,11 +27,7 @@ void main() {
 
   testWidgets('Send message in demo mode', (WidgetTester tester) async {
     // Build the chat screen in demo mode
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: ChatScreen(),
-      ),
-    );
+    await tester.pumpWidget(const MaterialApp(home: ChatScreen()));
 
     // Find the text field and enter text
     await tester.enterText(find.byType(TextField), 'Hello!');

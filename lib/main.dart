@@ -67,7 +67,11 @@ class _HomeScreenState extends State<HomeScreen> {
     _ollamaService = OllamaService();
     _connectionService = ConnectionService(widget.storageService);
     _webSearchService = WebSearchService();
-    _chatService = ChatService(_ollamaService, widget.storageService, _webSearchService);
+    _chatService = ChatService(
+      _ollamaService,
+      widget.storageService,
+      _webSearchService,
+    );
     _projectService = ProjectService(widget.storageService);
 
     // Set up Ollama connection if one exists
@@ -77,11 +81,13 @@ class _HomeScreenState extends State<HomeScreen> {
   void _setupConnection() {
     final connection = _connectionService.getDefaultConnection();
     if (connection != null) {
-      _ollamaService.setConnection(OllamaConnection(
-        host: connection.host,
-        port: connection.port,
-        useHttps: connection.useHttps,
-      ));
+      _ollamaService.setConnection(
+        OllamaConnection(
+          host: connection.host,
+          port: connection.port,
+          useHttps: connection.useHttps,
+        ),
+      );
     }
   }
 

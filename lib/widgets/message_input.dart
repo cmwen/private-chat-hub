@@ -7,10 +7,8 @@ import 'package:private_chat_hub/models/message.dart';
 import 'package:uuid/uuid.dart';
 
 /// Callback for sending a message with optional attachments.
-typedef OnSendMessageWithAttachments = void Function(
-  String text,
-  List<Attachment> attachments,
-);
+typedef OnSendMessageWithAttachments =
+    void Function(String text, List<Attachment> attachments);
 
 /// Message input field with send button and attachment support.
 class MessageInput extends StatefulWidget {
@@ -74,9 +72,31 @@ class _MessageInputState extends State<MessageInput> {
 
   /// Supported text file extensions for context attachments.
   static const List<String> _supportedTextExtensions = [
-    'txt', 'md', 'py', 'js', 'ts', 'java', 'kt', 'dart',
-    'json', 'yaml', 'yml', 'xml', 'html', 'css', 'c', 'cpp',
-    'h', 'hpp', 'cs', 'go', 'rb', 'php', 'swift', 'rs', 'sh',
+    'txt',
+    'md',
+    'py',
+    'js',
+    'ts',
+    'java',
+    'kt',
+    'dart',
+    'json',
+    'yaml',
+    'yml',
+    'xml',
+    'html',
+    'css',
+    'c',
+    'cpp',
+    'h',
+    'hpp',
+    'cs',
+    'go',
+    'rb',
+    'php',
+    'swift',
+    'rs',
+    'sh',
   ];
 
   /// Maximum file size for text attachments (5 MB).
@@ -139,9 +159,9 @@ class _MessageInputState extends State<MessageInput> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to pick file: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to pick file: $e')));
       }
     }
   }
@@ -168,9 +188,9 @@ class _MessageInputState extends State<MessageInput> {
 
     if (bytes == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to read ${file.name}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to read ${file.name}')));
       }
       return;
     }
@@ -180,13 +200,15 @@ class _MessageInputState extends State<MessageInput> {
     final mimeType = _getMimeType(extension);
 
     setState(() {
-      _attachments.add(Attachment(
-        id: const Uuid().v4(),
-        name: file.name,
-        mimeType: mimeType,
-        data: bytes!,
-        size: bytes.length,
-      ));
+      _attachments.add(
+        Attachment(
+          id: const Uuid().v4(),
+          name: file.name,
+          mimeType: mimeType,
+          data: bytes!,
+          size: bytes.length,
+        ),
+      );
     });
   }
 
@@ -256,9 +278,9 @@ class _MessageInputState extends State<MessageInput> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to pick image: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to pick image: $e')));
       }
     }
   }
@@ -277,9 +299,9 @@ class _MessageInputState extends State<MessageInput> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to take photo: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to take photo: $e')));
       }
     }
   }
@@ -289,13 +311,15 @@ class _MessageInputState extends State<MessageInput> {
     final mimeType = image.mimeType ?? 'image/jpeg';
 
     setState(() {
-      _attachments.add(Attachment(
-        id: const Uuid().v4(),
-        name: image.name,
-        mimeType: mimeType,
-        data: bytes,
-        size: bytes.length,
-      ));
+      _attachments.add(
+        Attachment(
+          id: const Uuid().v4(),
+          name: image.name,
+          mimeType: mimeType,
+          data: bytes,
+          size: bytes.length,
+        ),
+      );
     });
   }
 
@@ -405,10 +429,7 @@ class _AttachmentPreview extends StatelessWidget {
   final Attachment attachment;
   final VoidCallback onRemove;
 
-  const _AttachmentPreview({
-    required this.attachment,
-    required this.onRemove,
-  });
+  const _AttachmentPreview({required this.attachment, required this.onRemove});
 
   IconData _getFileIcon() {
     final ext = attachment.name.split('.').last.toLowerCase();
@@ -527,11 +548,7 @@ class _AttachmentPreview extends StatelessWidget {
                   color: Colors.red,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.close,
-                  size: 14,
-                  color: Colors.white,
-                ),
+                child: const Icon(Icons.close, size: 14, color: Colors.white),
               ),
             ),
           ),

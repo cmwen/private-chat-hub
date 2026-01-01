@@ -7,10 +7,7 @@ void main() {
       const tool = Tool(
         name: 'test_tool',
         description: 'A test tool',
-        parameters: {
-          'type': 'object',
-          'properties': {},
-        },
+        parameters: {'type': 'object', 'properties': {}},
       );
 
       expect(tool.name, 'test_tool');

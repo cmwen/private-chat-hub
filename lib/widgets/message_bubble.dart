@@ -73,7 +73,8 @@ class MessageBubble extends StatelessWidget {
                     // Display text file attachments if present
                     if (message.hasTextFiles) _buildFileAttachments(context),
                     // Display tool result indicator if this is a tool message
-                    if (message.isToolResult) _buildToolResultIndicator(context),
+                    if (message.isToolResult)
+                      _buildToolResultIndicator(context),
                     Text(
                       message.text,
                       style: TextStyle(
@@ -177,7 +178,9 @@ class MessageBubble extends StatelessWidget {
                           attachment.formattedSize,
                           style: TextStyle(
                             fontSize: 10,
-                            color: message.isMe ? Colors.white70 : Colors.grey[600],
+                            color: message.isMe
+                                ? Colors.white70
+                                : Colors.grey[600],
                           ),
                         ),
                       ],
@@ -305,9 +308,7 @@ class MessageBubble extends StatelessWidget {
           children: [
             GestureDetector(
               onTap: () => Navigator.pop(dialogContext),
-              child: InteractiveViewer(
-                child: Image.memory(attachment.data),
-              ),
+              child: InteractiveViewer(child: Image.memory(attachment.data)),
             ),
             Positioned(
               top: 8,

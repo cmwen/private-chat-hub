@@ -32,16 +32,12 @@ class SearchResult {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'title': title,
-      'url': url,
-      'snippet': snippet,
-    };
+    return {'title': title, 'url': url, 'snippet': snippet};
   }
 }
 
 /// Service for performing web searches.
-/// 
+///
 /// This service uses DuckDuckGo's HTML search (no API key required).
 /// For production use, consider using a proper search API like:
 /// - Google Custom Search API
@@ -53,14 +49,15 @@ class WebSearchService {
   WebSearchService({http.Client? client}) : _client = client ?? http.Client();
 
   /// Searches the web using DuckDuckGo Instant Answer API.
-  /// 
+  ///
   /// Returns a formatted string with search results.
   Future<String> search(String query) async {
     try {
       // Use DuckDuckGo Instant Answer API (free, no API key required)
       final encodedQuery = Uri.encodeComponent(query);
       final url = Uri.parse(
-          'https://api.duckduckgo.com/?q=$encodedQuery&format=json&no_html=1&skip_disambig=1');
+        'https://api.duckduckgo.com/?q=$encodedQuery&format=json&no_html=1&skip_disambig=1',
+      );
 
       final response = await _client
           .get(url)
@@ -71,7 +68,8 @@ class WebSearchService {
         return _formatDuckDuckGoResults(data, query);
       } else {
         throw WebSearchException(
-            'Search failed with status code: ${response.statusCode}');
+          'Search failed with status code: ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw WebSearchException('Error performing search: $e');
@@ -105,15 +103,15 @@ class WebSearchService {
     final relatedTopics = data['RelatedTopics'] as List<dynamic>?;
     if (relatedTopics != null && relatedTopics.isNotEmpty) {
       buffer.writeln('Related Information:');
-      
+
       int count = 0;
       for (final topic in relatedTopics) {
         if (count >= 5) break; // Limit to 5 results
-        
+
         if (topic is Map<String, dynamic>) {
           final text = topic['Text'] as String?;
           final firstUrl = topic['FirstURL'] as String?;
-          
+
           if (text != null && text.isNotEmpty) {
             count++;
             buffer.writeln('$count. $text');
@@ -129,7 +127,7 @@ class WebSearchService {
     // Definition (if available)
     final definition = data['Definition'] as String?;
     final definitionSource = data['DefinitionSource'] as String?;
-    
+
     if (definition != null && definition.isNotEmpty) {
       buffer.writeln('Definition:');
       buffer.writeln(definition);
@@ -140,12 +138,12 @@ class WebSearchService {
     }
 
     final result = buffer.toString().trim();
-    
+
     // If no results found, return a helpful message
     if (result == 'Web Search Results for: "$query"') {
       return 'No specific results found for "$query". The information might be too specific or recent. Try rephrasing your query or breaking it into simpler terms.';
     }
-    
+
     return result;
   }
 
@@ -154,21 +152,26 @@ class WebSearchService {
   Future<List<SearchResult>> searchHtml(String query) async {
     try {
       final encodedQuery = Uri.encodeComponent(query);
-      final url = Uri.parse('https://html.duckduckgo.com/html/?q=$encodedQuery');
+      final url = Uri.parse(
+        'https://html.duckduckgo.com/html/?q=$encodedQuery',
+      );
 
-      final response = await _client.get(
-        url,
-        headers: {
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-      ).timeout(const Duration(seconds: 10));
+      final response = await _client
+          .get(
+            url,
+            headers: {
+              'User-Agent':
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         return _parseHtmlResults(response.body);
       } else {
         throw WebSearchException(
-            'HTML search failed with status code: ${response.statusCode}');
+          'HTML search failed with status code: ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw WebSearchException('Error performing HTML search: $e');
@@ -178,7 +181,7 @@ class WebSearchService {
   /// Parses HTML search results (basic parsing).
   List<SearchResult> _parseHtmlResults(String html) {
     final results = <SearchResult>[];
-    
+
     // Basic HTML parsing - in a real app, use html package
     // This is a simple implementation for demonstration
     final resultPattern = RegExp(
@@ -188,18 +191,20 @@ class WebSearchService {
     );
 
     final matches = resultPattern.allMatches(html);
-    
+
     for (final match in matches.take(5)) {
       final url = match.group(1) ?? '';
       final title = match.group(2) ?? '';
       final snippet = match.group(3) ?? '';
-      
+
       if (url.isNotEmpty && title.isNotEmpty) {
-        results.add(SearchResult(
-          url: url,
-          title: _decodeHtmlEntities(title),
-          snippet: _decodeHtmlEntities(snippet),
-        ));
+        results.add(
+          SearchResult(
+            url: url,
+            title: _decodeHtmlEntities(title),
+            snippet: _decodeHtmlEntities(snippet),
+          ),
+        );
       }
     }
 
