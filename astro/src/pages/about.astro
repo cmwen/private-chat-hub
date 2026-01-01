@@ -1,18 +1,68 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
 ---
-<BaseLayout title="About">
+<BaseLayout title="About Private Chat Hub">
   <section>
-    <h2>About this site</h2>
-    <p>This small site is a lightweight static landing for the <code>min-android-app-template</code> Flutter repository. It's built with Astro and a Startlight-inspired theme so it's fast and easy to maintain.</p>
+    <h2>About Private Chat Hub</h2>
+    <p class="lead">Private Chat Hub is a privacy-first mobile application that lets you interact with self-hosted AI models directly on your Android device. Your conversations stay under your control.</p>
 
     <div class="card">
-      <h3>How it works</h3>
+      <h3>🎨 Our Philosophy</h3>
+      <p><strong>Privacy First:</strong> User data never leaves your control</p>
+      <p><strong>Local Performance:</strong> Optimize for local network operations</p>
+      <p><strong>Simplicity:</strong> Complex AI made accessible to everyone</p>
+      <p><strong>Transparency:</strong> Always show what's happening (model, resource usage)</p>
+      <p><strong>Extensibility:</strong> Build for today, prepare for tomorrow</p>
+    </div>
+
+    <div class="card">
+      <h3>👥 Who is this for?</h3>
+      
+      <p><strong>The Privacy Advocate</strong></p>
+      <p>Runs home servers and self-hosted services. Distrusts cloud AI services. Values complete control over data. Willing to invest in hardware for digital sovereignty.</p>
+      
+      <p style="margin-top:16px"><strong>The AI Developer</strong></p>
+      <p>Experiments with LLMs and models. Needs flexible testing environment. Wants to integrate AI into workflows. Understands technical trade-offs and values rapid experimentation.</p>
+      
+      <p style="margin-top:16px"><strong>The Power User</strong></p>
+      <p>Uses AI daily for productivity. Concerned about subscription costs. Wants offline/local capabilities. Values customization and control over generic cloud solutions.</p>
+    </div>
+
+    <div class="card">
+      <h3>🏗️ Built With</h3>
       <ul>
-        <li>Source in <code>/astro</code></li>
-        <li>Build uses <code>npm run build</code> to generate a static <code>dist/</code> folder</li>
-        <li>CI workflow deploys <code>dist/</code> to GitHub Pages when a GitHub Release is published (or on manual dispatch)</li>
+        <li><strong>Flutter 3.10.1+</strong> - Cross-platform mobile development</li>
+        <li><strong>Dart 3.10.1+</strong> - Fast, type-safe language</li>
+        <li><strong>Material Design 3</strong> - Beautiful, accessible UI</li>
+        <li><strong>Ollama Integration</strong> - Connect to any self-hosted LLM</li>
       </ul>
+    </div>
+
+    <div class="card">
+      <h3>🎯 Product Principles</h3>
+      <ol>
+        <li><strong>Data Ownership:</strong> Users own 100% of their conversation data</li>
+        <li><strong>No Subscriptions:</strong> Free to use, costs only your hardware</li>
+        <li><strong>Model Flexibility:</strong> Switch between models instantly</li>
+        <li><strong>Local Network:</strong> All communication stays on your network</li>
+        <li><strong>Open Development:</strong> Built in the open, transparent roadmap</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h3>📊 Success Metrics</h3>
+      <p>We measure success by:</p>
+      <ul>
+        <li>User satisfaction and app store ratings (target: 4.5+)</li>
+        <li>Community feedback and feature adoption</li>
+        <li>Technical performance (response time, reliability)</li>
+        <li>User retention (30-day: 60%+)</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>🔗 Project Links</h3>
+      <p><a href="https://github.com/cmwen/private-chat-hub" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub Repository</a> • <a href="/releases" style="color:var(--accent);text-decoration:none">Releases & Downloads</a> • <a href="/install" style="color:var(--accent);text-decoration:none">Installation Guide</a></p>
     </div>
   </section>
 </BaseLayout>

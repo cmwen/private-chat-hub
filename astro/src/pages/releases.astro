@@ -2,23 +2,62 @@
 import BaseLayout from '../layouts/BaseLayout.astro'
 ---
 
-<BaseLayout title="Releases">
+<BaseLayout title="Releases & Downloads">
   <section>
     <h2>Releases & Downloads</h2>
 
+    <p class="lead">Get the latest version of Private Chat Hub for your Android device.</p>
+
     <div class="card">
-      <p class="lead">Download the project artifacts (APK / AAB / Web) from GitHub Releases.</p>
-      <p><a href="https://github.com/cmwen/min-android-app-template/releases/latest" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">Open latest release on GitHub →</a></p>
+      <h3>📥 Latest Release</h3>
+      <p>Download the newest version with all the latest features and improvements.</p>
+      <p style="margin-top:12px"><a href="https://github.com/cmwen/private-chat-hub/releases/latest" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-weight:bold">→ Download Latest Release</a></p>
     </div>
 
     <div class="card">
-      <h3>If you built from source</h3>
+      <h3>📱 What You'll Get</h3>
       <ul>
-        <li>Android APK: <code>flutter build apk</code></li>
-        <li>Android App Bundle: <code>flutter build appbundle</code></li>
-        <li>iOS: <code>flutter build ios</code></li>
-        <li>Web: <code>flutter build web</code></li>
+        <li><strong>APK</strong> - Direct installation on Android device</li>
+        <li><strong>Release Notes</strong> - What's new in this version</li>
+        <li><strong>Changelog</strong> - All improvements and fixes</li>
       </ul>
+    </div>
+
+    <div class="card">
+      <h3>✅ System Requirements</h3>
+      <ul>
+        <li>Android 6.0 or higher</li>
+        <li>Ollama instance on local network</li>
+        <li>At least 100MB free storage</li>
+        <li>WiFi or local network connection</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>🎯 Installation Instructions</h3>
+      <ol>
+        <li>Download the APK file</li>
+        <li>Enable "Install from Unknown Sources" in Android Settings</li>
+        <li>Open the APK and follow the installation prompt</li>
+        <li>Launch Private Chat Hub and configure your Ollama connection</li>
+        <li>See the <a href="/install" style="color:var(--accent);text-decoration:none">Installation Guide</a> for detailed setup</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h3>🔄 Version History</h3>
+      <p>View all releases, including older versions and release notes on <a href="https://github.com/cmwen/private-chat-hub/releases" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub Releases</a>.</p>
+    </div>
+
+    <div class="card">
+      <h3>🛠️ Building from Source</h3>
+      <p>Prefer to build the app yourself? Check the <a href="https://github.com/cmwen/private-chat-hub" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub repository</a> for build instructions and development setup.</p>
+    </div>
+
+    <div class="card">
+      <h3>📊 What's New?</h3>
+      <p>Each release includes improvements, bug fixes, and new features. Check the release notes to see what's changed in the latest version.</p>
+      <p><a href="https://github.com/cmwen/private-chat-hub/releases/latest" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">View Latest Release Notes →</a></p>
     </div>
   </section>
 </BaseLayout>

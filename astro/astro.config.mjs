@@ -15,11 +15,11 @@ import { defineConfig } from 'astro/config';
 //
 // AI PROMPT: To update for your repo, replace:
 //   - 'cmwen' with your GitHub username
-//   - 'min-android-app-template' with your repository name
+//   - 'private-chat-hub' with your repository name
 // ============================================================================
 
 const GITHUB_USERNAME = 'cmwen';
-const REPO_NAME = 'min-android-app-template';
+const REPO_NAME = 'private-chat-hub';
 
 export default defineConfig({
   site: `https://${GITHUB_USERNAME}.github.io`,

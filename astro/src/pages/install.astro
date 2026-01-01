@@ -2,67 +2,110 @@
 import BaseLayout from '../layouts/BaseLayout.astro'
 ---
 
-<BaseLayout title="Install / Getting Started">
+<BaseLayout title="Install & Getting Started">
   <section>
-    <h2>Install & build guide</h2>
+    <h2>Getting Started with Private Chat Hub</h2>
 
-    <p class="lead">This quick guide shows how to get the Flutter template running locally and how to build release artifacts.</p>
+    <p class="lead">Get Private Chat Hub running on your Android device and connect to your Ollama instance in minutes.</p>
 
     <div class="card">
-      <h3>Prerequisites</h3>
+      <h3>📋 Prerequisites</h3>
       <ul>
-        <li>Flutter SDK 3.10.1 or higher</li>
-        <li>Dart 3.10.1 or higher</li>
-        <li>For Android: Android Studio or Android SDK</li>
-        <li>For iOS: Xcode (macOS only)</li>
-        <li>Node 18+ (for the website, not required for the app)</li>
+        <li><strong>Android Device</strong> - Android 6.0 or higher</li>
+        <li><strong>Ollama Instance</strong> - Running on your local network (home server, PC, etc.)</li>
+        <li><strong>Network Connection</strong> - Local network access between phone and Ollama host</li>
       </ul>
     </div>
 
     <div class="card">
-      <h3>Clone the repository</h3>
-      <pre style="background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;overflow:auto">git clone https://github.com/cmwen/min-android-app-template.git
-cd min-android-app-template</pre>
-    </div>
-
-    <div class="card">
-      <h3>Run locally</h3>
+      <h3>📥 Installation Options</h3>
+      
+      <p><strong>Option 1: Download APK (Easiest)</strong></p>
       <ol>
-        <li>Get dependencies: <code>flutter pub get</code></li>
-        <li>Run on any platform: <code>flutter run</code></li>
-        <li>Or specify a device:</li>
+        <li>Download the latest APK from <a href="https://github.com/cmwen/private-chat-hub/releases/latest" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub Releases</a></li>
+        <li>Enable "Install from Unknown Sources" in Android settings</li>
+        <li>Open the APK and follow the installation prompt</li>
+        <li>Launch the app and configure your Ollama connection</li>
       </ol>
-      <pre style="background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;overflow:auto">flutter run -d chrome    # Web
-flutter run -d macos     # macOS
-flutter run -d android   # Android
-flutter run -d ios       # iOS</pre>
+
+      <p style="margin-top:16px"><strong>Option 2: Build from Source</strong></p>
+      <ol>
+        <li>Install <a href="https://flutter.dev/docs/get-started/install" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">Flutter SDK 3.10.1+</a> and Dart</li>
+        <li>Clone the repository: <code>git clone https://github.com/cmwen/private-chat-hub.git</code></li>
+        <li>Get dependencies: <code>flutter pub get</code></li>
+        <li>Build APK: <code>flutter build apk --release</code></li>
+        <li>Install: <code>flutter install</code></li>
+      </ol>
     </div>
 
     <div class="card">
-      <h3>Build release artifacts</h3>
-      <pre style="background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;overflow:auto">flutter build apk         # Android APK
-flutter build appbundle   # Play Store
-flutter build ios         # iOS
-flutter build web         # Web</pre>
+      <h3>⚙️ Configure Ollama Connection</h3>
+      
+      <p><strong>Step 1: Find Your Ollama Host</strong></p>
+      <ul>
+        <li>If Ollama is running on your PC: Use your computer's local IP (e.g., <code>192.168.1.100</code>)</li>
+        <li>If Ollama is running on a NAS/Server: Use the server's local IP</li>
+        <li>Default Ollama port: <code>11434</code></li>
+      </ul>
+
+      <p style="margin-top:16px"><strong>Step 2: Connect in the App</strong></p>
+      <ol>
+        <li>Open Private Chat Hub</li>
+        <li>Tap "Settings" → "Connection"</li>
+        <li>Enter your Ollama host IP and port (e.g., <code>http://192.168.1.100:11434</code>)</li>
+        <li>Tap "Test Connection" to verify</li>
+        <li>Once connected, download or select a model</li>
+      </ol>
+
+      <p style="margin-top:16px"><strong>Troubleshooting Connection Issues</strong></p>
+      <ul>
+        <li><strong>Can't find host:</strong> Ensure your phone is on the same WiFi as your Ollama host</li>
+        <li><strong>Connection refused:</strong> Check that Ollama is running and listening on port 11434</li>
+        <li><strong>Slow responses:</strong> This is normal for first requests. Responses improve after warm-up</li>
+      </ul>
     </div>
 
     <div class="card">
-      <h3>Run tests</h3>
-      <pre style="background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;overflow:auto">flutter test              # Run all tests
-flutter test --coverage   # With coverage</pre>
+      <h3>🤖 Download AI Models</h3>
+      <ol>
+        <li>In the app, go to "Models" tab</li>
+        <li>Tap "Download Model"</li>
+        <li>Search for a model (e.g., <code>mistral</code>, <code>neural-chat</code>, <code>dolphin-mixtral</code>)</li>
+        <li>Tap to download (this happens on your Ollama host, not your phone)</li>
+        <li>Once downloaded, you can chat with it immediately</li>
+      </ol>
+      
+      <p style="margin-top:12px"><strong>Recommended Models for Getting Started:</strong></p>
+      <ul>
+        <li><strong>mistral</strong> (7B) - Fast and capable, great balance</li>
+        <li><strong>neural-chat</strong> (7B) - Optimized for conversation</li>
+        <li><strong>dolphin-mixtral</strong> (8x7B) - More powerful, higher quality</li>
+      </ul>
     </div>
 
     <div class="card">
-      <h3>Website (optional)</h3>
-      <p>If you need to work on the repository website, switch to the <code>astro/</code> directory and run:</p>
-      <pre style="background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;overflow:auto">cd astro
-npm install
-npm run dev</pre>
+      <h3>🎯 First Chat</h3>
+      <ol>
+        <li>Select a model from the dropdown at the top</li>
+        <li>Type a message in the chat input</li>
+        <li>Hit send and wait for a response (first response may take 10-30 seconds)</li>
+        <li>Your conversation is saved locally on your device</li>
+      </ol>
     </div>
 
     <div class="card">
-      <h3>Need more help?</h3>
-      <p>Open an issue or pull request on the <a href="https://github.com/cmwen/min-android-app-template" target="_blank" rel="noopener" style="color:var(--accent)">GitHub repository</a>. For CI or release problems check <code>.github/workflows/</code>.</p>
+      <h3>💡 Tips for Best Experience</h3>
+      <ul>
+        <li><strong>WiFi is best:</strong> Larger models respond faster over WiFi</li>
+        <li><strong>Keep Ollama running:</strong> The app connects to your host in real-time</li>
+        <li><strong>Export conversations:</strong> Use the menu to export chats as backup</li>
+        <li><strong>Try different models:</strong> Each model has different strengths and response styles</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>📖 For Developers</h3>
+      <p>Want to build from source or contribute? Check the <a href="https://github.com/cmwen/private-chat-hub" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub repository</a> for development setup and contribution guidelines.</p>
     </div>
   </section>
 </BaseLayout>

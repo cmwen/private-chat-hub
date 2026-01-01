@@ -1,17 +1,23 @@
 ---
+import { SITE } from 'astro:env/server';
 const { title } = Astro.props;
+const getLink = (path) => {
+  const base = import.meta.env.BASE_URL;
+  if (path === '/') return base.endsWith('/') ? base : base + '/';
+  return base + path.replace(/^\//, '');
+};
 ---
 <header class="site-title">
-  <div class="logo">FL</div>
+  <div class="logo">💬</div>
   <div>
     <h1>{title}</h1>
-    <p class="lead">A minimal Flutter app template for cross-platform development</p>
+    <p class="lead">Privacy-first AI on your terms. Own your conversations.</p>
     <nav class="nav">
-      <a href="/" class="active">Home</a>
-      <a href="/about">About</a>
-      <a href="/install">Install</a>
-      <a href="/releases">Releases</a>
-      <a href="https://github.com/cmwen/min-android-app-template" target="_blank" rel="noopener">Repository</a>
+      <a href={getLink('/')} class="active">Home</a>
+      <a href={getLink('/about')}>About</a>
+      <a href={getLink('/install')}>Install</a>
+      <a href={getLink('/releases')}>Downloads</a>
+      <a href="https://github.com/cmwen/private-chat-hub" target="_blank" rel="noopener">Repository</a>
     </nav>
   </div>
 </header>

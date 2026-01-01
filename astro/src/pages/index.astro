@@ -1,54 +1,80 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
 ---
-<BaseLayout title="private-chat-hub">
+<BaseLayout title="Private Chat Hub">
   <section>
-    <h2>Welcome 👋</h2>
-    <p class="lead">A minimal <strong>Flutter</strong> app template for cross-platform development. Build for Android, iOS, Web, and Desktop from a single codebase.</p>
+    <h2>Your AI, Your Data, Your Control</h2>
+    <p class="lead"><strong>Private Chat Hub</strong> empowers you to own your AI conversations by providing a seamless, privacy-first mobile experience for interacting with self-hosted AI models. Your data never leaves your control.</p>
 
     <div class="card">
-      <h3>What's here</h3>
+      <h3>🎯 The Problem</h3>
+      <p>Cloud AI services lock you into their infrastructure and send your conversations to corporate servers. <strong>Private Chat Hub</strong> is different—all your conversations stay on your devices and infrastructure.</p>
+    </div>
+
+    <div class="card">
+      <h3>✨ Why Private Chat Hub?</h3>
+      <table style="width:100%;margin-top:12px">
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
+          <td style="padding:8px 0"><strong>Feature</strong></td>
+          <td style="padding:8px 0"><strong>Private Chat Hub</strong></td>
+          <td style="padding:8px 0"><strong>ChatGPT/Claude</strong></td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
+          <td style="padding:8px 0">Data Ownership</td>
+          <td style="padding:8px 0">✅ 100% User Controlled</td>
+          <td style="padding:8px 0">❌ Cloud Storage</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
+          <td style="padding:8px 0">Model Choice</td>
+          <td style="padding:8px 0">✅ Any Ollama Model</td>
+          <td style="padding:8px 0">❌ Provider Locked</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
+          <td style="padding:8px 0">Works Offline</td>
+          <td style="padding:8px 0">✅ Local Network</td>
+          <td style="padding:8px 0">❌ Internet Required</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
+          <td style="padding:8px 0">Cost</td>
+          <td style="padding:8px 0">✅ Free</td>
+          <td style="padding:8px 0">💰 Subscription</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0">Customization</td>
+          <td style="padding:8px 0">✅ Full Control</td>
+          <td style="padding:8px 0">⚠️ Limited</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>🚀 Core Features</h3>
       <ul>
-        <li>Short project overview and docs link</li>
-        <li>Quick links to repository and CI</li>
-        <li>Light Startlight-inspired theme</li>
+        <li><strong>Connect to Ollama</strong> - Set up your local AI instance once, chat from anywhere on your network</li>
+        <li><strong>Multiple Models</strong> - Switch between different AI models instantly, experiment freely</li>
+        <li><strong>Offline First</strong> - Works entirely on your local network, no cloud dependencies</li>
+        <li><strong>Privacy Focused</strong> - Complete control over your data and conversations</li>
+        <li><strong>Material Design 3</strong> - Beautiful, familiar interface with dark mode</li>
+        <li><strong>Export Conversations</strong> - Own your chat history, export and backup anytime</li>
       </ul>
     </div>
 
     <div class="card">
-      <h3>Features</h3>
-      <ul>
-        <li>Flutter 3.10.1+ with Material Design 3</li>
-        <li>Cross-platform: Android, iOS, Web, macOS, Linux, Windows</li>
-        <li>Simple dependency management with pubspec.yaml</li>
-        <li>CI/CD workflows with signed release support</li>
-        <li>AI-friendly customization points</li>
-      </ul>
+      <h3>👥 Built For</h3>
+      <p><strong>Privacy Advocates</strong> - Run your own infrastructure, maintain complete data ownership</p>
+      <p><strong>AI Developers</strong> - Test and compare different models rapidly without rate limits or costs</p>
+      <p><strong>Power Users</strong> - Use advanced features like context management and custom agents</p>
     </div>
 
     <div class="card">
-      <h3>Download / Release</h3>
-      <p class="lead">Get a packaged release from GitHub Releases (APK, App Bundle, Web).</p>
-      <p><a href="https://github.com/cmwen/min-android-app-template/releases/latest" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">Download latest release →</a></p>
+      <h3>⚡ Get Started</h3>
+      <p>Install the app, point it to your Ollama instance, and start chatting. No cloud signup required.</p>
+      <p><a href="https://github.com/cmwen/private-chat-hub/releases/latest" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">📥 Download Latest Release →</a></p>
     </div>
 
     <div class="card">
-      <h3>Quick start</h3>
-      <p class="lead">Get started in minutes with Flutter.</p>
-      <pre style="background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;margin-top:8px;overflow:auto">git clone https://github.com/cmwen/min-android-app-template.git
-cd min-android-app-template
-flutter pub get
-flutter run</pre>
-      <p style="margin-top:8px"><a href="/install" style="color:var(--accent);text-decoration:none">Open full install guide →</a></p>
-    </div>
-
-    <div class="card">
-      <h3>Next steps</h3>
-      <ol>
-        <li>Customize <code>lib/main.dart</code> with your app</li>
-        <li>Update <code>pubspec.yaml</code> with your app name</li>
-        <li>Configure <code>astro/astro.config.mjs</code> for your GitHub Pages URL</li>
-      </ol>
+      <h3>📚 Learn More</h3>
+      <p><a href="/about" style="color:var(--accent);text-decoration:none">About the Project</a> • <a href="/install" style="color:var(--accent);text-decoration:none">Installation Guide</a> • <a href="https://github.com/cmwen/private-chat-hub" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub Repository</a></p>
     </div>
   </section>
 </BaseLayout>
