@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:private_chat_hub/models/comparison_conversation.dart';
 import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/screens/chat_screen.dart';
+import 'package:private_chat_hub/screens/comparison_chat_screen.dart';
 import 'package:private_chat_hub/screens/conversation_list_screen.dart';
 import 'package:private_chat_hub/screens/models_screen.dart';
 import 'package:private_chat_hub/screens/projects_screen.dart';
@@ -108,7 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // If a conversation is selected, show the chat screen
+    // If a conversation is selected, show the appropriate chat screen
     if (_selectedConversation != null) {
       return PopScope(
         canPop: false,
@@ -118,11 +120,17 @@ class _HomeScreenState extends State<HomeScreen> {
             _onBackFromChat();
           }
         },
-        child: ChatScreen(
-          chatService: _chatService,
-          conversation: _selectedConversation,
-          onBack: _onBackFromChat,
-        ),
+        child: _selectedConversation is ComparisonConversation
+            ? ComparisonChatScreen(
+                chatService: _chatService,
+                conversation: _selectedConversation as ComparisonConversation,
+                onBack: _onBackFromChat,
+              )
+            : ChatScreen(
+                chatService: _chatService,
+                conversation: _selectedConversation,
+                onBack: _onBackFromChat,
+              ),
       );
     }
 

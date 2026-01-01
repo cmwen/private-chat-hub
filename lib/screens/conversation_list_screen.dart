@@ -4,6 +4,7 @@ import 'package:private_chat_hub/screens/search_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/ollama_service.dart';
+import 'package:private_chat_hub/widgets/dual_model_selector.dart';
 import 'package:intl/intl.dart';
 
 /// Screen showing the list of conversations.
@@ -112,6 +113,37 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     );
 
     widget.onConversationSelected(conversation);
+  }
+
+  Future<void> _createComparisonConversation() async {
+    if (_models.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You need at least 2 models to compare'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Show dual model selector
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => DualModelSelector(
+        models: _models,
+        initialModel1: _selectedModel,
+        onModelsSelected: (model1, model2) async {
+          // Create comparison conversation using the service method
+          final conversation = await widget.chatService.createComparisonConversation(
+            model1Name: model1,
+            model2Name: model2,
+          );
+          
+          if (!mounted) return;
+          widget.onConversationSelected(conversation);
+        },
+      ),
+    );
   }
 
   Future<void> _deleteConversation(Conversation conversation) async {
@@ -261,11 +293,27 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'conversation_list_fab',
-        onPressed: _createNewConversation,
-        icon: const Icon(Icons.add),
-        label: const Text('New Chat'),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (_models.length >= 2)
+            FloatingActionButton.extended(
+              heroTag: 'compare_models_fab',
+              onPressed: _createComparisonConversation,
+              icon: const Icon(Icons.compare_arrows),
+              label: const Text('Compare'),
+              backgroundColor: Theme.of(context).colorScheme.tertiary,
+              foregroundColor: Theme.of(context).colorScheme.onTertiary,
+            ),
+          if (_models.length >= 2) const SizedBox(height: 12),
+          FloatingActionButton.extended(
+            heroTag: 'conversation_list_fab',
+            onPressed: _createNewConversation,
+            icon: const Icon(Icons.add),
+            label: const Text('New Chat'),
+          ),
+        ],
       ),
     );
   }

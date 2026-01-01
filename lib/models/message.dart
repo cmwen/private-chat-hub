@@ -4,6 +4,9 @@ import 'dart:typed_data';
 /// The role of a message sender.
 enum MessageRole { user, assistant, system, tool }
 
+/// The source model for comparison mode messages.
+enum ModelSource { user, model1, model2 }
+
 /// Represents an attached file or image.
 class Attachment {
   final String id;
@@ -79,6 +82,7 @@ class Message {
   final bool isError;
   final String? errorMessage;
   final List<Attachment> attachments;
+  final ModelSource? modelSource;
 
   const Message({
     required this.id,
@@ -90,6 +94,7 @@ class Message {
     this.isError = false,
     this.errorMessage,
     this.attachments = const [],
+    this.modelSource,
   });
 
   /// Whether this message has image attachments.
@@ -111,6 +116,7 @@ class Message {
     required String text,
     required DateTime timestamp,
     List<Attachment>? attachments,
+    ModelSource? modelSource,
   }) {
     return Message(
       id: id,
@@ -119,6 +125,7 @@ class Message {
       timestamp: timestamp,
       role: MessageRole.user,
       attachments: attachments ?? const [],
+      modelSource: modelSource,
     );
   }
 
@@ -128,6 +135,7 @@ class Message {
     required String text,
     required DateTime timestamp,
     bool isStreaming = false,
+    ModelSource? modelSource,
   }) {
     return Message(
       id: id,
@@ -136,6 +144,7 @@ class Message {
       timestamp: timestamp,
       role: MessageRole.assistant,
       isStreaming: isStreaming,
+      modelSource: modelSource,
     );
   }
 
@@ -175,6 +184,7 @@ class Message {
   /// Creates a Message from JSON map.
   factory Message.fromJson(Map<String, dynamic> json) {
     final attachmentsJson = json['attachments'] as List<dynamic>?;
+    final modelSourceStr = json['modelSource'] as String?;
     return Message(
       id: json['id'] as String,
       text: json['text'] as String,
@@ -192,6 +202,12 @@ class Message {
               ?.map((a) => Attachment.fromJson(a as Map<String, dynamic>))
               .toList() ??
           const [],
+      modelSource: modelSourceStr != null
+          ? ModelSource.values.firstWhere(
+              (s) => s.name == modelSourceStr,
+              orElse: () => ModelSource.user,
+            )
+          : null,
     );
   }
 
@@ -207,6 +223,7 @@ class Message {
       'isError': isError,
       'errorMessage': errorMessage,
       'attachments': attachments.map((a) => a.toJson()).toList(),
+      'modelSource': modelSource?.name,
     };
   }
 
@@ -252,6 +269,7 @@ class Message {
     bool? isError,
     String? errorMessage,
     List<Attachment>? attachments,
+    ModelSource? modelSource,
   }) {
     return Message(
       id: id ?? this.id,
@@ -263,6 +281,7 @@ class Message {
       isError: isError ?? this.isError,
       errorMessage: errorMessage ?? this.errorMessage,
       attachments: attachments ?? this.attachments,
+      modelSource: modelSource ?? this.modelSource,
     );
   }
 

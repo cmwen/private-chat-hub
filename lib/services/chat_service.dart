@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' show min;
+import 'package:private_chat_hub/models/comparison_conversation.dart';
 import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
 import 'package:private_chat_hub/services/ollama_service.dart';
@@ -117,9 +118,14 @@ class ChatService {
 
     try {
       final List<dynamic> jsonList = jsonDecode(jsonString);
-      var conversations = jsonList
-          .map((json) => Conversation.fromJson(json as Map<String, dynamic>))
-          .toList();
+      var conversations = jsonList.map((json) {
+        final jsonMap = json as Map<String, dynamic>;
+        // Check if it's a comparison conversation
+        if (jsonMap['isComparisonMode'] == true) {
+          return ComparisonConversation.fromJson(jsonMap);
+        }
+        return Conversation.fromJson(jsonMap);
+      }).toList();
 
       // Filter by project if specified
       if (projectId != null) {
@@ -174,6 +180,31 @@ class ChatService {
       updatedAt: DateTime.now(),
       systemPrompt: systemPrompt,
       projectId: projectId,
+    );
+
+    final conversations = getConversations();
+    conversations.insert(0, conversation);
+    await _saveConversations(conversations);
+    await setCurrentConversation(conversation.id);
+
+    return conversation;
+  }
+
+  /// Creates a new comparison conversation.
+  Future<ComparisonConversation> createComparisonConversation({
+    required String model1Name,
+    required String model2Name,
+    String? title,
+    String? systemPrompt,
+  }) async {
+    final conversation = ComparisonConversation(
+      id: const Uuid().v4(),
+      title: title ?? 'Compare: $model1Name vs $model2Name',
+      modelName: model1Name,
+      model2Name: model2Name,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      systemPrompt: systemPrompt,
     );
 
     final conversations = getConversations();
@@ -378,6 +409,245 @@ class ChatService {
     }
   }
 
+  /// Sends a message to two models simultaneously for comparison.
+  ///
+  /// Returns a stream of updated ComparisonConversations as both models respond.
+  /// Responses from both models stream independently and update as they arrive.
+  Stream<ComparisonConversation> sendDualModelMessage(
+    String conversationId,
+    String text,
+  ) async* {
+    // Cancel any existing streams for this conversation
+    await cancelMessageGeneration(conversationId);
+
+    // Get the comparison conversation
+    final initialConversation = getConversation(conversationId);
+    if (initialConversation == null) {
+      throw Exception('Conversation not found');
+    }
+    if (initialConversation is! ComparisonConversation) {
+      throw Exception('Not a comparison conversation');
+    }
+
+    ComparisonConversation conversation = initialConversation;
+
+    // Create and add user message
+    final userMessage = Message.user(
+      id: const Uuid().v4(),
+      text: text,
+      timestamp: DateTime.now(),
+      modelSource: ModelSource.user,
+    );
+    conversation = (await addMessage(conversationId, userMessage))
+        as ComparisonConversation;
+
+    // Create a broadcast stream controller
+    final streamController =
+        StreamController<ComparisonConversation>.broadcast();
+    _activeStreams[conversationId] = streamController as StreamController<Conversation>;
+
+    // Yield initial state with user message
+    streamController.add(conversation);
+    yield conversation;
+
+    // Create placeholder messages for both models
+    final model1MessageId = const Uuid().v4();
+    final model2MessageId = const Uuid().v4();
+
+    var model1Message = Message.assistant(
+      id: model1MessageId,
+      text: '',
+      timestamp: DateTime.now(),
+      isStreaming: true,
+      modelSource: ModelSource.model1,
+    );
+
+    var model2Message = Message.assistant(
+      id: model2MessageId,
+      text: '',
+      timestamp: DateTime.now(),
+      isStreaming: true,
+      modelSource: ModelSource.model2,
+    );
+
+    conversation = (await addMessage(conversationId, model1Message))
+        as ComparisonConversation;
+    conversation = (await addMessage(conversationId, model2Message))
+        as ComparisonConversation;
+
+    streamController.add(conversation);
+    yield conversation;
+
+    // Start both generation processes in parallel
+    _generateDualModelMessagesInBackground(
+      conversationId,
+      conversation,
+      model1MessageId,
+      model2MessageId,
+      streamController,
+    );
+
+    // Listen to the broadcast stream and yield updates
+    await for (final updatedConversation in streamController.stream) {
+      yield updatedConversation;
+    }
+  }
+
+  /// Internal method to generate messages from both models in background
+  Future<void> _generateDualModelMessagesInBackground(
+    String conversationId,
+    ComparisonConversation conversation,
+    String model1MessageId,
+    String model2MessageId,
+    StreamController<ComparisonConversation> streamController,
+  ) async {
+    var model1Message = conversation.messages.firstWhere(
+      (m) => m.id == model1MessageId,
+    );
+    var model2Message = conversation.messages.firstWhere(
+      (m) => m.id == model2MessageId,
+    );
+
+    bool model1Done = false;
+    bool model2Done = false;
+
+    // Prepare messages for Ollama API (shared conversation history)
+    final ollamaMessages = <Map<String, dynamic>>[];
+
+    // Add system prompt if present
+    if (conversation.systemPrompt != null) {
+      ollamaMessages.add({
+        'role': 'system',
+        'content': conversation.systemPrompt,
+      });
+    }
+
+    // Add conversation history (only user messages and responses, excluding current placeholders)
+    for (final msg in conversation.messages) {
+      if (msg.id != model1MessageId &&
+          msg.id != model2MessageId &&
+          !msg.isError) {
+        // For comparison mode, only include user messages and messages from Model1
+        // to maintain conversation continuity (or use separate histories if preferred)
+        if (msg.modelSource == ModelSource.user ||
+            msg.modelSource == ModelSource.model1) {
+          ollamaMessages.add(msg.toOllamaMessage());
+        }
+      }
+    }
+
+    // Helper function to update conversation safely
+    Future<void> updateConversationSafely(Message updatedMessage) async {
+      if (streamController.isClosed) return;
+
+      final messages = conversation.messages.map((m) {
+        if (m.id == updatedMessage.id) return updatedMessage;
+        return m;
+      }).toList();
+
+      conversation = conversation.copyWith(
+        messages: messages,
+        updatedAt: DateTime.now(),
+      );
+      await updateConversation(conversation);
+
+      if (!streamController.isClosed) {
+        streamController.add(conversation);
+      }
+    }
+
+    // Stream Model 1 response
+    final buffer1 = StringBuffer();
+    final subscription1 = _ollama
+        .sendChatStream(
+          model: conversation.model1Name,
+          messages: ollamaMessages,
+          options: conversation.parameters1.toOllamaOptions(),
+        )
+        .listen(
+          (data) async {
+            final message = data['message'] as Map<String, dynamic>?;
+            if (message == null) return;
+
+            final content = message['content'] as String?;
+            if (content != null && content.isNotEmpty) {
+              buffer1.write(content);
+            }
+
+            model1Message = model1Message.copyWith(text: buffer1.toString());
+            await updateConversationSafely(model1Message);
+          },
+          onError: (error) async {
+            model1Message = Message.error(
+              id: model1MessageId,
+              errorMessage: error.toString(),
+              timestamp: DateTime.now(),
+            ).copyWith(modelSource: ModelSource.model1);
+            await updateConversationSafely(model1Message);
+            model1Done = true;
+            if (model2Done) _cleanupStream(conversationId);
+          },
+          onDone: () async {
+            model1Message = model1Message.copyWith(isStreaming: false);
+            await updateConversationSafely(model1Message);
+            model1Done = true;
+            if (model2Done) {
+              _cleanupStream(conversationId);
+              await streamController.close();
+            }
+          },
+          cancelOnError: true,
+        );
+
+    // Stream Model 2 response
+    final buffer2 = StringBuffer();
+    final subscription2 = _ollama
+        .sendChatStream(
+          model: conversation.model2Name,
+          messages: ollamaMessages,
+          options: conversation.parameters2.toOllamaOptions(),
+        )
+        .listen(
+          (data) async {
+            final message = data['message'] as Map<String, dynamic>?;
+            if (message == null) return;
+
+            final content = message['content'] as String?;
+            if (content != null && content.isNotEmpty) {
+              buffer2.write(content);
+            }
+
+            model2Message = model2Message.copyWith(text: buffer2.toString());
+            await updateConversationSafely(model2Message);
+          },
+          onError: (error) async {
+            model2Message = Message.error(
+              id: model2MessageId,
+              errorMessage: error.toString(),
+              timestamp: DateTime.now(),
+            ).copyWith(modelSource: ModelSource.model2);
+            await updateConversationSafely(model2Message);
+            model2Done = true;
+            if (model1Done) _cleanupStream(conversationId);
+          },
+          onDone: () async {
+            model2Message = model2Message.copyWith(isStreaming: false);
+            await updateConversationSafely(model2Message);
+            model2Done = true;
+            if (model1Done) {
+              _cleanupStream(conversationId);
+              await streamController.close();
+            }
+          },
+          cancelOnError: true,
+        );
+
+    // Store subscriptions (we'll store model1's subscription as the primary one)
+    _activeSubscriptions[conversationId] = subscription1;
+    // Store model2's subscription with a special key for cleanup
+    _activeSubscriptions['${conversationId}_model2'] = subscription2;
+  }
+
   /// Internal method to generate message in background
   Future<void> _generateMessageInBackground(
     String conversationId,
@@ -570,6 +840,10 @@ class ChatService {
   Future<void> cancelMessageGeneration(String conversationId) async {
     final subscription = _activeSubscriptions.remove(conversationId);
     await subscription?.cancel();
+
+    // Also cancel model2 subscription if it exists (for comparison mode)
+    final subscription2 = _activeSubscriptions.remove('${conversationId}_model2');
+    await subscription2?.cancel();
 
     final controller = _activeStreams.remove(conversationId);
     if (controller != null && !controller.isClosed) {
