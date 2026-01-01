@@ -61,7 +61,9 @@ class _ChatScreenState extends State<ChatScreen> {
     super.didChangeDependencies();
     // Check if there's an active stream we can reconnect to
     if (widget.chatService != null && _conversation != null) {
-      final activeStream = widget.chatService!.getActiveStream(_conversation!.id);
+      final activeStream = widget.chatService!.getActiveStream(
+        _conversation!.id,
+      );
       if (activeStream != null && _streamSubscription == null) {
         // Reconnect to the active stream
         _reconnectToActiveStream();
@@ -71,7 +73,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _reconnectToActiveStream() {
     if (widget.chatService == null || _conversation == null) return;
-    
+
     final activeStream = widget.chatService!.getActiveStream(_conversation!.id);
     if (activeStream != null) {
       setState(() => _isLoading = true);
@@ -160,37 +162,34 @@ class _ChatScreenState extends State<ChatScreen> {
       _streamSubscription = widget.chatService!
           .sendMessage(_conversation!.id, text)
           .listen(
-        (updatedConversation) {
-          if (!mounted) return;
-          setState(() {
-            _conversation = updatedConversation;
-            _messages = List.from(updatedConversation.messages);
-          });
-          _scrollToBottom();
-        },
-        onError: (error) {
-          if (!mounted) return;
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: $error'),
-              backgroundColor: Colors.red,
-            ),
+            (updatedConversation) {
+              if (!mounted) return;
+              setState(() {
+                _conversation = updatedConversation;
+                _messages = List.from(updatedConversation.messages);
+              });
+              _scrollToBottom();
+            },
+            onError: (error) {
+              if (!mounted) return;
+              setState(() => _isLoading = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error: $error'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            },
+            onDone: () {
+              if (!mounted) return;
+              setState(() => _isLoading = false);
+            },
           );
-        },
-        onDone: () {
-          if (!mounted) return;
-          setState(() => _isLoading = false);
-        },
-      );
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -245,7 +244,10 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _handleSendMessageWithAttachments(String text, List<Attachment> attachments) {
+  void _handleSendMessageWithAttachments(
+    String text,
+    List<Attachment> attachments,
+  ) {
     if (text.isEmpty && attachments.isEmpty) return;
 
     // If no chat service or conversation, use demo mode
@@ -258,7 +260,10 @@ class _ChatScreenState extends State<ChatScreen> {
     _sendMessageWithAttachments(text, attachments);
   }
 
-  void _handleDemoMessageWithAttachments(String text, List<Attachment> attachments) {
+  void _handleDemoMessageWithAttachments(
+    String text,
+    List<Attachment> attachments,
+  ) {
     final displayText = attachments.isNotEmpty
         ? (text.isNotEmpty ? text : '[Image attached]')
         : text;
@@ -281,7 +286,8 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       String response;
       if (attachments.any((a) => a.isImage)) {
-        response = 'I can see you\'ve attached ${attachments.length} image(s). '
+        response =
+            'I can see you\'ve attached ${attachments.length} image(s). '
             'In demo mode, I can\'t analyze images. To use vision capabilities, '
             'please connect to an Ollama instance with a vision model like LLaVA.';
       } else {
@@ -301,7 +307,10 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  Future<void> _sendMessageWithAttachments(String text, List<Attachment> attachments) async {
+  Future<void> _sendMessageWithAttachments(
+    String text,
+    List<Attachment> attachments,
+  ) async {
     setState(() => _isLoading = true);
 
     try {
@@ -312,13 +321,18 @@ class _ChatScreenState extends State<ChatScreen> {
       // Create user message with attachments
       final userMessage = Message.user(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        text: text.isNotEmpty ? text : '[Attached ${attachments.length} image(s)]',
+        text: text.isNotEmpty
+            ? text
+            : '[Attached ${attachments.length} image(s)]',
         timestamp: DateTime.now(),
         attachments: attachments,
       );
 
       // Add user message to conversation
-      var conversation = await widget.chatService!.addMessage(_conversation!.id, userMessage);
+      var conversation = await widget.chatService!.addMessage(
+        _conversation!.id,
+        userMessage,
+      );
       if (!mounted) return;
       setState(() {
         _conversation = conversation;
@@ -330,37 +344,34 @@ class _ChatScreenState extends State<ChatScreen> {
       _streamSubscription = widget.chatService!
           .sendMessageWithContext(_conversation!.id)
           .listen(
-        (updatedConversation) {
-          if (!mounted) return;
-          setState(() {
-            _conversation = updatedConversation;
-            _messages = List.from(updatedConversation.messages);
-          });
-          _scrollToBottom();
-        },
-        onError: (error) {
-          if (!mounted) return;
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: $error'),
-              backgroundColor: Colors.red,
-            ),
+            (updatedConversation) {
+              if (!mounted) return;
+              setState(() {
+                _conversation = updatedConversation;
+                _messages = List.from(updatedConversation.messages);
+              });
+              _scrollToBottom();
+            },
+            onError: (error) {
+              if (!mounted) return;
+              setState(() => _isLoading = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error: $error'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            },
+            onDone: () {
+              if (!mounted) return;
+              setState(() => _isLoading = false);
+            },
           );
-        },
-        onDone: () {
-          if (!mounted) return;
-          setState(() => _isLoading = false);
-        },
-      );
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -388,10 +399,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   const SizedBox(width: 12),
                   const Text(
                     'Conversation Info',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const Spacer(),
                   IconButton(
@@ -405,7 +413,10 @@ class _ChatScreenState extends State<ChatScreen> {
               _InfoRow('Model', _conversation!.modelName),
               _InfoRow('Messages', '${_conversation!.messageCount}'),
               _InfoRow('Created', _formatDateTime(_conversation!.createdAt)),
-              _InfoRow('Last Updated', _formatDateTime(_conversation!.updatedAt)),
+              _InfoRow(
+                'Last Updated',
+                _formatDateTime(_conversation!.updatedAt),
+              ),
               const SizedBox(height: 16),
               const Divider(),
               const SizedBox(height: 16),
@@ -414,10 +425,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   const Text(
                     'System Prompt',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                   ),
                   TextButton.icon(
                     icon: const Icon(Icons.edit, size: 18),
@@ -456,10 +464,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   const Text(
                     'Model Parameters',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                   ),
                   TextButton.icon(
                     icon: const Icon(Icons.tune, size: 18),
@@ -585,9 +590,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   min: 0.0,
                   max: 2.0,
                   divisions: 20,
-                  description: 'Controls randomness. Lower = more focused, Higher = more creative.',
+                  description:
+                      'Controls randomness. Lower = more focused, Higher = more creative.',
                   onChanged: (v) {
-                    setSheetState(() => params = params.copyWith(temperature: v));
+                    setSheetState(
+                      () => params = params.copyWith(temperature: v),
+                    );
                   },
                 ),
                 const SizedBox(height: 16),
@@ -601,7 +609,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   description: 'Limits vocabulary to top K tokens per step.',
                   isInteger: true,
                   onChanged: (v) {
-                    setSheetState(() => params = params.copyWith(topK: v.round()));
+                    setSheetState(
+                      () => params = params.copyWith(topK: v.round()),
+                    );
                   },
                 ),
                 const SizedBox(height: 16),
@@ -625,10 +635,13 @@ class _ChatScreenState extends State<ChatScreen> {
                   min: 100,
                   max: 8000,
                   divisions: 79,
-                  description: 'Maximum response length. ~750 words per 1000 tokens.',
+                  description:
+                      'Maximum response length. ~750 words per 1000 tokens.',
                   isInteger: true,
                   onChanged: (v) {
-                    setSheetState(() => params = params.copyWith(maxTokens: v.round()));
+                    setSheetState(
+                      () => params = params.copyWith(maxTokens: v.round()),
+                    );
                   },
                 ),
                 const SizedBox(height: 24),
@@ -637,7 +650,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () {
-                          setSheetState(() => params = ModelParameters.balanced);
+                          setSheetState(
+                            () => params = ModelParameters.balanced,
+                          );
                         },
                         child: const Text('Reset'),
                       ),
@@ -647,19 +662,24 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: FilledButton(
                         onPressed: () async {
                           Navigator.pop(sheetContext);
-                          if (widget.chatService != null && _conversation != null) {
+                          if (widget.chatService != null &&
+                              _conversation != null) {
                             final updatedConversation = _conversation!.copyWith(
                               parameters: params,
                               updatedAt: DateTime.now(),
                             );
                             final messenger = ScaffoldMessenger.of(context);
-                            await widget.chatService!.updateConversation(updatedConversation);
+                            await widget.chatService!.updateConversation(
+                              updatedConversation,
+                            );
                             if (!mounted) return;
                             setState(() {
                               _conversation = updatedConversation;
                             });
                             messenger.showSnackBar(
-                              const SnackBar(content: Text('Parameters updated')),
+                              const SnackBar(
+                                content: Text('Parameters updated'),
+                              ),
                             );
                           }
                         },
@@ -717,12 +737,14 @@ class _ChatScreenState extends State<ChatScreen> {
               Navigator.pop(dialogContext);
               if (widget.chatService != null && _conversation != null) {
                 final updatedConversation = _conversation!.copyWith(
-                  systemPrompt: controller.text.isEmpty 
-                      ? null 
+                  systemPrompt: controller.text.isEmpty
+                      ? null
                       : controller.text,
                   updatedAt: DateTime.now(),
                 );
-                await widget.chatService!.updateConversation(updatedConversation);
+                await widget.chatService!.updateConversation(
+                  updatedConversation,
+                );
                 setState(() {
                   _conversation = updatedConversation;
                 });
@@ -798,7 +820,9 @@ class _ChatScreenState extends State<ChatScreen> {
             IconButton(
               icon: const Icon(Icons.stop_circle_outlined),
               onPressed: () async {
-                await widget.chatService!.cancelMessageGeneration(_conversation!.id);
+                await widget.chatService!.cancelMessageGeneration(
+                  _conversation!.id,
+                );
                 if (!mounted) return;
                 setState(() {
                   _isLoading = false;
@@ -845,9 +869,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
                       final message = _messages[index];
-                      final showTimestamp = index == 0 ||
-                          _messages[index - 1]
-                                  .timestamp
+                      final showTimestamp =
+                          index == 0 ||
+                          _messages[index - 1].timestamp
                                   .difference(message.timestamp)
                                   .inMinutes
                                   .abs() >
@@ -901,26 +925,16 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.chat_bubble_outline,
-            size: 64,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             'No messages yet',
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 18, color: Colors.grey[600]),
           ),
           const SizedBox(height: 8),
           Text(
             'Start the conversation!',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
           ),
         ],
       ),
@@ -945,7 +959,9 @@ class _ChatScreenState extends State<ChatScreen> {
               if (_conversation != null && widget.chatService != null) {
                 await widget.chatService!.clearConversation(_conversation!.id);
                 if (!mounted) return;
-                _conversation = widget.chatService!.getConversation(_conversation!.id);
+                _conversation = widget.chatService!.getConversation(
+                  _conversation!.id,
+                );
                 _loadMessages();
               } else {
                 setState(() {
@@ -990,7 +1006,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 _messages.removeWhere((m) => m.id == message.id);
               });
               if (_conversation != null && widget.chatService != null) {
-                widget.chatService!.deleteMessage(_conversation!.id, message.id);
+                widget.chatService!.deleteMessage(
+                  _conversation!.id,
+                  message.id,
+                );
               }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -1011,7 +1030,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _editMessage(Message message) {
     // Show dialog with the message text for editing
     final controller = TextEditingController(text: message.text);
-    
+
     showDialog(
       context: context,
       builder: (dialogContext) => _EditMessageDialog(
@@ -1105,10 +1124,7 @@ class _MessageItem extends StatelessWidget {
 
     return GestureDetector(
       onLongPress: onLongPress,
-      child: MessageBubble(
-        message: message,
-        showTimestamp: showTimestamp,
-      ),
+      child: MessageBubble(message: message, showTimestamp: showTimestamp),
     );
   }
 }
@@ -1148,13 +1164,20 @@ class _MarkdownMessageBubble extends StatelessWidget {
             CircleAvatar(
               radius: 16,
               backgroundColor: colorScheme.secondary,
-              child: const Icon(Icons.psychology, size: 18, color: Colors.white),
+              child: const Icon(
+                Icons.psychology,
+                size: 18,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(width: 8),
             Flexible(
               child: Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.grey[200],
                   borderRadius: const BorderRadius.only(
@@ -1282,9 +1305,7 @@ class _InfoRow extends StatelessWidget {
               ),
             ),
           ),
-          Expanded(
-            child: Text(value),
-          ),
+          Expanded(child: Text(value)),
         ],
       ),
     );
@@ -1318,10 +1339,7 @@ class _ParameterDisplay extends StatelessWidget {
               ),
             ),
           ),
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -1350,7 +1368,7 @@ class _PresetChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return ActionChip(
       label: Text(label),
-      backgroundColor: isSelected 
+      backgroundColor: isSelected
           ? Theme.of(context).colorScheme.primaryContainer
           : null,
       onPressed: onTap,

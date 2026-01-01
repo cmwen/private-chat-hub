@@ -35,15 +35,15 @@ class Project {
   /// Gets the full context to prepend to conversations.
   String? get fullContext {
     final parts = <String>[];
-    
+
     if (systemPrompt != null && systemPrompt!.isNotEmpty) {
       parts.add(systemPrompt!);
     }
-    
+
     if (instructions != null && instructions!.isNotEmpty) {
       parts.add('\n\nProject Instructions:\n$instructions');
     }
-    
+
     return parts.isEmpty ? null : parts.join('\n');
   }
 

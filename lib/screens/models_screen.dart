@@ -42,17 +42,20 @@ class _ModelsScreenState extends State<ModelsScreen> {
       final connection = widget.connectionService.getDefaultConnection();
       if (connection == null) {
         setState(() {
-          _error = 'No Ollama connection configured. Go to Settings to add one.';
+          _error =
+              'No Ollama connection configured. Go to Settings to add one.';
           _isLoading = false;
         });
         return;
       }
 
-      widget.ollamaService.setConnection(OllamaConnection(
-        host: connection.host,
-        port: connection.port,
-        useHttps: connection.useHttps,
-      ));
+      widget.ollamaService.setConnection(
+        OllamaConnection(
+          host: connection.host,
+          port: connection.port,
+          useHttps: connection.useHttps,
+        ),
+      );
 
       final models = await widget.ollamaService.listModels();
       setState(() {
@@ -95,9 +98,9 @@ class _ModelsScreenState extends State<ModelsScreen> {
         await widget.ollamaService.deleteModel(model.name);
         await _loadModels();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${model.name} deleted')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('${model.name} deleted')));
         }
       } catch (e) {
         if (mounted) {
@@ -125,9 +128,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
   void _showPullModelDialog() {
     showDialog(
       context: context,
-      builder: (context) => _PullModelDialog(
-        onPull: _pullModel,
-      ),
+      builder: (context) => _PullModelDialog(onPull: _pullModel),
     );
   }
 
@@ -247,11 +248,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.error_outline,
-                size: 64,
-                color: Colors.red[300],
-              ),
+              Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
               const SizedBox(height: 16),
               const Text(
                 'Failed to load models',
@@ -313,39 +310,41 @@ class _ModelsScreenState extends State<ModelsScreen> {
     return Column(
       children: [
         // Download progress indicators
-        ..._downloadProgress.entries.map((entry) => Container(
-              padding: const EdgeInsets.all(16),
-              color: Colors.blue[50],
-              child: Row(
-                children: [
-                  const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Downloading ${entry.key}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          entry.value.status,
-                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                        ),
-                        if (entry.value.progress != null) ...[
-                          const SizedBox(height: 4),
-                          LinearProgressIndicator(value: entry.value.progress),
-                        ],
+        ..._downloadProgress.entries.map(
+          (entry) => Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.blue[50],
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Downloading ${entry.key}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        entry.value.status,
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      ),
+                      if (entry.value.progress != null) ...[
+                        const SizedBox(height: 4),
+                        LinearProgressIndicator(value: entry.value.progress),
                       ],
-                    ),
+                    ],
                   ),
-                ],
-              ),
-            )),
+                ),
+              ],
+            ),
+          ),
+        ),
         // Models list
         Expanded(
           child: RefreshIndicator(
@@ -499,7 +498,10 @@ class _ModelCard extends StatelessWidget {
                     value: 'delete',
                     child: ListTile(
                       leading: Icon(Icons.delete, color: Colors.red),
-                      title: Text('Delete', style: TextStyle(color: Colors.red)),
+                      title: Text(
+                        'Delete',
+                        style: TextStyle(color: Colors.red),
+                      ),
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
@@ -532,13 +534,7 @@ class _InfoChip extends StatelessWidget {
         children: [
           Icon(icon, size: 12, color: Colors.grey[600]),
           const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-          ),
+          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
         ],
       ),
     );
@@ -594,7 +590,10 @@ class _PullModelDialogState extends State<_PullModelDialog> {
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.psychology),
                   title: Text(model.$1),
-                  subtitle: Text(model.$2, style: const TextStyle(fontSize: 12)),
+                  subtitle: Text(
+                    model.$2,
+                    style: const TextStyle(fontSize: 12),
+                  ),
                   onTap: () => widget.onPull(model.$1),
                 ),
               ),
@@ -700,7 +699,11 @@ class _ModelDetailsSheetState extends State<_ModelDetailsSheet> {
               CircleAvatar(
                 radius: 28,
                 backgroundColor: Theme.of(context).colorScheme.primary,
-                child: const Icon(Icons.psychology, color: Colors.white, size: 28),
+                child: const Icon(
+                  Icons.psychology,
+                  color: Colors.white,
+                  size: 28,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -789,10 +792,7 @@ class _DetailSection extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         ...children,
@@ -815,10 +815,7 @@ class _DetailRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 120,
-            child: Text(
-              label,
-              style: TextStyle(color: Colors.grey[600]),
-            ),
+            child: Text(label, style: TextStyle(color: Colors.grey[600])),
           ),
           Expanded(child: Text(value)),
         ],

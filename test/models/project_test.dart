@@ -46,19 +46,22 @@ void main() {
       expect(restored.isPinned, project.isPinned);
     });
 
-    test('should generate full context from system prompt and instructions', () {
-      final projectWithBoth = Project(
-        id: '1',
-        name: 'Test',
-        systemPrompt: 'System prompt here',
-        instructions: 'Instructions here',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
+    test(
+      'should generate full context from system prompt and instructions',
+      () {
+        final projectWithBoth = Project(
+          id: '1',
+          name: 'Test',
+          systemPrompt: 'System prompt here',
+          instructions: 'Instructions here',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
 
-      expect(projectWithBoth.fullContext, contains('System prompt here'));
-      expect(projectWithBoth.fullContext, contains('Instructions here'));
-    });
+        expect(projectWithBoth.fullContext, contains('System prompt here'));
+        expect(projectWithBoth.fullContext, contains('Instructions here'));
+      },
+    );
 
     test('should return null for full context when no prompts set', () {
       final project = Project(
@@ -79,10 +82,7 @@ void main() {
         updatedAt: DateTime.now(),
       );
 
-      final updated = project.copyWith(
-        name: 'Updated',
-        isPinned: true,
-      );
+      final updated = project.copyWith(name: 'Updated', isPinned: true);
 
       expect(updated.name, 'Updated');
       expect(updated.isPinned, true);

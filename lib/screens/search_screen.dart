@@ -77,11 +77,13 @@ class _SearchScreenState extends State<SearchScreen> {
       for (final message in conversation.messages) {
         final textLower = message.text.toLowerCase();
         if (textLower.contains(queryLower)) {
-          results.add(SearchResult(
-            conversation: conversation,
-            message: message,
-            highlightedText: _getHighlightedSnippet(message.text, query),
-          ));
+          results.add(
+            SearchResult(
+              conversation: conversation,
+              message: message,
+              highlightedText: _getHighlightedSnippet(message.text, query),
+            ),
+          );
         }
       }
     }
@@ -100,7 +102,9 @@ class _SearchScreenState extends State<SearchScreen> {
     final lowerQuery = query.toLowerCase();
     final index = lowerText.indexOf(lowerQuery);
 
-    if (index == -1) return text.length > 100 ? '${text.substring(0, 100)}...' : text;
+    if (index == -1) {
+      return text.length > 100 ? '${text.substring(0, 100)}...' : text;
+    }
 
     // Get context around the match
     final start = (index - 30).clamp(0, text.length);
@@ -219,7 +223,11 @@ class _SearchScreenState extends State<SearchScreen> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Row(
                 children: [
-                  Icon(Icons.chat_bubble_outline, size: 16, color: Colors.grey[600]),
+                  Icon(
+                    Icons.chat_bubble_outline,
+                    size: 16,
+                    color: Colors.grey[600],
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -237,13 +245,18 @@ class _SearchScreenState extends State<SearchScreen> {
                 ],
               ),
             ),
-            ...results.map((result) => _SearchResultTile(
-              result: result,
-              query: _lastQuery,
-              onTap: () {
-                widget.onResultSelected(result.conversation, result.message.id);
-              },
-            )),
+            ...results.map(
+              (result) => _SearchResultTile(
+                result: result,
+                query: _lastQuery,
+                onTap: () {
+                  widget.onResultSelected(
+                    result.conversation,
+                    result.message.id,
+                  );
+                },
+              ),
+            ),
             const Divider(),
           ],
         );
@@ -299,13 +312,15 @@ class _SearchResultTile extends StatelessWidget {
         spans.add(TextSpan(text: text.substring(start, index)));
       }
       // Add highlighted match
-      spans.add(TextSpan(
-        text: text.substring(index, index + query.length),
-        style: const TextStyle(
-          backgroundColor: Colors.yellow,
-          fontWeight: FontWeight.bold,
+      spans.add(
+        TextSpan(
+          text: text.substring(index, index + query.length),
+          style: const TextStyle(
+            backgroundColor: Colors.yellow,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-      ));
+      );
       start = index + query.length;
       index = lowerText.indexOf(lowerQuery, start);
     }

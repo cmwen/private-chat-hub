@@ -9,9 +9,7 @@ void main() {
         'modified_at': '2025-01-01T00:00:00Z',
         'size': 4_500_000_000,
         'digest': 'abc123',
-        'details': {
-          'parameter_size': '3B',
-        },
+        'details': {'parameter_size': '3B'},
       };
 
       final model = OllamaModel.fromJson(json);
@@ -24,10 +22,7 @@ void main() {
     });
 
     test('should handle model without tag', () {
-      final json = {
-        'name': 'phi3',
-        'size': 2_000_000_000,
-      };
+      final json = {'name': 'phi3', 'size': 2_000_000_000};
 
       final model = OllamaModel.fromJson(json);
 
@@ -38,17 +33,20 @@ void main() {
 
     test('should format size correctly', () {
       expect(
-        OllamaModel.fromJson({'name': 'test', 'size': 500_000_000}).sizeFormatted,
+        OllamaModel.fromJson({
+          'name': 'test',
+          'size': 500_000_000,
+        }).sizeFormatted,
         '477 MB',
       );
       expect(
-        OllamaModel.fromJson({'name': 'test', 'size': 1_500_000_000}).sizeFormatted,
+        OllamaModel.fromJson({
+          'name': 'test',
+          'size': 1_500_000_000,
+        }).sizeFormatted,
         '1.4 GB',
       );
-      expect(
-        OllamaModel.fromJson({'name': 'test'}).sizeFormatted,
-        'Unknown',
-      );
+      expect(OllamaModel.fromJson({'name': 'test'}).sizeFormatted, 'Unknown');
     });
   });
 
@@ -91,10 +89,7 @@ void main() {
 
     test('should create copy with updated fields', () {
       final original = OllamaConnection(host: 'localhost');
-      final updated = original.copyWith(
-        host: '192.168.1.100',
-        port: 8080,
-      );
+      final updated = original.copyWith(host: '192.168.1.100', port: 8080);
 
       expect(updated.host, '192.168.1.100');
       expect(updated.port, 8080);
@@ -106,8 +101,10 @@ void main() {
     test('should format exception with status code', () {
       final exception = OllamaException('Connection failed', 500);
 
-      expect(exception.toString(),
-          'OllamaException: Connection failed (Status: 500)');
+      expect(
+        exception.toString(),
+        'OllamaException: Connection failed (Status: 500)',
+      );
     });
 
     test('should format exception without status code', () {

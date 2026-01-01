@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// Status of the connection to Ollama.
-enum ConnectionState {
-  connected,
-  disconnected,
-  checking,
-  error,
-}
+enum ConnectionState { connected, disconnected, checking, error }
 
 /// A widget that displays the current connection status.
 class ConnectionStatusIndicator extends StatelessWidget {
@@ -25,25 +20,25 @@ class ConnectionStatusIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     final (icon, color, defaultMessage) = switch (state) {
       ConnectionState.connected => (
-          Icons.cloud_done,
-          Colors.green,
-          'Connected',
-        ),
+        Icons.cloud_done,
+        Colors.green,
+        'Connected',
+      ),
       ConnectionState.disconnected => (
-          Icons.cloud_off,
-          Colors.grey,
-          'Disconnected',
-        ),
+        Icons.cloud_off,
+        Colors.grey,
+        'Disconnected',
+      ),
       ConnectionState.checking => (
-          Icons.cloud_sync,
-          Colors.orange,
-          'Connecting...',
-        ),
+        Icons.cloud_sync,
+        Colors.orange,
+        'Connecting...',
+      ),
       ConnectionState.error => (
-          Icons.error_outline,
-          Colors.red,
-          'Connection Error',
-        ),
+        Icons.error_outline,
+        Colors.red,
+        'Connection Error',
+      ),
     };
 
     final displayMessage = message ?? defaultMessage;
@@ -65,10 +60,7 @@ class ConnectionStatusIndicator extends StatelessWidget {
               SizedBox(
                 width: 14,
                 height: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: color,
-                ),
+                child: CircularProgressIndicator(strokeWidth: 2, color: color),
               )
             else
               Icon(icon, size: 14, color: color),
@@ -112,12 +104,7 @@ class ConnectionBanner extends StatelessWidget {
         children: [
           const Icon(Icons.warning_amber, color: Colors.orange, size: 20),
           const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(fontSize: 13),
-            ),
-          ),
+          Expanded(child: Text(message, style: const TextStyle(fontSize: 13))),
           if (actionLabel != null && onAction != null)
             TextButton(
               onPressed: onAction,

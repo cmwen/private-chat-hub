@@ -1,12 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:private_chat_hub/models/tool.dart';
 
 /// The role of a message sender.
-enum MessageRole {
-  user,
-  assistant,
-  system,
-}
+enum MessageRole { user, assistant, system, tool }
 
 /// Represents an attached file or image.
 class Attachment {
@@ -28,10 +25,9 @@ class Attachment {
   bool get isImage => mimeType.startsWith('image/');
 
   /// Whether this attachment is a text file.
-  bool get isTextFile => !isImage && (
-    mimeType.startsWith('text/') ||
-    mimeType == 'application/json'
-  );
+  bool get isTextFile =>
+      !isImage &&
+      (mimeType.startsWith('text/') || mimeType == 'application/json');
 
   /// Gets the text content of this attachment (if it's a text file).
   String? get textContent {
@@ -84,6 +80,8 @@ class Message {
   final bool isError;
   final String? errorMessage;
   final List<Attachment> attachments;
+  final List<ToolCall>? toolCalls;
+  final String? toolCallId;
 
   const Message({
     required this.id,
@@ -95,6 +93,8 @@ class Message {
     this.isError = false,
     this.errorMessage,
     this.attachments = const [],
+    this.toolCalls,
+    this.toolCallId,
   });
 
   /// Whether this message has image attachments.
@@ -107,7 +107,14 @@ class Message {
   List<Attachment> get images => attachments.where((a) => a.isImage).toList();
 
   /// Gets all text file attachments.
-  List<Attachment> get textFiles => attachments.where((a) => a.isTextFile).toList();
+  List<Attachment> get textFiles =>
+      attachments.where((a) => a.isTextFile).toList();
+
+  /// Whether this message contains tool calls.
+  bool get hasToolCalls => toolCalls != null && toolCalls!.isNotEmpty;
+
+  /// Whether this message is a tool result.
+  bool get isToolResult => role == MessageRole.tool && toolCallId != null;
 
   /// Creates a user message.
   factory Message.user({
@@ -175,9 +182,27 @@ class Message {
     );
   }
 
+  /// Creates a tool result message.
+  factory Message.toolResult({
+    required String id,
+    required String toolCallId,
+    required String content,
+    required DateTime timestamp,
+  }) {
+    return Message(
+      id: id,
+      text: content,
+      isMe: false,
+      timestamp: timestamp,
+      role: MessageRole.tool,
+      toolCallId: toolCallId,
+    );
+  }
+
   /// Creates a Message from JSON map.
   factory Message.fromJson(Map<String, dynamic> json) {
     final attachmentsJson = json['attachments'] as List<dynamic>?;
+    final toolCallsJson = json['toolCalls'] as List<dynamic>?;
     return Message(
       id: json['id'] as String,
       text: json['text'] as String,
@@ -190,9 +215,15 @@ class Message {
       isStreaming: json['isStreaming'] as bool? ?? false,
       isError: json['isError'] as bool? ?? false,
       errorMessage: json['errorMessage'] as String?,
-      attachments: attachmentsJson
-          ?.map((a) => Attachment.fromJson(a as Map<String, dynamic>))
-          .toList() ?? const [],
+      attachments:
+          attachmentsJson
+              ?.map((a) => Attachment.fromJson(a as Map<String, dynamic>))
+              .toList() ??
+          const [],
+      toolCalls: toolCallsJson
+          ?.map((tc) => ToolCall.fromJson(tc as Map<String, dynamic>))
+          .toList(),
+      toolCallId: json['toolCallId'] as String?,
     );
   }
 
@@ -208,6 +239,9 @@ class Message {
       'isError': isError,
       'errorMessage': errorMessage,
       'attachments': attachments.map((a) => a.toJson()).toList(),
+      if (toolCalls != null)
+        'toolCalls': toolCalls!.map((tc) => tc.toJson()).toList(),
+      if (toolCallId != null) 'toolCallId': toolCallId,
     };
   }
 
@@ -215,7 +249,7 @@ class Message {
   Map<String, dynamic> toOllamaMessage() {
     // Build content with text files included
     var content = text;
-    
+
     // Append text file contents to the message
     if (hasTextFiles) {
       final buffer = StringBuffer(text);
@@ -231,17 +265,32 @@ class Message {
       }
       content = buffer.toString();
     }
-    
-    final msg = <String, dynamic>{
-      'role': role.name,
-      'content': content,
-    };
-    
+
+    final msg = <String, dynamic>{'role': role.name, 'content': content};
+
     // Add images for vision models
     if (hasImages) {
       msg['images'] = images.map((img) => base64Encode(img.data)).toList();
     }
-    
+
+    // Add tool calls if present
+    if (hasToolCalls) {
+      msg['tool_calls'] = toolCalls!
+          .map(
+            (tc) => {
+              'id': tc.id,
+              'type': 'function',
+              'function': {'name': tc.name, 'arguments': tc.arguments},
+            },
+          )
+          .toList();
+    }
+
+    // Add tool call ID for tool result messages
+    if (isToolResult && toolCallId != null) {
+      msg['tool_call_id'] = toolCallId;
+    }
+
     return msg;
   }
 
@@ -256,6 +305,8 @@ class Message {
     bool? isError,
     String? errorMessage,
     List<Attachment>? attachments,
+    List<ToolCall>? toolCalls,
+    String? toolCallId,
   }) {
     return Message(
       id: id ?? this.id,
@@ -267,6 +318,8 @@ class Message {
       isError: isError ?? this.isError,
       errorMessage: errorMessage ?? this.errorMessage,
       attachments: attachments ?? this.attachments,
+      toolCalls: toolCalls ?? this.toolCalls,
+      toolCallId: toolCallId ?? this.toolCallId,
     );
   }
 
@@ -278,4 +331,3 @@ class Message {
   @override
   int get hashCode => id.hashCode;
 }
-

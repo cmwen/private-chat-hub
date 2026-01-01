@@ -110,7 +110,11 @@ void main() {
     });
 
     test('should include images in Ollama message format', () {
-      final imageData = Uint8List.fromList([0xFF, 0xD8, 0xFF]); // JPEG magic bytes
+      final imageData = Uint8List.fromList([
+        0xFF,
+        0xD8,
+        0xFF,
+      ]); // JPEG magic bytes
       final attachment = Attachment(
         id: 'att-1',
         name: 'photo.jpg',
@@ -249,7 +253,12 @@ void main() {
     });
 
     test('should not identify binary files as text files', () {
-      final binaryData = Uint8List.fromList([0x89, 0x50, 0x4E, 0x47]); // PNG magic
+      final binaryData = Uint8List.fromList([
+        0x89,
+        0x50,
+        0x4E,
+        0x47,
+      ]); // PNG magic
       final attachment = Attachment(
         id: 'att-bin',
         name: 'image.png',

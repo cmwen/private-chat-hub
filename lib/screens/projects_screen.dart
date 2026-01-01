@@ -65,8 +65,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   }
 
   Future<void> _deleteProject(Project project) async {
-    final conversationCount = widget.chatService.getProjectConversationCount(project.id);
-    
+    final conversationCount = widget.chatService.getProjectConversationCount(
+      project.id,
+    );
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -94,9 +96,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       await widget.projectService.deleteProject(project.id);
       _loadProjects();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${project.name} deleted')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('${project.name} deleted')));
       }
     }
   }
@@ -134,8 +136,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _projects.isEmpty
-              ? _buildEmptyState()
-              : _buildProjectList(),
+          ? _buildEmptyState()
+          : _buildProjectList(),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'projects_fab',
         onPressed: _createProject,
@@ -152,26 +154,16 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.folder_outlined,
-              size: 80,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.folder_outlined, size: 80, color: Colors.grey[400]),
             const SizedBox(height: 24),
             const Text(
               'No projects yet',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               'Create a project to organize your conversations\nand share context across chats',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
               textAlign: TextAlign.center,
             ),
           ],
@@ -188,7 +180,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         itemCount: _projects.length,
         itemBuilder: (context, index) {
           final project = _projects[index];
-          final conversationCount = widget.chatService.getProjectConversationCount(project.id);
+          final conversationCount = widget.chatService
+              .getProjectConversationCount(project.id);
 
           return _ProjectCard(
             project: project,
@@ -235,10 +228,7 @@ class _ProjectCard extends StatelessWidget {
               CircleAvatar(
                 radius: 24,
                 backgroundColor: project.color,
-                child: Icon(
-                  project.icon,
-                  color: Colors.white,
-                ),
+                child: Icon(project.icon, color: Colors.white),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -273,10 +263,7 @@ class _ProjectCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         project.description!,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -333,7 +320,11 @@ class _ProjectCard extends StatelessWidget {
                   PopupMenuItem(
                     value: 'pin',
                     child: ListTile(
-                      leading: Icon(project.isPinned ? Icons.push_pin_outlined : Icons.push_pin),
+                      leading: Icon(
+                        project.isPinned
+                            ? Icons.push_pin_outlined
+                            : Icons.push_pin,
+                      ),
                       title: Text(project.isPinned ? 'Unpin' : 'Pin'),
                       contentPadding: EdgeInsets.zero,
                     ),
@@ -342,7 +333,10 @@ class _ProjectCard extends StatelessWidget {
                     value: 'delete',
                     child: ListTile(
                       leading: Icon(Icons.delete, color: Colors.red),
-                      title: Text('Delete', style: TextStyle(color: Colors.red)),
+                      title: Text(
+                        'Delete',
+                        style: TextStyle(color: Colors.red),
+                      ),
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
@@ -408,7 +402,10 @@ class _CreateProjectDialogState extends State<_CreateProjectDialog> {
             ),
             const SizedBox(height: 16),
             // Icon and color selection
-            const Text('Appearance', style: TextStyle(fontWeight: FontWeight.w500)),
+            const Text(
+              'Appearance',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -456,18 +453,23 @@ class _CreateProjectDialogState extends State<_CreateProjectDialog> {
                         children: Project.availableIcons.map((iconName) {
                           final isSelected = iconName == _selectedIcon;
                           return GestureDetector(
-                            onTap: () => setState(() => _selectedIcon = iconName),
+                            onTap: () =>
+                                setState(() => _selectedIcon = iconName),
                             child: Container(
                               width: 32,
                               height: 32,
                               decoration: BoxDecoration(
-                                color: isSelected ? Colors.grey[300] : Colors.grey[100],
+                                color: isSelected
+                                    ? Colors.grey[300]
+                                    : Colors.grey[100],
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Icon(
                                 _getIconData(iconName),
                                 size: 18,
-                                color: isSelected ? Colors.black : Colors.grey[600],
+                                color: isSelected
+                                    ? Colors.black
+                                    : Colors.grey[600],
                               ),
                             ),
                           );
@@ -517,7 +519,8 @@ class _CreateProjectDialogState extends State<_CreateProjectDialog> {
                 maxLines: 3,
                 decoration: const InputDecoration(
                   labelText: 'Project Instructions',
-                  hintText: 'Context and background info (e.g., "This is a Flutter project using BLoC...")',
+                  hintText:
+                      'Context and background info (e.g., "This is a Flutter project using BLoC...")',
                   border: OutlineInputBorder(),
                 ),
               ),
