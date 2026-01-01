@@ -83,6 +83,7 @@ In addition to role-based agents, this project includes **Agent Skills** - speci
 │   ├── agents/             # Copilot Chat agents
 │   ├── skills/             # Agent skills (task-specific workflows)
 │   └── prompts/            # Copilot custom prompts (legacy)
+├── audit/                  # Temporary LLM-generated summaries and logs
 └── pubspec.yaml            # Dependencies and project config
 ```
 
