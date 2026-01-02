@@ -80,7 +80,14 @@ class _ComparisonChatScreenState extends State<ComparisonChatScreen> {
   }
 
   Future<void> _handleSendMessage(String text) async {
-    if (text.trim().isEmpty ||
+    await _handleSendMessageWithAttachments(text, []);
+  }
+
+  Future<void> _handleSendMessageWithAttachments(
+    String text,
+    List<Attachment> attachments,
+  ) async {
+    if (text.trim().isEmpty && attachments.isEmpty ||
         widget.chatService == null ||
         _conversation == null) {
       return;
@@ -95,7 +102,10 @@ class _ComparisonChatScreenState extends State<ComparisonChatScreen> {
     try {
       final stream = widget.chatService!.sendDualModelMessage(
         _conversation!.id,
-        text,
+        text.isNotEmpty
+            ? text
+            : '[Attached ${attachments.length} file(s)]',
+        attachments: attachments,
       );
 
       _streamSubscription = stream.listen(
@@ -198,6 +208,7 @@ class _ComparisonChatScreenState extends State<ComparisonChatScreen> {
           ),
           MessageInput(
             onSendMessage: _handleSendMessage,
+            onSendMessageWithAttachments: _handleSendMessageWithAttachments,
             isLoading: _isLoading,
           ),
         ],

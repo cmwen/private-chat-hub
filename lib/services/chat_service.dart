@@ -406,8 +406,9 @@ class ChatService {
   /// Responses from both models stream independently and update as they arrive.
   Stream<ComparisonConversation> sendDualModelMessage(
     String conversationId,
-    String text,
-  ) async* {
+    String text, {
+    List<Attachment>? attachments,
+  }) async* {
     // Cancel any existing streams for this conversation
     await cancelMessageGeneration(conversationId);
 
@@ -428,6 +429,7 @@ class ChatService {
       text: text,
       timestamp: DateTime.now(),
       modelSource: ModelSource.user,
+      attachments: attachments,
     );
     conversation = (await addMessage(conversationId, userMessage))
         as ComparisonConversation;
