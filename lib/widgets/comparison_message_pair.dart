@@ -110,7 +110,9 @@ class _ComparisonMessagePairState extends State<ComparisonMessagePair> {
 
   Widget _buildPageIndicator(int index, ThemeData theme) {
     final isActive = _currentPage == index;
-    final color = index == 0 ? theme.colorScheme.primary : theme.colorScheme.secondary;
+    final color = index == 0
+        ? theme.colorScheme.primary
+        : theme.colorScheme.secondary;
 
     return GestureDetector(
       onTap: () {
@@ -165,7 +167,9 @@ class _ComparisonMessagePairState extends State<ComparisonMessagePair> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: accentColor.withValues(alpha: 0.1),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(12),
+              ),
             ),
             child: Row(
               children: [
@@ -252,11 +256,7 @@ class _ComparisonMessagePairState extends State<ComparisonMessagePair> {
     if (message.isError) {
       return Row(
         children: [
-          Icon(
-            Icons.error_outline,
-            color: theme.colorScheme.error,
-            size: 20,
-          ),
+          Icon(Icons.error_outline, color: theme.colorScheme.error, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -285,9 +285,7 @@ class _ComparisonMessagePairState extends State<ComparisonMessagePair> {
       selectable: true,
       styleSheet: MarkdownStyleSheet(
         p: theme.textTheme.bodyMedium,
-        code: theme.textTheme.bodySmall?.copyWith(
-          fontFamily: 'monospace',
-        ),
+        code: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
         codeblockDecoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),

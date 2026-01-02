@@ -134,11 +134,12 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
         initialModel1: _selectedModel,
         onModelsSelected: (model1, model2) async {
           // Create comparison conversation using the service method
-          final conversation = await widget.chatService.createComparisonConversation(
-            model1Name: model1,
-            model2Name: model2,
-          );
-          
+          final conversation = await widget.chatService
+              .createComparisonConversation(
+                model1Name: model1,
+                model2Name: model2,
+              );
+
           if (!mounted) return;
           widget.onConversationSelected(conversation);
         },

@@ -60,7 +60,8 @@ class ComparisonConversation extends Conversation {
           : const ModelParameters(),
       parameters2: json['parameters2'] != null
           ? ModelParameters.fromJson(
-              json['parameters2'] as Map<String, dynamic>)
+              json['parameters2'] as Map<String, dynamic>,
+            )
           : const ModelParameters(),
       projectId: json['projectId'] as String?,
     );
@@ -111,7 +112,7 @@ class ComparisonConversation extends Conversation {
   @override
   String get lastMessagePreview {
     if (messages.isEmpty) return 'Comparing $model1Name vs $model2Name';
-    
+
     // Show the last user message if available
     final userMsgs = messages.where((m) => m.isMe).toList();
     if (userMsgs.isNotEmpty) {
@@ -121,7 +122,7 @@ class ComparisonConversation extends Conversation {
       }
       return text;
     }
-    
+
     return 'Comparing models...';
   }
 }
