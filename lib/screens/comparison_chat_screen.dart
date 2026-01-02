@@ -102,9 +102,7 @@ class _ComparisonChatScreenState extends State<ComparisonChatScreen> {
     try {
       final stream = widget.chatService!.sendDualModelMessage(
         _conversation!.id,
-        text.isNotEmpty
-            ? text
-            : '[Attached ${attachments.length} file(s)]',
+        text.isNotEmpty ? text : '[Attached ${attachments.length} file(s)]',
         attachments: attachments,
       );
 
@@ -136,10 +134,7 @@ class _ComparisonChatScreenState extends State<ComparisonChatScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -284,10 +279,7 @@ class _ComparisonChatScreenState extends State<ComparisonChatScreen> {
           Container(
             width: 24,
             height: 24,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             child: Center(
               child: Text(
                 label,
@@ -324,25 +316,25 @@ class _ComparisonChatScreenState extends State<ComparisonChatScreen> {
   int _getDisplayItemCount() {
     // Group messages: user message followed by both model responses
     // Count user messages to determine number of display items
-    final userMessages = _messages.where(
-      (m) => m.modelSource == ModelSource.user,
-    ).toList();
-    
+    final userMessages = _messages
+        .where((m) => m.modelSource == ModelSource.user)
+        .toList();
+
     return userMessages.length;
   }
 
   Widget _buildMessageItem(BuildContext context, int index, ThemeData theme) {
     // Get the nth user message and its corresponding model responses
-    final userMessages = _messages.where(
-      (m) => m.modelSource == ModelSource.user,
-    ).toList();
-    
+    final userMessages = _messages
+        .where((m) => m.modelSource == ModelSource.user)
+        .toList();
+
     if (index >= userMessages.length) {
       return const SizedBox.shrink();
     }
 
     final userMessage = userMessages[index];
-    
+
     // Find the corresponding model responses after this user message
     final userMessageIndex = _messages.indexOf(userMessage);
     Message? model1Response;
@@ -351,11 +343,14 @@ class _ComparisonChatScreenState extends State<ComparisonChatScreen> {
     // Look for model responses after this user message
     for (int i = userMessageIndex + 1; i < _messages.length; i++) {
       final msg = _messages[i];
-      if (msg.modelSource == ModelSource.user) break; // Stop at next user message
-      
+      if (msg.modelSource == ModelSource.user) {
+        break; // Stop at next user message
+      }
+
       if (msg.modelSource == ModelSource.model1 && model1Response == null) {
         model1Response = msg;
-      } else if (msg.modelSource == ModelSource.model2 && model2Response == null) {
+      } else if (msg.modelSource == ModelSource.model2 &&
+          model2Response == null) {
         model2Response = msg;
       }
     }
@@ -381,7 +376,7 @@ class _ComparisonChatScreenState extends State<ComparisonChatScreen> {
           model1Name: _conversation!.model1Name,
           model2Name: _conversation!.model2Name,
         ),
-        
+
         const SizedBox(height: 24),
       ],
     );

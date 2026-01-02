@@ -66,10 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _ollamaService = OllamaService();
     _connectionService = ConnectionService(widget.storageService);
-    _chatService = ChatService(
-      _ollamaService,
-      widget.storageService,
-    );
+    _chatService = ChatService(_ollamaService, widget.storageService);
     _projectService = ProjectService(widget.storageService);
 
     // Set up Ollama connection if one exists

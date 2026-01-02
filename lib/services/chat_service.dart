@@ -17,37 +17,37 @@ class ChatService {
   // Track active message generation streams
   final Map<String, StreamController<Conversation>> _activeStreams = {};
   final Map<String, StreamSubscription> _activeSubscriptions = {};
-  
+
   // Cache for model capabilities
   final Map<String, bool> _modelCapabilitiesCache = {};
 
   ChatService(this._ollama, this._storage);
 
   /// Checks if a model supports tool calling by querying the Ollama API.
-  /// 
+  ///
   /// Fetches the model information from Ollama's /api/show endpoint and checks
   /// the capabilities field. This is more reliable than hardcoding model names,
   /// as it respects what the model actually supports.
-  /// 
+  ///
   /// Uses caching to avoid repeated API calls.
   Future<bool> modelSupportsTools(String modelName) async {
     final modelFamily = modelName.split(':').first.toLowerCase();
-    
+
     // Check cache first
     if (_modelCapabilitiesCache.containsKey(modelFamily)) {
       return _modelCapabilitiesCache[modelFamily] ?? false;
     }
-    
+
     try {
       final modelInfo = await _ollama.showModel(modelName);
-      
+
       // The /api/show endpoint returns a "capabilities" array
       // Example: "capabilities": ["completion", "vision", "tools"]
       final capabilities = modelInfo['capabilities'] as List<dynamic>?;
-      
+
       if (capabilities != null) {
         final supportsTools = capabilities.contains('tools');
-        
+
         // Cache the result
         _modelCapabilitiesCache[modelFamily] = supportsTools;
         return supportsTools;
@@ -62,7 +62,7 @@ class ChatService {
   }
 
   /// Fallback method that checks if a model supports tools based on hardcoded names.
-  /// 
+  ///
   /// This is used when the Ollama API doesn't return capabilities information.
   /// Based on Ollama documentation:
   /// - llama3.1+ have native function calling
@@ -71,7 +71,6 @@ class ChatService {
   /// - qwen2.5+ have tool support
   /// - command-r models have tool support
   bool _modelSupportsFallback(String modelFamily) {
-    
     // llama3.1+ (but not llama3.0 or llama2)
     if (modelFamily.startsWith('llama3.')) {
       final versionMatch = RegExp(r'llama3\.(\d+)').firstMatch(modelFamily);
@@ -80,14 +79,14 @@ class ChatService {
         return minorVersion >= 1;
       }
     }
-    
+
     // Mistral models with tool support
     if (modelFamily.startsWith('mistral-3') ||
         modelFamily.startsWith('mistral-nemo') ||
         modelFamily.startsWith('mistral-large')) {
       return true;
     }
-    
+
     // Other known tool-capable models
     if (modelFamily.startsWith('qwen2.5') ||
         modelFamily.startsWith('qwen2.6') ||
@@ -95,7 +94,7 @@ class ChatService {
         modelFamily.startsWith('command-r')) {
       return true;
     }
-    
+
     return false;
   }
 
@@ -431,13 +430,15 @@ class ChatService {
       modelSource: ModelSource.user,
       attachments: attachments,
     );
-    conversation = (await addMessage(conversationId, userMessage))
-        as ComparisonConversation;
+    conversation =
+        (await addMessage(conversationId, userMessage))
+            as ComparisonConversation;
 
     // Create a broadcast stream controller
     final streamController =
         StreamController<ComparisonConversation>.broadcast();
-    _activeStreams[conversationId] = streamController as StreamController<Conversation>;
+    _activeStreams[conversationId] =
+        streamController as StreamController<Conversation>;
 
     // Yield initial state with user message
     streamController.add(conversation);
@@ -463,10 +464,12 @@ class ChatService {
       modelSource: ModelSource.model2,
     );
 
-    conversation = (await addMessage(conversationId, model1Message))
-        as ComparisonConversation;
-    conversation = (await addMessage(conversationId, model2Message))
-        as ComparisonConversation;
+    conversation =
+        (await addMessage(conversationId, model1Message))
+            as ComparisonConversation;
+    conversation =
+        (await addMessage(conversationId, model2Message))
+            as ComparisonConversation;
 
     streamController.add(conversation);
     yield conversation;
@@ -818,7 +821,9 @@ class ChatService {
     await subscription?.cancel();
 
     // Also cancel model2 subscription if it exists (for comparison mode)
-    final subscription2 = _activeSubscriptions.remove('${conversationId}_model2');
+    final subscription2 = _activeSubscriptions.remove(
+      '${conversationId}_model2',
+    );
     await subscription2?.cancel();
 
     final controller = _activeStreams.remove(conversationId);

@@ -34,7 +34,8 @@ class _DualModelSelectorState extends State<DualModelSelector> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final canConfirm = _selectedModel1 != null &&
+    final canConfirm =
+        _selectedModel1 != null &&
         _selectedModel2 != null &&
         _selectedModel1 != _selectedModel2;
 
@@ -156,7 +157,8 @@ class _DualModelSelectorState extends State<DualModelSelector> {
           value: value,
           hint: Text(hint),
           items: widget.models.map((model) {
-              final isDisabled = disabledValue != null && model.name == disabledValue;
+            final isDisabled =
+                disabledValue != null && model.name == disabledValue;
             return DropdownMenuItem<String>(
               value: model.name,
               enabled: !isDisabled,
@@ -172,7 +174,9 @@ class _DualModelSelectorState extends State<DualModelSelector> {
                           style: TextStyle(
                             fontWeight: FontWeight.w500,
                             color: isDisabled
-                                ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                                ? theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.3,
+                                  )
                                 : null,
                           ),
                         ),
