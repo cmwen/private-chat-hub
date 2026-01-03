@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:private_chat_hub/models/model_capabilities.dart';
 
 /// Represents an Ollama model.
 class OllamaModel {
@@ -50,15 +51,16 @@ class OllamaModel {
 
   /// Returns true if this model supports tool calling.
   ///
-  /// Based on model family name. Known tool-capable models:
-  /// - llama3.1 and newer (llama3.2, llama3.3, etc.)
-  /// - mistral-3 (native function calling)
-  /// - mistral-nemo (function calling support)
-  /// - mistral-large (may have tool support)
-  /// - qwen2.5 and newer
-  /// - command-r and command-r-plus (Cohere models)
-  /// - Other models with explicit function calling support
+  /// Uses the ModelCapabilitiesRegistry for known models,
+  /// with fallback heuristics for unknown models.
   bool get supportsTools {
+    // First check the capabilities registry
+    final capabilities = ModelCapabilitiesRegistry.getCapabilities(name);
+    if (capabilities != ModelCapabilities.unknown) {
+      return capabilities.supportsTools;
+    }
+
+    // Fallback to heuristic checks for unknown models
     final modelFamily = family.toLowerCase();
 
     // llama3.1+ (but not llama3.0 or llama2)
@@ -87,6 +89,21 @@ class OllamaModel {
 
     // llama2 and earlier llama3 versions don't support tools
     return false;
+  }
+
+  /// Returns true if this model supports vision/image input.
+  bool get supportsVision {
+    return ModelCapabilitiesRegistry.supportsVision(name);
+  }
+
+  /// Returns true if this model is optimized for code generation.
+  bool get supportsCode {
+    return ModelCapabilitiesRegistry.supportsCode(name);
+  }
+
+  /// Gets the full capabilities for this model.
+  ModelCapabilities get capabilities {
+    return ModelCapabilitiesRegistry.getCapabilities(name);
   }
 }
 

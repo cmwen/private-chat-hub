@@ -12,6 +12,8 @@ import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/ollama_service.dart';
 import 'package:private_chat_hub/services/project_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
+import 'package:private_chat_hub/services/tool_config_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,14 +22,23 @@ void main() async {
   final storageService = StorageService();
   await storageService.init();
 
-  runApp(MyApp(storageService: storageService));
+  // Initialize shared preferences for tool config
+  final prefs = await SharedPreferences.getInstance();
+  final toolConfigService = ToolConfigService(prefs);
+
+  runApp(MyApp(storageService: storageService, toolConfigService: toolConfigService));
 }
 
 /// The root widget of the application.
 class MyApp extends StatelessWidget {
   final StorageService storageService;
+  final ToolConfigService toolConfigService;
 
-  const MyApp({super.key, required this.storageService});
+  const MyApp({
+    super.key,
+    required this.storageService,
+    required this.toolConfigService,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +48,10 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueAccent),
         useMaterial3: true,
       ),
-      home: HomeScreen(storageService: storageService),
+      home: HomeScreen(
+        storageService: storageService,
+        toolConfigService: toolConfigService,
+      ),
     );
   }
 }
@@ -45,8 +59,13 @@ class MyApp extends StatelessWidget {
 /// Home screen with bottom navigation.
 class HomeScreen extends StatefulWidget {
   final StorageService storageService;
+  final ToolConfigService toolConfigService;
 
-  const HomeScreen({super.key, required this.storageService});
+  const HomeScreen({
+    super.key,
+    required this.storageService,
+    required this.toolConfigService,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -157,6 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
             connectionService: _connectionService,
             ollamaService: _ollamaService,
             chatService: _chatService,
+            toolConfigService: widget.toolConfigService,
           ),
         ],
       ),

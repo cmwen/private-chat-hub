@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:private_chat_hub/models/message.dart';
+import 'package:private_chat_hub/widgets/tool_widgets.dart';
 import 'package:intl/intl.dart';
 
 /// A chat message bubble widget.
@@ -66,6 +67,9 @@ class MessageBubble extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Display tool badges for assistant messages
+                    if (!message.isMe && message.hasToolCalls) 
+                      _buildToolBadges(context),
                     // Display image attachments if present
                     if (message.hasImages) _buildImageAttachments(context),
                     // Display text file attachments if present
@@ -96,6 +100,49 @@ class MessageBubble extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildToolBadges(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        children: message.toolCalls.map((toolCall) {
+          return ToolBadge(
+            toolCall: toolCall,
+            onTap: () => _showToolCallDetails(context, toolCall),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  void _showToolCallDetails(BuildContext context, toolCall) {
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                ToolBadge(toolCall: toolCall),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(sheetContext),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ToolCallDetails(toolCall: toolCall),
+          ],
+        ),
+      ),
     );
   }
 

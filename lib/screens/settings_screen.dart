@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:private_chat_hub/models/connection.dart';
+import 'package:private_chat_hub/models/tool_models.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/network_discovery_service.dart';
 import 'package:private_chat_hub/services/ollama_service.dart';
+import 'package:private_chat_hub/services/tool_config_service.dart';
+import 'package:private_chat_hub/widgets/tool_settings_widget.dart';
 
 /// Settings screen for managing Ollama connections.
 class SettingsScreen extends StatefulWidget {
   final ConnectionService connectionService;
   final OllamaService ollamaService;
   final ChatService? chatService;
+  final ToolConfigService? toolConfigService;
 
   const SettingsScreen({
     super.key,
     required this.connectionService,
     required this.ollamaService,
     this.chatService,
+    this.toolConfigService,
   });
 
   @override
@@ -25,17 +30,36 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   List<Connection> _connections = [];
   bool _isLoading = false;
+  ToolConfig _toolConfig = const ToolConfig();
 
   @override
   void initState() {
     super.initState();
     _loadConnections();
+    _loadToolConfig();
   }
 
   void _loadConnections() {
     setState(() {
       _connections = widget.connectionService.getConnections();
     });
+  }
+
+  void _loadToolConfig() {
+    if (widget.toolConfigService != null) {
+      setState(() {
+        _toolConfig = widget.toolConfigService!.getConfig();
+      });
+    }
+  }
+
+  Future<void> _saveToolConfig(ToolConfig config) async {
+    if (widget.toolConfigService != null) {
+      await widget.toolConfigService!.saveConfig(config);
+      setState(() {
+        _toolConfig = config;
+      });
+    }
   }
 
   Future<void> _testConnection(Connection connection) async {
@@ -211,6 +235,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
+                  if (widget.toolConfigService != null)
+                    ToolSettingsWidget(
+                      config: _toolConfig,
+                      onConfigChanged: _saveToolConfig,
+                    ),
                   const Divider(),
                 ],
                 ListTile(

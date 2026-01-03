@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:private_chat_hub/models/tool_models.dart';
 
 /// The role of a message sender.
 enum MessageRole { user, assistant, system, tool }
@@ -83,6 +84,9 @@ class Message {
   final String? errorMessage;
   final List<Attachment> attachments;
   final ModelSource? modelSource;
+  
+  /// Tool calls made during this message generation (for assistant messages).
+  final List<ToolCall> toolCalls;
 
   const Message({
     required this.id,
@@ -95,7 +99,11 @@ class Message {
     this.errorMessage,
     this.attachments = const [],
     this.modelSource,
+    this.toolCalls = const [],
   });
+
+  /// Whether this message has any tool calls.
+  bool get hasToolCalls => toolCalls.isNotEmpty;
 
   /// Whether this message has image attachments.
   bool get hasImages => attachments.any((a) => a.isImage);
@@ -185,6 +193,7 @@ class Message {
   factory Message.fromJson(Map<String, dynamic> json) {
     final attachmentsJson = json['attachments'] as List<dynamic>?;
     final modelSourceStr = json['modelSource'] as String?;
+    final toolCallsJson = json['toolCalls'] as List<dynamic>?;
     return Message(
       id: json['id'] as String,
       text: json['text'] as String,
@@ -208,6 +217,11 @@ class Message {
               orElse: () => ModelSource.user,
             )
           : null,
+      toolCalls:
+          toolCallsJson
+              ?.map((tc) => ToolCall.fromJson(tc as Map<String, dynamic>))
+              .toList() ??
+          const [],
     );
   }
 
@@ -224,6 +238,7 @@ class Message {
       'errorMessage': errorMessage,
       'attachments': attachments.map((a) => a.toJson()).toList(),
       'modelSource': modelSource?.name,
+      'toolCalls': toolCalls.map((tc) => tc.toJson()).toList(),
     };
   }
 
@@ -270,6 +285,7 @@ class Message {
     String? errorMessage,
     List<Attachment>? attachments,
     ModelSource? modelSource,
+    List<ToolCall>? toolCalls,
   }) {
     return Message(
       id: id ?? this.id,
@@ -282,6 +298,7 @@ class Message {
       errorMessage: errorMessage ?? this.errorMessage,
       attachments: attachments ?? this.attachments,
       modelSource: modelSource ?? this.modelSource,
+      toolCalls: toolCalls ?? this.toolCalls,
     );
   }
 
