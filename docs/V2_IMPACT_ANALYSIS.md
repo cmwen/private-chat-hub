@@ -31,6 +31,7 @@ v2 is designed as a **pure additive architecture**. Existing features work uncha
 | **Message search (FTS)** | ✅ FTS5 tables | ✅ Same + new fields | Backward compatible | Auto-migrate |
 | **Attachments (images)** | ✅ Supported | ✅ Same mechanism | None | None needed |
 | **Conversation management** | ✅ Working | ✅ Enhanced | New optional fields | Auto-migrate |
+
 | **System prompts** | ✅ Supported | ✅ Same | None | None needed |
 
 **Backward Compatibility Status:** ✅ 100% Compatible
