@@ -451,6 +451,31 @@ class _ModelCard extends StatelessWidget {
                         ],
                       ],
                     ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: [
+                        if (model.capabilities.supportsVision)
+                          _SmallCapabilityChip(
+                            icon: Icons.visibility,
+                            label: 'Vision',
+                            color: Colors.purple,
+                          ),
+                        if (model.capabilities.supportsTools)
+                          _SmallCapabilityChip(
+                            icon: Icons.build,
+                            label: 'Tools',
+                            color: Colors.blue,
+                          ),
+                        if (model.capabilities.supportsCode)
+                          _SmallCapabilityChip(
+                            icon: Icons.code,
+                            label: 'Code',
+                            color: Colors.green,
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -516,6 +541,84 @@ class _InfoChip extends StatelessWidget {
           Icon(icon, size: 12, color: Colors.grey[600]),
           const SizedBox(width: 4),
           Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+        ],
+      ),
+    );
+  }
+}
+
+class _CapabilityChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _CapabilityChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SmallCapabilityChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _SmallCapabilityChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 0.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -711,6 +814,50 @@ class _ModelDetailsSheetState extends State<_ModelDetailsSheet> {
           if (_isLoading)
             const Center(child: CircularProgressIndicator())
           else if (_details != null) ...[
+            // Capabilities badges
+            _DetailSection(
+              title: 'Capabilities',
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (widget.model.capabilities.supportsVision)
+                      _CapabilityChip(
+                        icon: Icons.visibility,
+                        label: 'Vision',
+                        color: Colors.purple,
+                      ),
+                    if (widget.model.capabilities.supportsTools)
+                      _CapabilityChip(
+                        icon: Icons.build,
+                        label: 'Tools',
+                        color: Colors.blue,
+                      ),
+                    if (widget.model.capabilities.supportsCode)
+                      _CapabilityChip(
+                        icon: Icons.code,
+                        label: 'Code',
+                        color: Colors.green,
+                      ),
+                    _CapabilityChip(
+                      icon: Icons.storage,
+                      label:
+                          '${(widget.model.capabilities.contextLength / 1024).toStringAsFixed(0)}K context',
+                      color: Colors.orange,
+                    ),
+                  ],
+                ),
+                if (widget.model.capabilities.description.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.model.capabilities.description,
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 16),
             _DetailSection(
               title: 'Model Information',
               children: [

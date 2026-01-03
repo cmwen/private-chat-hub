@@ -535,9 +535,40 @@ class _ModelSelectorSheet extends StatelessWidget {
                       ),
                     ),
                     title: Text(model.name),
-                    subtitle: Text(
-                      '${model.sizeFormatted}${model.parameterCount != null ? ' • ${model.parameterCount}' : ''}',
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${model.sizeFormatted}${model.parameterCount != null ? ' • ${model.parameterCount}' : ''}',
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 2,
+                          children: [
+                            if (model.capabilities.supportsVision)
+                              _CapabilityBadge(
+                                icon: Icons.visibility,
+                                label: 'Vision',
+                                color: Colors.purple,
+                              ),
+                            if (model.capabilities.supportsTools)
+                              _CapabilityBadge(
+                                icon: Icons.build,
+                                label: 'Tools',
+                                color: Colors.blue,
+                              ),
+                            if (model.capabilities.supportsCode)
+                              _CapabilityBadge(
+                                icon: Icons.code,
+                                label: 'Code',
+                                color: Colors.green,
+                              ),
+                          ],
+                        ),
+                      ],
                     ),
+                    isThreeLine: true,
                     trailing: isSelected
                         ? const Icon(Icons.check, color: Colors.green)
                         : null,
@@ -700,6 +731,46 @@ class _NewConversationDialogState extends State<_NewConversationDialog> {
           child: const Text('Start Chat'),
         ),
       ],
+    );
+  }
+}
+
+/// Small badge for displaying model capabilities.
+class _CapabilityBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _CapabilityBadge({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 0.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

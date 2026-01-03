@@ -645,6 +645,15 @@ class ModelCapabilitiesRegistry {
       description: 'AI2 OLMo 2 - Open model',
       family: 'olmo',
     ),
+    // === Ollama / GPT-OSS ===
+    'gpt-oss': ModelCapabilities(
+      supportsVision: false,
+      supportsTools: true,
+      supportsCode: true,
+      contextLength: 131072,
+      description: 'GPT-OSS (Ollama) - Open-weight models with agentic/function-calling support. See https://ollama.com/library/gpt-oss (128K context)',
+      family: 'gpt-oss',
+    ),
   };
 
   /// Gets capabilities for a model by its name.
