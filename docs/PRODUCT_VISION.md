@@ -19,16 +19,16 @@
 - **Export & Portability**: Own your chat history and move it anywhere
 
 ### For AI Enthusiasts & Developers
-- **Model Flexibility**: Switch between models instantly, experiment freely
-- **Self-Hosted Infrastructure**: Connect to your Ollama instance
-- **Advanced Features**: Vision models, file context, function calling
-- **Resource Awareness**: Smart recommendations based on your hardware
+- **Model Flexibility**: Switch between models instantly, experiment freely; compare models side-by-side (v2)
+- **Self-Hosted Infrastructure**: Connect to your Ollama instance; extend with MCP servers (v2)
+- **Advanced Features**: Vision models, file context, tool calling (v2), extended reasoning models (v2)
+- **Resource Awareness**: Smart recommendations based on your hardware; performance metrics per model (v2)
 
 ### For Power Users
 - **Organized Workspace**: Projects/spaces for topic-based conversations
 - **Context Management**: Use conversation history as context automatically
-- **Custom Agents**: Create GPT-like agents with predefined personalities
-- **Seamless Sharing**: Use Android's native sharing for conversations
+- **Multi-Model Intelligence**: Compare responses from multiple models; let AI tools search the web (v2)
+- **Seamless Integration**: Use Android's native sharing for conversations; listen with TTS (v2); long-running tasks (v2)
 
 ## 🎨 Product Principles
 
@@ -113,7 +113,7 @@
 
 ## 🗺️ Product Roadmap
 
-### Phase 1: MVP (3-4 months)
+### v1: MVP (Q1 2026) ✅
 **Goal**: Deliver core local chat experience
 
 - ✅ Connect to local Ollama instance
@@ -124,9 +124,7 @@
 - ✅ Model information and management
 - ✅ Basic settings and configuration
 
-**Release Target**: Q1 2026
-
-### Phase 2: Organization & Context (2-3 months)
+### v1.1: Organization & Context (Q2 2026)
 **Goal**: Enable power users to organize and contextualize
 
 - Projects/Spaces for organized conversations
@@ -136,38 +134,54 @@
 - Android native sharing integration
 - Conversation templates
 
-**Release Target**: Q2 2026
+### v2: Advanced AI & Integration (Q2-Q3 2026)
+**Goal**: Transform into comprehensive AI platform with tool calling, comparison, and native integration
 
-### Phase 3: Agents & Automation (2-3 months)
-**Goal**: Enable custom agents and advanced features
+**Phase 1: Tool Calling (8-10 weeks)**
+- ✨ Tool calling framework (Web Search, MCP)
+- ✨ Web search integration with results
+- ✨ Tool error handling and fallbacks
+- ✨ Ollama function calling support
 
+**Phase 2: Model Comparison (6-8 weeks)**
+- ✨ Side-by-side model comparison chat
+- ✨ Parallel model requests (2-4 models)
+- ✨ Performance metrics per model
+- ✨ Model switching mid-conversation
+
+**Phase 3: Native Android Integration (6-8 weeks)**
+- ✨ Share intent (receive text & images from other apps)
+- ✨ Share conversations to other apps
+- ✨ Text-to-speech for AI responses
+- ✨ Clipboard quick actions
+
+**Phase 4: Thinking Models & Long-Running Tasks (8-10 weeks)**
+- ✨ Extended reasoning model support
+- ✨ Multi-step task orchestration
+- ✨ Background task execution
+- ✨ Task progress tracking and templates
+
+**Phase 5: Remote MCP Integration (6-8 weeks)**
+- ✨ MCP server discovery and management
+- ✨ Dynamic tool invocation via MCP
+- ✨ Tool permissions and security
+
+**Release Target**: Q2-Q3 2026
+
+### v2.1+: Future Enhancements
+- Voice input (speech-to-text)
+- Scheduled/recurring tasks
+- Advanced analytics and insights
 - Custom agent creation (GPT-like)
-- Agent marketplace/sharing
-- Function/tool calling support
-- Advanced model parameters
-- Conversation branching
-- Model performance insights
+- Model performance benchmarking
 
-**Release Target**: Q3 2026
-
-### Phase 4: Voice & Multi-Modal (2-3 months)
-**Goal**: Hands-free interaction
-
-- Audio to text (voice input)
-- Text to speech (voice output)
-- Image generation support
-- Advanced vision capabilities
-- Multi-modal conversations
-
-**Release Target**: Q4 2026
-
-### Future Considerations
+### Future Considerations (v3+)
 - Multi-device sync (local network)
 - API gateway support (LiteLLM, OpenRouter)
 - Cloud backup (encrypted, user-controlled)
 - Desktop companion app
-- Conversation analytics
 - Collaborative spaces (local network)
+- Enterprise features (team management, audit logs)
 
 ## 🎬 Go-to-Market Strategy
 
@@ -206,10 +220,19 @@
 
 ## 📋 Related Documents
 
-- [PRODUCT_REQUIREMENTS.md](PRODUCT_REQUIREMENTS.md) - Detailed functional requirements
+### v1 Documentation
+- [PRODUCT_REQUIREMENTS.md](PRODUCT_REQUIREMENTS.md) - v1 functional requirements
 - [USER_PERSONAS.md](USER_PERSONAS.md) - Complete user persona definitions
 - [USER_STORIES_MVP.md](USER_STORIES_MVP.md) - MVP user stories with acceptance criteria
-- [ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md) - Technical architecture (to be created by @architect)
+
+### v2 Planning (NEW)
+- [PRODUCT_ROADMAP_V2.md](PRODUCT_ROADMAP_V2.md) - Complete v2 roadmap with 5 phases, timelines, and architecture
+- [USER_STORIES_V2.md](USER_STORIES_V2.md) - 26 user stories with detailed acceptance criteria
+- [REQUIREMENTS_V2.md](REQUIREMENTS_V2.md) - Functional and non-functional requirements for v2
+- [V2_PLANNING_QUICK_REFERENCE.md](V2_PLANNING_QUICK_REFERENCE.md) - Quick reference guide and next steps
+
+### Architecture
+- [ARCHITECTURE_DECISIONS.md](ARCHITECTURE_DECISIONS.md) - v1 technical decisions
 
 ---
 
