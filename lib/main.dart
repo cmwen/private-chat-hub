@@ -9,7 +9,7 @@ import 'package:private_chat_hub/screens/projects_screen.dart';
 import 'package:private_chat_hub/screens/settings_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
-import 'package:private_chat_hub/services/ollama_service.dart';
+import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/project_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:private_chat_hub/services/tool_config_service.dart';
@@ -30,7 +30,7 @@ void main() async {
 }
 
 /// The root widget of the application.
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   final StorageService storageService;
   final ToolConfigService toolConfigService;
 
@@ -41,6 +41,46 @@ class MyApp extends StatelessWidget {
   });
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  ThemeMode _themeMode = ThemeMode.system;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadThemeMode();
+  }
+
+  Future<void> _loadThemeMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final themeModeString = prefs.getString('theme_mode') ?? 'system';
+    setState(() {
+      _themeMode = _themeModeFromString(themeModeString);
+    });
+  }
+
+  ThemeMode _themeModeFromString(String value) {
+    switch (value) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
+    }
+  }
+
+  void _updateThemeMode(ThemeMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('theme_mode', mode.name);
+    setState(() {
+      _themeMode = mode;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Private Chat Hub',
@@ -48,9 +88,19 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueAccent),
         useMaterial3: true,
       ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blueAccent,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      themeMode: _themeMode,
       home: HomeScreen(
-        storageService: storageService,
-        toolConfigService: toolConfigService,
+        storageService: widget.storageService,
+        toolConfigService: widget.toolConfigService,
+        onThemeModeChanged: _updateThemeMode,
+        currentThemeMode: _themeMode,
       ),
     );
   }
@@ -60,11 +110,15 @@ class MyApp extends StatelessWidget {
 class HomeScreen extends StatefulWidget {
   final StorageService storageService;
   final ToolConfigService toolConfigService;
+  final Function(ThemeMode) onThemeModeChanged;
+  final ThemeMode currentThemeMode;
 
   const HomeScreen({
     super.key,
     required this.storageService,
     required this.toolConfigService,
+    required this.onThemeModeChanged,
+    required this.currentThemeMode,
   });
 
   @override
@@ -72,7 +126,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late final OllamaService _ollamaService;
+  late final OllamaConnectionManager _ollamaManager;
   late final ConnectionService _connectionService;
   late final ChatService _chatService;
   late final ProjectService _projectService;
@@ -83,9 +137,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _ollamaService = OllamaService();
+    _ollamaManager = OllamaConnectionManager();
     _connectionService = ConnectionService(widget.storageService);
-    _chatService = ChatService(_ollamaService, widget.storageService);
+    _chatService = ChatService(_ollamaManager, widget.storageService);
     _projectService = ProjectService(widget.storageService);
 
     // Set up Ollama connection if one exists
@@ -95,19 +149,14 @@ class _HomeScreenState extends State<HomeScreen> {
   void _setupConnection() {
     final connection = _connectionService.getDefaultConnection();
     if (connection != null) {
-      _ollamaService.setConnection(
-        OllamaConnection(
-          host: connection.host,
-          port: connection.port,
-          useHttps: connection.useHttps,
-        ),
-      );
+      _ollamaManager.setConnection(connection);
     }
   }
 
   @override
   void dispose() {
-    _ollamaService.dispose();
+    // Clean up resources
+    _chatService.dispose();
     super.dispose();
   }
 
@@ -157,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ConversationListScreen(
             chatService: _chatService,
             connectionService: _connectionService,
-            ollamaService: _ollamaService,
+            ollamaManager: _ollamaManager,
             onConversationSelected: _onConversationSelected,
             onNewConversation: () {},
           ),
@@ -165,18 +214,20 @@ class _HomeScreenState extends State<HomeScreen> {
             projectService: _projectService,
             chatService: _chatService,
             connectionService: _connectionService,
-            ollamaService: _ollamaService,
+            ollamaManager: _ollamaManager,
             onConversationSelected: _onConversationSelected,
           ),
           ModelsScreen(
-            ollamaService: _ollamaService,
+            ollamaManager: _ollamaManager,
             connectionService: _connectionService,
           ),
           SettingsScreen(
             connectionService: _connectionService,
-            ollamaService: _ollamaService,
+            ollamaManager: _ollamaManager,
             chatService: _chatService,
             toolConfigService: widget.toolConfigService,
+            onThemeModeChanged: widget.onThemeModeChanged,
+            currentThemeMode: widget.currentThemeMode,
           ),
         ],
       ),

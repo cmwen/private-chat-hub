@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:private_chat_hub/services/ollama_service.dart';
+import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
 
 /// Widget for selecting two models for comparison.
 class DualModelSelector extends StatefulWidget {
-  final List<OllamaModel> models;
+  final List<OllamaModelInfo> models;
   final String? initialModel1;
   final String? initialModel2;
   final Function(String model1, String model2) onModelsSelected;

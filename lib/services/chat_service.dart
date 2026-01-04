@@ -3,13 +3,16 @@ import 'dart:convert';
 import 'package:private_chat_hub/models/comparison_conversation.dart';
 import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
-import 'package:private_chat_hub/services/ollama_service.dart';
+import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
+import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:uuid/uuid.dart';
 
-/// Service for managing chat conversations and sending messages to Ollama.
+/// Service for managing chat conversations and sending messages to Ollama using the toolkit.
+///
+/// This is a clean rewrite that properly integrates with the ollama_toolkit.
 class ChatService {
-  final OllamaService _ollama;
+  final OllamaConnectionManager _ollamaManager;
   final StorageService _storage;
   static const String _conversationsKey = 'conversations';
   static const String _currentConversationKey = 'current_conversation_id';
@@ -18,85 +21,11 @@ class ChatService {
   final Map<String, StreamController<Conversation>> _activeStreams = {};
   final Map<String, StreamSubscription> _activeSubscriptions = {};
 
-  // Cache for model capabilities
-  final Map<String, bool> _modelCapabilitiesCache = {};
+  ChatService(this._ollamaManager, this._storage);
 
-  ChatService(this._ollama, this._storage);
-
-  /// Checks if a model supports tool calling by querying the Ollama API.
-  ///
-  /// Fetches the model information from Ollama's /api/show endpoint and checks
-  /// the capabilities field. This is more reliable than hardcoding model names,
-  /// as it respects what the model actually supports.
-  ///
-  /// Uses caching to avoid repeated API calls.
-  Future<bool> modelSupportsTools(String modelName) async {
-    final modelFamily = modelName.split(':').first.toLowerCase();
-
-    // Check cache first
-    if (_modelCapabilitiesCache.containsKey(modelFamily)) {
-      return _modelCapabilitiesCache[modelFamily] ?? false;
-    }
-
-    try {
-      final modelInfo = await _ollama.showModel(modelName);
-
-      // The /api/show endpoint returns a "capabilities" array
-      // Example: "capabilities": ["completion", "vision", "tools"]
-      final capabilities = modelInfo['capabilities'] as List<dynamic>?;
-
-      if (capabilities != null) {
-        final supportsTools = capabilities.contains('tools');
-
-        // Cache the result
-        _modelCapabilitiesCache[modelFamily] = supportsTools;
-        return supportsTools;
-      } else {
-        // Fallback to hardcoded list if capabilities not available
-        return _modelSupportsFallback(modelFamily);
-      }
-    } catch (e) {
-      // Fallback to hardcoded list on error
-      return _modelSupportsFallback(modelFamily);
-    }
-  }
-
-  /// Fallback method that checks if a model supports tools based on hardcoded names.
-  ///
-  /// This is used when the Ollama API doesn't return capabilities information.
-  /// Based on Ollama documentation:
-  /// - llama3.1+ have native function calling
-  /// - mistral-3 has native function calling
-  /// - mistral-nemo has function calling
-  /// - qwen2.5+ have tool support
-  /// - command-r models have tool support
-  bool _modelSupportsFallback(String modelFamily) {
-    // llama3.1+ (but not llama3.0 or llama2)
-    if (modelFamily.startsWith('llama3.')) {
-      final versionMatch = RegExp(r'llama3\.(\d+)').firstMatch(modelFamily);
-      if (versionMatch != null) {
-        final minorVersion = int.tryParse(versionMatch.group(1) ?? '0') ?? 0;
-        return minorVersion >= 1;
-      }
-    }
-
-    // Mistral models with tool support
-    if (modelFamily.startsWith('mistral-3') ||
-        modelFamily.startsWith('mistral-nemo') ||
-        modelFamily.startsWith('mistral-large')) {
-      return true;
-    }
-
-    // Other known tool-capable models
-    if (modelFamily.startsWith('qwen2.5') ||
-        modelFamily.startsWith('qwen2.6') ||
-        modelFamily.startsWith('qwen3') ||
-        modelFamily.startsWith('command-r')) {
-      return true;
-    }
-
-    return false;
-  }
+  // ============================================================================
+  // CONVERSATION MANAGEMENT
+  // ============================================================================
 
   /// Gets all saved conversations.
   List<Conversation> getConversations({
@@ -110,26 +39,20 @@ class ChatService {
       final List<dynamic> jsonList = jsonDecode(jsonString);
       var conversations = jsonList.map((json) {
         final jsonMap = json as Map<String, dynamic>;
-        // Check if it's a comparison conversation
         if (jsonMap['isComparisonMode'] == true) {
           return ComparisonConversation.fromJson(jsonMap);
         }
         return Conversation.fromJson(jsonMap);
       }).toList();
 
-      // Filter by project if specified
       if (projectId != null) {
-        conversations = conversations
-            .where((c) => c.projectId == projectId)
-            .toList();
+        conversations =
+            conversations.where((c) => c.projectId == projectId).toList();
       } else if (excludeProjectConversations) {
-        // Only show standalone conversations (not in any project)
-        conversations = conversations
-            .where((c) => c.projectId == null)
-            .toList();
+        conversations =
+            conversations.where((c) => c.projectId == null).toList();
       }
 
-      // Sort by updated date, most recent first
       conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       return conversations;
     } catch (e) {
@@ -205,33 +128,6 @@ class ChatService {
     return conversation;
   }
 
-  /// Deletes all conversations in a project.
-  Future<void> deleteProjectConversations(String projectId) async {
-    final conversations = getConversations();
-    final updatedConversations = conversations
-        .where((c) => c.projectId != projectId)
-        .toList();
-    await _saveConversations(updatedConversations);
-  }
-
-  /// Moves a conversation to a project.
-  Future<void> moveConversationToProject(
-    String conversationId,
-    String? projectId,
-  ) async {
-    final conversations = getConversations();
-    final index = conversations.indexWhere((c) => c.id == conversationId);
-
-    if (index != -1) {
-      conversations[index] = conversations[index].copyWith(
-        projectId: projectId,
-        clearProjectId: projectId == null,
-        updatedAt: DateTime.now(),
-      );
-      await _saveConversations(conversations);
-    }
-  }
-
   /// Gets a conversation by ID.
   Conversation? getConversation(String id) {
     final conversations = getConversations();
@@ -256,14 +152,38 @@ class ChatService {
   /// Deletes a conversation.
   Future<void> deleteConversation(String id) async {
     final conversations = getConversations();
-    final updatedConversations = conversations
-        .where((c) => c.id != id)
-        .toList();
+    final updatedConversations =
+        conversations.where((c) => c.id != id).toList();
     await _saveConversations(updatedConversations);
 
-    // Clear current if we deleted it
     if (getCurrentConversationId() == id) {
       await _storage.remove(_currentConversationKey);
+    }
+  }
+
+  /// Deletes all conversations in a project.
+  Future<void> deleteProjectConversations(String projectId) async {
+    final conversations = getConversations();
+    final updatedConversations =
+        conversations.where((c) => c.projectId != projectId).toList();
+    await _saveConversations(updatedConversations);
+  }
+
+  /// Moves a conversation to a project.
+  Future<void> moveConversationToProject(
+    String conversationId,
+    String? projectId,
+  ) async {
+    final conversations = getConversations();
+    final index = conversations.indexWhere((c) => c.id == conversationId);
+
+    if (index != -1) {
+      conversations[index] = conversations[index].copyWith(
+        projectId: projectId,
+        clearProjectId: projectId == null,
+        updatedAt: DateTime.now(),
+      );
+      await _saveConversations(conversations);
     }
   }
 
@@ -295,6 +215,16 @@ class ChatService {
     if (id == null) return null;
     return getConversation(id);
   }
+
+  /// Deletes all conversations.
+  Future<void> deleteAllConversations() async {
+    await _storage.remove(_conversationsKey);
+    await _storage.remove(_currentConversationKey);
+  }
+
+  // ============================================================================
+  // MESSAGE MANAGEMENT
+  // ============================================================================
 
   /// Adds a message to a conversation.
   Future<Conversation> addMessage(
@@ -330,9 +260,8 @@ class ChatService {
       return null;
     }
 
-    final updatedMessages = conversation.messages
-        .where((m) => m.id != messageId)
-        .toList();
+    final updatedMessages =
+        conversation.messages.where((m) => m.id != messageId).toList();
 
     conversation = conversation.copyWith(
       messages: updatedMessages,
@@ -343,21 +272,22 @@ class ChatService {
     return conversation;
   }
 
+  // ============================================================================
+  // CHAT GENERATION - SINGLE MODEL
+  // ============================================================================
+
   /// Sends a message and gets a streaming response from Ollama.
   ///
   /// Returns a stream of updated conversations as the response streams in.
-  /// The stream continues in the background even if the listener is cancelled.
   Stream<Conversation> sendMessage(String conversationId, String text) async* {
-    // Cancel any existing stream for this conversation
     await cancelMessageGeneration(conversationId);
 
-    // Get the conversation
     final initialConversation = getConversation(conversationId);
     if (initialConversation == null) {
       throw Exception('Conversation not found');
     }
 
-    // Create and add user message
+    // Add user message
     final userMessage = Message.user(
       id: const Uuid().v4(),
       text: text,
@@ -365,15 +295,14 @@ class ChatService {
     );
     var conversation = await addMessage(conversationId, userMessage);
 
-    // Create a broadcast stream controller for this conversation
+    // Create stream controller
     final streamController = StreamController<Conversation>.broadcast();
     _activeStreams[conversationId] = streamController;
 
-    // Yield initial state with user message
     streamController.add(conversation);
     yield conversation;
 
-    // Create a placeholder for the assistant response
+    // Create placeholder assistant message
     final assistantMessageId = const Uuid().v4();
     var assistantMessage = Message.assistant(
       id: assistantMessageId,
@@ -385,33 +314,166 @@ class ChatService {
     streamController.add(conversation);
     yield conversation;
 
-    // Start the background generation process
-    _generateMessageInBackground(
+    // Start generation in background
+    _generateSingleModelMessage(
       conversationId,
       conversation,
       assistantMessageId,
       streamController,
     );
 
-    // Listen to the broadcast stream and yield updates
+    // Yield updates from the stream
     await for (final updatedConversation in streamController.stream) {
       yield updatedConversation;
     }
   }
 
-  /// Sends a message to two models simultaneously for comparison.
+  /// Streams a response for the current conversation context.
   ///
-  /// Returns a stream of updated ComparisonConversations as both models respond.
-  /// Responses from both models stream independently and update as they arrive.
+  /// Used when messages (with attachments) have already been added.
+  Stream<Conversation> sendMessageWithContext(String conversationId) async* {
+    await cancelMessageGeneration(conversationId);
+
+    final initialConversation = getConversation(conversationId);
+    if (initialConversation == null) {
+      throw Exception('Conversation not found');
+    }
+
+    var conversation = initialConversation;
+
+    final streamController = StreamController<Conversation>.broadcast();
+    _activeStreams[conversationId] = streamController;
+
+    final assistantMessageId = const Uuid().v4();
+    var assistantMessage = Message.assistant(
+      id: assistantMessageId,
+      text: '',
+      timestamp: DateTime.now(),
+      isStreaming: true,
+    );
+    conversation = await addMessage(conversationId, assistantMessage);
+    streamController.add(conversation);
+    yield conversation;
+
+    _generateSingleModelMessage(
+      conversationId,
+      conversation,
+      assistantMessageId,
+      streamController,
+    );
+
+    await for (final updatedConversation in streamController.stream) {
+      yield updatedConversation;
+    }
+  }
+
+  /// Internal: generates a message from a single model.
+  Future<void> _generateSingleModelMessage(
+    String conversationId,
+    Conversation conversation,
+    String assistantMessageId,
+    StreamController<Conversation> streamController,
+  ) async {
+    final client = _ollamaManager.client;
+    if (client == null) {
+      _handleError(
+        conversationId,
+        conversation,
+        assistantMessageId,
+        streamController,
+        'No Ollama connection configured',
+      );
+      return;
+    }
+
+    try {
+      // Build message history for Ollama
+      final ollamaMessages = _buildOllamaMessageHistory(
+        conversation,
+        excludeMessageId: assistantMessageId,
+      );
+
+      // Stream the response
+      final buffer = StringBuffer();
+      final subscription = client
+          .chatStream(
+            conversation.modelName,
+            ollamaMessages,
+            options: conversation.parameters.toOllamaOptions(),
+          )
+          .listen(
+            (response) async {
+              if (streamController.isClosed) return;
+
+              final content = response.message.content;
+              if (content.isNotEmpty) {
+                buffer.write(content);
+              }
+
+              conversation = await _updateAssistantMessage(
+                conversation,
+                assistantMessageId,
+                buffer.toString(),
+                isStreaming: true,
+              );
+
+              if (!streamController.isClosed) {
+                streamController.add(conversation);
+              }
+            },
+            onError: (error) {
+              _handleError(
+                conversationId,
+                conversation,
+                assistantMessageId,
+                streamController,
+                error.toString(),
+              );
+            },
+            onDone: () async {
+              if (streamController.isClosed) return;
+
+              conversation = await _updateAssistantMessage(
+                conversation,
+                assistantMessageId,
+                buffer.toString(),
+                isStreaming: false,
+              );
+
+              if (!streamController.isClosed) {
+                streamController.add(conversation);
+              }
+
+              _cleanupStream(conversationId);
+              await streamController.close();
+            },
+            cancelOnError: true,
+          );
+
+      _activeSubscriptions[conversationId] = subscription;
+    } catch (e) {
+      _handleError(
+        conversationId,
+        conversation,
+        assistantMessageId,
+        streamController,
+        e.toString(),
+      );
+    }
+  }
+
+  // ============================================================================
+  // CHAT GENERATION - DUAL MODEL (COMPARISON)
+  // ============================================================================
+
+  /// Sends a message to two models simultaneously for comparison.
   Stream<ComparisonConversation> sendDualModelMessage(
     String conversationId,
     String text, {
     List<Attachment>? attachments,
   }) async* {
-    // Cancel any existing streams for this conversation
     await cancelMessageGeneration(conversationId);
 
-    // Get the comparison conversation
     final initialConversation = getConversation(conversationId);
     if (initialConversation == null) {
       throw Exception('Conversation not found');
@@ -422,7 +484,7 @@ class ChatService {
 
     ComparisonConversation conversation = initialConversation;
 
-    // Create and add user message
+    // Add user message
     final userMessage = Message.user(
       id: const Uuid().v4(),
       text: text,
@@ -431,20 +493,17 @@ class ChatService {
       attachments: attachments,
     );
     conversation =
-        (await addMessage(conversationId, userMessage))
-            as ComparisonConversation;
+        (await addMessage(conversationId, userMessage)) as ComparisonConversation;
 
-    // Create a broadcast stream controller
     final streamController =
         StreamController<ComparisonConversation>.broadcast();
     _activeStreams[conversationId] =
         streamController as StreamController<Conversation>;
 
-    // Yield initial state with user message
     streamController.add(conversation);
     yield conversation;
 
-    // Create placeholder messages for both models
+    // Create placeholders for both models
     final model1MessageId = const Uuid().v4();
     final model2MessageId = const Uuid().v4();
 
@@ -465,17 +524,15 @@ class ChatService {
     );
 
     conversation =
-        (await addMessage(conversationId, model1Message))
-            as ComparisonConversation;
+        (await addMessage(conversationId, model1Message)) as ComparisonConversation;
     conversation =
-        (await addMessage(conversationId, model2Message))
-            as ComparisonConversation;
+        (await addMessage(conversationId, model2Message)) as ComparisonConversation;
 
     streamController.add(conversation);
     yield conversation;
 
-    // Start both generation processes in parallel
-    _generateDualModelMessagesInBackground(
+    // Start both generations
+    _generateDualModelMessages(
       conversationId,
       conversation,
       model1MessageId,
@@ -483,56 +540,37 @@ class ChatService {
       streamController,
     );
 
-    // Listen to the broadcast stream and yield updates
     await for (final updatedConversation in streamController.stream) {
       yield updatedConversation;
     }
   }
 
-  /// Internal method to generate messages from both models in background
-  Future<void> _generateDualModelMessagesInBackground(
+  /// Internal: generates messages from both models in parallel.
+  Future<void> _generateDualModelMessages(
     String conversationId,
     ComparisonConversation conversation,
     String model1MessageId,
     String model2MessageId,
     StreamController<ComparisonConversation> streamController,
   ) async {
-    var model1Message = conversation.messages.firstWhere(
-      (m) => m.id == model1MessageId,
-    );
-    var model2Message = conversation.messages.firstWhere(
-      (m) => m.id == model2MessageId,
-    );
+    final client = _ollamaManager.client;
+    if (client == null) {
+      streamController.addError('No Ollama connection configured');
+      _cleanupStream(conversationId);
+      await streamController.close();
+      return;
+    }
 
     bool model1Done = false;
     bool model2Done = false;
 
-    // Prepare messages for Ollama API (shared conversation history)
-    final ollamaMessages = <Map<String, dynamic>>[];
+    final ollamaMessages = _buildOllamaMessageHistory(
+      conversation,
+      excludeMessageId: model1MessageId,
+      excludeMessageId2: model2MessageId,
+      includeModel1Only: true,
+    );
 
-    // Add system prompt if present
-    if (conversation.systemPrompt != null) {
-      ollamaMessages.add({
-        'role': 'system',
-        'content': conversation.systemPrompt,
-      });
-    }
-
-    // Add conversation history (only user messages and responses, excluding current placeholders)
-    for (final msg in conversation.messages) {
-      if (msg.id != model1MessageId &&
-          msg.id != model2MessageId &&
-          !msg.isError) {
-        // For comparison mode, only include user messages and messages from Model1
-        // to maintain conversation continuity (or use separate histories if preferred)
-        if (msg.modelSource == ModelSource.user ||
-            msg.modelSource == ModelSource.model1) {
-          ollamaMessages.add(msg.toOllamaMessage());
-        }
-      }
-    }
-
-    // Helper function to update conversation safely
     Future<void> updateConversationSafely(Message updatedMessage) async {
       if (streamController.isClosed) return;
 
@@ -552,29 +590,28 @@ class ChatService {
       }
     }
 
-    // Stream Model 1 response
+    // Model 1 stream
     final buffer1 = StringBuffer();
-    final subscription1 = _ollama
-        .sendChatStream(
-          model: conversation.model1Name,
-          messages: ollamaMessages,
+    final subscription1 = client
+        .chatStream(
+          conversation.model1Name,
+          ollamaMessages,
           options: conversation.parameters1.toOllamaOptions(),
         )
         .listen(
-          (data) async {
-            final message = data['message'] as Map<String, dynamic>?;
-            if (message == null) return;
-
-            final content = message['content'] as String?;
-            if (content != null && content.isNotEmpty) {
+          (response) async {
+            final content = response.message.content;
+            if (content.isNotEmpty) {
               buffer1.write(content);
             }
 
-            model1Message = model1Message.copyWith(text: buffer1.toString());
+            var model1Message = conversation.messages
+                .firstWhere((m) => m.id == model1MessageId)
+                .copyWith(text: buffer1.toString());
             await updateConversationSafely(model1Message);
           },
           onError: (error) async {
-            model1Message = Message.error(
+            var model1Message = Message.error(
               id: model1MessageId,
               errorMessage: error.toString(),
               timestamp: DateTime.now(),
@@ -584,7 +621,9 @@ class ChatService {
             if (model2Done) _cleanupStream(conversationId);
           },
           onDone: () async {
-            model1Message = model1Message.copyWith(isStreaming: false);
+            var model1Message = conversation.messages
+                .firstWhere((m) => m.id == model1MessageId)
+                .copyWith(isStreaming: false);
             await updateConversationSafely(model1Message);
             model1Done = true;
             if (model2Done) {
@@ -595,29 +634,28 @@ class ChatService {
           cancelOnError: true,
         );
 
-    // Stream Model 2 response
+    // Model 2 stream
     final buffer2 = StringBuffer();
-    final subscription2 = _ollama
-        .sendChatStream(
-          model: conversation.model2Name,
-          messages: ollamaMessages,
+    final subscription2 = client
+        .chatStream(
+          conversation.model2Name,
+          ollamaMessages,
           options: conversation.parameters2.toOllamaOptions(),
         )
         .listen(
-          (data) async {
-            final message = data['message'] as Map<String, dynamic>?;
-            if (message == null) return;
-
-            final content = message['content'] as String?;
-            if (content != null && content.isNotEmpty) {
+          (response) async {
+            final content = response.message.content;
+            if (content.isNotEmpty) {
               buffer2.write(content);
             }
 
-            model2Message = model2Message.copyWith(text: buffer2.toString());
+            var model2Message = conversation.messages
+                .firstWhere((m) => m.id == model2MessageId)
+                .copyWith(text: buffer2.toString());
             await updateConversationSafely(model2Message);
           },
           onError: (error) async {
-            model2Message = Message.error(
+            var model2Message = Message.error(
               id: model2MessageId,
               errorMessage: error.toString(),
               timestamp: DateTime.now(),
@@ -627,7 +665,9 @@ class ChatService {
             if (model1Done) _cleanupStream(conversationId);
           },
           onDone: () async {
-            model2Message = model2Message.copyWith(isStreaming: false);
+            var model2Message = conversation.messages
+                .firstWhere((m) => m.id == model2MessageId)
+                .copyWith(isStreaming: false);
             await updateConversationSafely(model2Message);
             model2Done = true;
             if (model1Done) {
@@ -638,192 +678,157 @@ class ChatService {
           cancelOnError: true,
         );
 
-    // Store subscriptions (we'll store model1's subscription as the primary one)
     _activeSubscriptions[conversationId] = subscription1;
-    // Store model2's subscription with a special key for cleanup
     _activeSubscriptions['${conversationId}_model2'] = subscription2;
   }
 
-  /// Internal method to generate message in background
-  Future<void> _generateMessageInBackground(
+  // ============================================================================
+  // HELPERS
+  // ============================================================================
+
+  /// Builds Ollama message history from conversation.
+  List<OllamaMessage> _buildOllamaMessageHistory(
+    Conversation conversation, {
+    String? excludeMessageId,
+    String? excludeMessageId2,
+    bool includeModel1Only = false,
+  }) {
+    final messages = <OllamaMessage>[];
+
+    // Add system prompt
+    if (conversation.systemPrompt != null) {
+      messages.add(OllamaMessage.system(conversation.systemPrompt!));
+    }
+
+    // Add conversation history
+    for (final msg in conversation.messages) {
+      if (msg.id == excludeMessageId ||
+          msg.id == excludeMessageId2 ||
+          msg.isError) {
+        continue;
+      }
+
+      if (includeModel1Only &&
+          msg.modelSource != ModelSource.user &&
+          msg.modelSource != ModelSource.model1) {
+        continue;
+      }
+
+      messages.add(_convertMessageToOllama(msg));
+    }
+
+    return messages;
+  }
+
+  /// Converts app Message to OllamaMessage.
+  OllamaMessage _convertMessageToOllama(Message message) {
+    switch (message.role) {
+      case MessageRole.user:
+        // Handle attachments (images)
+        List<String>? images;
+        if (message.attachments != null && message.attachments!.isNotEmpty) {
+          images = message.attachments!
+              .where((a) => a.isImage)
+              .map((a) => base64Encode(a.data))
+              .toList();
+        }
+        return OllamaMessage.user(message.text, images: images);
+
+      case MessageRole.assistant:
+        return OllamaMessage.assistant(message.text);
+
+      case MessageRole.system:
+        return OllamaMessage.system(message.text);
+
+      case MessageRole.tool:
+        // Tool messages - extract tool name from message if needed
+        return OllamaMessage.tool(
+          message.text,
+          toolName: 'tool',
+        );
+    }
+  }
+
+  /// Updates an assistant message in the conversation.
+  Future<Conversation> _updateAssistantMessage(
+    Conversation conversation,
+    String messageId,
+    String text, {
+    required bool isStreaming,
+  }) async {
+    final messages = conversation.messages.map((m) {
+      if (m.id == messageId) {
+        return m.copyWith(text: text, isStreaming: isStreaming);
+      }
+      return m;
+    }).toList();
+
+    final updatedConversation = conversation.copyWith(
+      messages: messages,
+      updatedAt: DateTime.now(),
+    );
+    await updateConversation(updatedConversation);
+    return updatedConversation;
+  }
+
+  /// Handles errors during message generation.
+  void _handleError(
     String conversationId,
     Conversation conversation,
     String assistantMessageId,
     StreamController<Conversation> streamController,
+    String errorMessage,
   ) async {
-    var assistantMessage = conversation.messages.firstWhere(
-      (m) => m.id == assistantMessageId,
+    if (streamController.isClosed) return;
+
+    final errorMsg = Message.error(
+      id: assistantMessageId,
+      errorMessage: errorMessage,
+      timestamp: DateTime.now(),
     );
 
-    try {
-      // Prepare messages for Ollama API
-      final ollamaMessages = <Map<String, dynamic>>[];
+    final messages = conversation.messages.map((m) {
+      if (m.id == assistantMessageId) return errorMsg;
+      return m;
+    }).toList();
 
-      // Add system prompt if present
-      if (conversation.systemPrompt != null) {
-        ollamaMessages.add({
-          'role': 'system',
-          'content': conversation.systemPrompt,
-        });
-      }
+    final errorConversation = conversation.copyWith(
+      messages: messages,
+      updatedAt: DateTime.now(),
+    );
+    await updateConversation(errorConversation);
 
-      // Add conversation history
-      for (final msg in conversation.messages) {
-        if (msg.id != assistantMessageId && !msg.isError) {
-          final ollamaMsg = msg.toOllamaMessage();
-          ollamaMessages.add(ollamaMsg);
-        }
-      }
-
-      // Stream the response with model parameters
-      final buffer = StringBuffer();
-
-      final subscription = _ollama
-          .sendChatStream(
-            model: conversation.modelName,
-            messages: ollamaMessages,
-            options: conversation.parameters.toOllamaOptions(),
-          )
-          .listen(
-            (data) async {
-              if (streamController.isClosed) return;
-
-              final message = data['message'] as Map<String, dynamic>?;
-              if (message == null) return;
-
-              // Handle regular content
-              final content = message['content'] as String?;
-              if (content != null && content.isNotEmpty) {
-                buffer.write(content);
-              }
-              // Update the assistant message with accumulated text
-              assistantMessage = assistantMessage.copyWith(
-                text: buffer.toString(),
-              );
-
-              // Update the conversation with the updated message
-              final messages = conversation.messages.map((m) {
-                if (m.id == assistantMessageId) return assistantMessage;
-                return m;
-              }).toList();
-
-              conversation = conversation.copyWith(
-                messages: messages,
-                updatedAt: DateTime.now(),
-              );
-              await updateConversation(conversation);
-
-              if (!streamController.isClosed) {
-                streamController.add(conversation);
-              }
-            },
-            onError: (error) async {
-              if (streamController.isClosed) return;
-
-              // Update the assistant message to show error
-              assistantMessage = Message.error(
-                id: assistantMessageId,
-                errorMessage: error.toString(),
-                timestamp: DateTime.now(),
-              );
-
-              final errorMessages = conversation.messages.map((m) {
-                if (m.id == assistantMessageId) return assistantMessage;
-                return m;
-              }).toList();
-
-              conversation = conversation.copyWith(
-                messages: errorMessages,
-                updatedAt: DateTime.now(),
-              );
-              await updateConversation(conversation);
-
-              if (!streamController.isClosed) {
-                streamController.add(conversation);
-              }
-
-              _cleanupStream(conversationId);
-              await streamController.close();
-            },
-            onDone: () async {
-              if (streamController.isClosed) return;
-
-              // Mark streaming as complete
-              assistantMessage = assistantMessage.copyWith(isStreaming: false);
-
-              // Finalize the message
-              final finalMessages = conversation.messages.map((m) {
-                if (m.id == assistantMessageId) return assistantMessage;
-                return m;
-              }).toList();
-
-              conversation = conversation.copyWith(
-                messages: finalMessages,
-                updatedAt: DateTime.now(),
-              );
-              await updateConversation(conversation);
-
-              if (!streamController.isClosed) {
-                streamController.add(conversation);
-              }
-
-              _cleanupStream(conversationId);
-              await streamController.close();
-            },
-            cancelOnError: true,
-          );
-
-      _activeSubscriptions[conversationId] = subscription;
-    } catch (e) {
-      if (streamController.isClosed) return;
-
-      // Update the assistant message to show error
-      assistantMessage = Message.error(
-        id: assistantMessageId,
-        errorMessage: e.toString(),
-        timestamp: DateTime.now(),
-      );
-
-      final errorMessages = conversation.messages.map((m) {
-        if (m.id == assistantMessageId) return assistantMessage;
-        return m;
-      }).toList();
-
-      conversation = conversation.copyWith(
-        messages: errorMessages,
-        updatedAt: DateTime.now(),
-      );
-      await updateConversation(conversation);
-
-      if (!streamController.isClosed) {
-        streamController.add(conversation);
-      }
-
-      _cleanupStream(conversationId);
-      await streamController.close();
+    if (!streamController.isClosed) {
+      streamController.add(errorConversation);
     }
+
+    _cleanupStream(conversationId);
+    await streamController.close();
   }
 
-  /// Cleanup stream resources
+  /// Cleans up stream resources.
   void _cleanupStream(String conversationId) {
     _activeSubscriptions.remove(conversationId)?.cancel();
+    _activeSubscriptions.remove('${conversationId}_model2')?.cancel();
     _activeStreams.remove(conversationId);
   }
 
-  /// Check if a message is currently being generated for a conversation
+  // ============================================================================
+  // STREAM MANAGEMENT
+  // ============================================================================
+
+  /// Check if a message is currently being generated for a conversation.
   bool isGenerating(String conversationId) {
     return _activeStreams.containsKey(conversationId);
   }
 
-  /// Cancel ongoing message generation for a conversation
+  /// Cancel ongoing message generation for a conversation.
   Future<void> cancelMessageGeneration(String conversationId) async {
     final subscription = _activeSubscriptions.remove(conversationId);
     await subscription?.cancel();
 
-    // Also cancel model2 subscription if it exists (for comparison mode)
-    final subscription2 = _activeSubscriptions.remove(
-      '${conversationId}_model2',
-    );
+    final subscription2 =
+        _activeSubscriptions.remove('${conversationId}_model2');
     await subscription2?.cancel();
 
     final controller = _activeStreams.remove(conversationId);
@@ -831,12 +836,11 @@ class ChatService {
       await controller.close();
     }
 
-    // Mark any streaming messages as incomplete/cancelled
+    // Mark any streaming messages as cancelled
     final conversation = getConversation(conversationId);
     if (conversation != null) {
-      final hasStreamingMessage = conversation.messages.any(
-        (m) => m.isStreaming,
-      );
+      final hasStreamingMessage =
+          conversation.messages.any((m) => m.isStreaming);
       if (hasStreamingMessage) {
         final updatedMessages = conversation.messages.map((m) {
           if (m.isStreaming) {
@@ -857,12 +861,12 @@ class ChatService {
     }
   }
 
-  /// Get active stream for a conversation (allows reconnecting)
+  /// Get active stream for a conversation (allows reconnecting).
   Stream<Conversation>? getActiveStream(String conversationId) {
     return _activeStreams[conversationId]?.stream;
   }
 
-  /// Dispose of all resources
+  /// Dispose of all resources.
   void dispose() {
     for (final subscription in _activeSubscriptions.values) {
       subscription.cancel();
@@ -877,6 +881,10 @@ class ChatService {
     _activeStreams.clear();
   }
 
+  // ============================================================================
+  // SYNCHRONOUS CHAT (NON-STREAMING)
+  // ============================================================================
+
   /// Sends a message and gets a non-streaming response from Ollama.
   Future<Conversation> sendMessageSync(
     String conversationId,
@@ -887,7 +895,12 @@ class ChatService {
       throw Exception('Conversation not found');
     }
 
-    // Create and add user message
+    final client = _ollamaManager.client;
+    if (client == null) {
+      throw Exception('No Ollama connection configured');
+    }
+
+    // Add user message
     final userMessage = Message.user(
       id: const Uuid().v4(),
       text: text,
@@ -896,32 +909,20 @@ class ChatService {
     var conversation = await addMessage(conversationId, userMessage);
 
     try {
-      // Prepare messages for Ollama API
-      final ollamaMessages = <Map<String, dynamic>>[];
-
-      if (conversation.systemPrompt != null) {
-        ollamaMessages.add({
-          'role': 'system',
-          'content': conversation.systemPrompt,
-        });
-      }
-
-      for (final msg in conversation.messages) {
-        if (!msg.isError) {
-          ollamaMessages.add(msg.toOllamaMessage());
-        }
-      }
+      // Build message history
+      final ollamaMessages = _buildOllamaMessageHistory(conversation);
 
       // Get response
-      final response = await _ollama.sendChat(
-        model: conversation.modelName,
-        messages: ollamaMessages,
+      final response = await client.chat(
+        conversation.modelName,
+        ollamaMessages,
+        options: conversation.parameters.toOllamaOptions(),
       );
 
       // Add assistant message
       final assistantMessage = Message.assistant(
         id: const Uuid().v4(),
-        text: response,
+        text: response.message.content,
         timestamp: DateTime.now(),
       );
       conversation = await addMessage(conversationId, assistantMessage);
@@ -936,56 +937,5 @@ class ChatService {
     }
 
     return conversation;
-  }
-
-  /// Deletes all conversations.
-  Future<void> deleteAllConversations() async {
-    await _storage.remove(_conversationsKey);
-    await _storage.remove(_currentConversationKey);
-  }
-
-  /// Streams a response for the current conversation context.
-  ///
-  /// This is used when messages (with attachments) have already been added
-  /// and we just need to get the AI response.
-  Stream<Conversation> sendMessageWithContext(String conversationId) async* {
-    // Cancel any existing stream for this conversation
-    await cancelMessageGeneration(conversationId);
-
-    final initialConversation = getConversation(conversationId);
-    if (initialConversation == null) {
-      throw Exception('Conversation not found');
-    }
-
-    var conversation = initialConversation;
-
-    // Create a broadcast stream controller for this conversation
-    final streamController = StreamController<Conversation>.broadcast();
-    _activeStreams[conversationId] = streamController;
-
-    // Create a placeholder for the assistant response
-    final assistantMessageId = const Uuid().v4();
-    var assistantMessage = Message.assistant(
-      id: assistantMessageId,
-      text: '',
-      timestamp: DateTime.now(),
-      isStreaming: true,
-    );
-    conversation = await addMessage(conversationId, assistantMessage);
-    streamController.add(conversation);
-    yield conversation;
-
-    // Start the background generation process
-    _generateMessageInBackground(
-      conversationId,
-      conversation,
-      assistantMessageId,
-      streamController,
-    );
-
-    // Listen to the broadcast stream and yield updates
-    await for (final updatedConversation in streamController.stream) {
-      yield updatedConversation;
-    }
   }
 }

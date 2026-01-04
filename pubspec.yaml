@@ -50,6 +50,9 @@ dependencies:
   # UUID generation for unique identifiers
   uuid: ^4.5.1
   
+  # Package info for app version
+  package_info_plus: ^8.1.2
+  
   # Markdown rendering for AI responses
   flutter_markdown: ^0.7.5+1
   
