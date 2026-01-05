@@ -201,7 +201,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Text(
                             'Add an Ollama server to get started',
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                           ),
                           const SizedBox(height: 16),

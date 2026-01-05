@@ -297,7 +297,12 @@ class _SearchResultTile extends StatelessWidget {
       onTap: onTap,
     );
   }
-  Widget _buildHighlightedText(BuildContext context, String text, String query) {
+
+  Widget _buildHighlightedText(
+    BuildContext context,
+    String text,
+    String query,
+  ) {
     final lowerText = text.toLowerCase();
     final lowerQuery = query.toLowerCase();
     final spans = <TextSpan>[];

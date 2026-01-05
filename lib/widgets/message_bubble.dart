@@ -333,7 +333,9 @@ class MessageBubble extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Theme.of(sheetContext).colorScheme.surfaceContainerLow,
+                      color: Theme.of(
+                        sheetContext,
+                      ).colorScheme.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: SelectableText(
