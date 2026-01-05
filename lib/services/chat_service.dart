@@ -572,7 +572,7 @@ class ChatService {
 
     try {
       _log('Running agent.runWithTools for model: ${conversation.modelName}');
-      
+
       // Show initial status
       conversation = await _updateStatusMessage(
         conversation,
@@ -582,7 +582,7 @@ class ChatService {
       if (!streamController.isClosed) {
         streamController.add(conversation);
       }
-      
+
       final result = await agent.runWithTools(lastUserMessage.text, tools);
 
       _log('Agent completed with ${result.steps.length} steps');
@@ -597,7 +597,7 @@ class ChatService {
       // Collect tool calls from agent steps and update status
       for (final step in result.steps) {
         _log('Step: type=${step.type}, tool=${step.toolName}');
-        
+
         // Update status for tool calls
         if (step.type == 'tool_call' && step.toolName != null) {
           final toolDisplayName = _getToolDisplayName(step.toolName!);
@@ -609,7 +609,7 @@ class ChatService {
           if (!streamController.isClosed) {
             streamController.add(conversation);
           }
-          
+
           final toolCall = app_tools.ToolCall(
             id: const Uuid().v4(),
             toolName: step.toolName!,

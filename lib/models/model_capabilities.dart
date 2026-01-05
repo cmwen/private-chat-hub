@@ -229,8 +229,9 @@ class ModelCapabilitiesRegistry {
     // === Gemma Family (Google) ===
     'gemma3': ModelCapabilities(
       supportsVision: true,
-      supportsTools: false,  // Per ollama_model.dart - gemma3 does NOT support tool calling
-      supportsCode: false,   // Gemma3 is not specialized for code
+      supportsTools:
+          false, // Per ollama_model.dart - gemma3 does NOT support tool calling
+      supportsCode: false, // Gemma3 is not specialized for code
       contextLength: 131072,
       description: 'Google Gemma 3 - Multimodal with vision',
       family: 'gemma',

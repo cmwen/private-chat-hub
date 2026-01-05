@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:private_chat_hub/ollama_toolkit/models/ollama_message.dart';
-import 'package:private_chat_hub/ollama_toolkit/models/ollama_tool.dart';
 import 'package:private_chat_hub/ollama_toolkit/thinking_loop/agent.dart';
 import 'package:private_chat_hub/ollama_toolkit/thinking_loop/tools.dart';
 
@@ -95,10 +94,7 @@ void main() {
     });
 
     test('ToolCall.fromJson with null arguments defaults to empty map', () {
-      final json = {
-        'id': 'call_123',
-        'name': 'web_search',
-      };
+      final json = {'id': 'call_123', 'name': 'web_search'};
 
       final toolCall = ToolCall.fromJson(json);
 
@@ -122,9 +118,7 @@ void main() {
     test('ToolCall.fromJson prefers direct fields over nested function', () {
       final json = {
         'name': 'direct_search',
-        'function': {
-          'name': 'nested_search',
-        },
+        'function': {'name': 'nested_search'},
       };
 
       final toolCall = ToolCall.fromJson(json);
@@ -166,11 +160,7 @@ void main() {
             'name': 'web_search',
             'arguments': {'query': 'flutter'},
           },
-          {
-            'id': 'call_2',
-            'name': 'get_current_datetime',
-            'arguments': {},
-          },
+          {'id': 'call_2', 'name': 'get_current_datetime', 'arguments': {}},
         ],
       };
 
@@ -188,11 +178,7 @@ void main() {
         'role': 'assistant',
         'content': 'Processing...',
         'tool_calls': [
-          {
-            'id': 'call_1',
-            'name': '',
-            'arguments': {},
-          },
+          {'id': 'call_1', 'name': '', 'arguments': {}},
         ],
       };
 
@@ -203,10 +189,7 @@ void main() {
     });
 
     test('OllamaMessage without tool calls', () {
-      final json = {
-        'role': 'assistant',
-        'content': 'Here is the answer.',
-      };
+      final json = {'role': 'assistant', 'content': 'Here is the answer.'};
 
       final message = OllamaMessage.fromJson(json);
 
@@ -302,11 +285,7 @@ void main() {
     });
 
     test('Empty tool name is skipped', () {
-      final toolCall = ToolCall(
-        id: 'call_1',
-        name: '',
-        arguments: {},
-      );
+      final toolCall = ToolCall(id: 'call_1', name: '', arguments: {});
 
       // Empty name should be treated as invalid
       expect(toolCall.name.isEmpty, true);
@@ -446,9 +425,7 @@ void main() {
 
       Tool? foundTool;
       try {
-        foundTool = tools.firstWhere(
-          (t) => t.name == 'invalid_tool',
-        );
+        foundTool = tools.firstWhere((t) => t.name == 'invalid_tool');
       } catch (e) {
         foundTool = null;
       }
@@ -468,11 +445,7 @@ void main() {
             'name': 'web_search',
             'arguments': {'query': 'flutter'},
           },
-          {
-            'id': 'call_2',
-            'name': '',
-            'arguments': {},
-          },
+          {'id': 'call_2', 'name': '', 'arguments': {}},
           {
             'id': 'call_3',
             'name': 'read_url',
@@ -496,8 +469,9 @@ void main() {
         ToolCall(id: 'c3', name: 'read_url', arguments: {'url': 'test'}),
       ];
 
-      final validToolCalls =
-          toolCalls.where((tc) => tc.name.isNotEmpty).toList();
+      final validToolCalls = toolCalls
+          .where((tc) => tc.name.isNotEmpty)
+          .toList();
 
       expect(validToolCalls.length, 2);
       expect(validToolCalls[0].name, 'web_search');

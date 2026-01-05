@@ -117,8 +117,7 @@ class Message {
           toolCall.result != null &&
           toolCall.result!.data != null) {
         try {
-          final searchResults =
-              SearchResults.fromJson(toolCall.result!.data!);
+          final searchResults = SearchResults.fromJson(toolCall.result!.data!);
           for (final result in searchResults.results) {
             urls.add(result.url);
           }

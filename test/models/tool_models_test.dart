@@ -250,10 +250,7 @@ void main() {
     });
 
     test('should not be available without API key', () {
-      const config = ToolConfig(
-        enabled: true,
-        webSearchEnabled: true,
-      );
+      const config = ToolConfig(enabled: true, webSearchEnabled: true);
 
       expect(config.webSearchAvailable, false);
     });
@@ -306,10 +303,7 @@ void main() {
     });
 
     test('should throw for unknown tool', () {
-      expect(
-        () => AvailableTools.getByName('unknown'),
-        throwsArgumentError,
-      );
+      expect(() => AvailableTools.getByName('unknown'), throwsArgumentError);
     });
   });
 }

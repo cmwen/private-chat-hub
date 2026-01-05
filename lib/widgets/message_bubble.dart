@@ -421,7 +421,7 @@ class MessageBubble extends StatelessWidget {
 
   Widget _buildWebReferences(BuildContext context) {
     final references = message.webSearchReferences;
-    
+
     return Padding(
       padding: const EdgeInsets.only(top: 12, bottom: 4),
       child: Column(
@@ -453,7 +453,7 @@ class MessageBubble extends StatelessWidget {
               // Extract domain from URL
               final uri = Uri.tryParse(url);
               final domain = uri?.host.replaceFirst('www.', '') ?? url;
-              
+
               return InkWell(
                 onTap: () => _launchUrl(context, url),
                 borderRadius: BorderRadius.circular(12),
@@ -522,16 +522,10 @@ class MessageBubble extends StatelessWidget {
           children: [
             const Text(
               'Source URL',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            SelectableText(
-              url,
-              style: const TextStyle(fontSize: 14),
-            ),
+            SelectableText(url, style: const TextStyle(fontSize: 14)),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,

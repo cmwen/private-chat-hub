@@ -92,12 +92,16 @@ void main() {
     });
 
     test('should find models with specific capability', () {
-      final visionModels = ModelRegistry.findModelsByCapability(supportsVision: true);
+      final visionModels = ModelRegistry.findModelsByCapability(
+        supportsVision: true,
+      );
       expect(visionModels.contains('llama3.2'), true);
       expect(visionModels.contains('gemma3'), true);
       expect(visionModels.contains('llama3.3'), false);
 
-      final toolModels = ModelRegistry.findModelsByCapability(supportsToolCalling: true);
+      final toolModels = ModelRegistry.findModelsByCapability(
+        supportsToolCalling: true,
+      );
       expect(toolModels.contains('llama3.3'), true);
       expect(toolModels.contains('gemma3'), false);
     });
