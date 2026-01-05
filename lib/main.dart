@@ -9,10 +9,12 @@ import 'package:private_chat_hub/screens/projects_screen.dart';
 import 'package:private_chat_hub/screens/settings_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
+import 'package:private_chat_hub/services/jina_search_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/project_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:private_chat_hub/services/tool_config_service.dart';
+import 'package:private_chat_hub/services/tool_executor_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
@@ -26,7 +28,9 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   final toolConfigService = ToolConfigService(prefs);
 
-  runApp(MyApp(storageService: storageService, toolConfigService: toolConfigService));
+  runApp(
+    MyApp(storageService: storageService, toolConfigService: toolConfigService),
+  );
 }
 
 /// The root widget of the application.
@@ -139,7 +143,33 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _ollamaManager = OllamaConnectionManager();
     _connectionService = ConnectionService(widget.storageService);
-    _chatService = ChatService(_ollamaManager, widget.storageService);
+
+    // Initialize tool executor with proper config from settings
+    final toolConfig = widget.toolConfigService.getConfig();
+    print(
+      '[HomeScreen.initState] Tool config: enabled=${toolConfig.enabled}, webSearchEnabled=${toolConfig.webSearchEnabled}, hasJinaKey=${toolConfig.jinaApiKey != null && toolConfig.jinaApiKey!.isNotEmpty}',
+    );
+
+    final toolExecutor =
+        toolConfig.jinaApiKey != null &&
+            toolConfig.jinaApiKey!.isNotEmpty &&
+            toolConfig.enabled &&
+            toolConfig.webSearchEnabled
+        ? ToolExecutorService(
+            jinaService: JinaSearchService(apiKey: toolConfig.jinaApiKey!),
+            config: toolConfig,
+          )
+        : null;
+
+    print(
+      '[HomeScreen.initState] Tool executor created: ${toolExecutor != null}',
+    );
+
+    _chatService = ChatService(
+      _ollamaManager,
+      widget.storageService,
+      toolExecutor: toolExecutor,
+    );
     _projectService = ProjectService(widget.storageService);
 
     // Set up Ollama connection if one exists

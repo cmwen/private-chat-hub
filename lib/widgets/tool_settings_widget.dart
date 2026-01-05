@@ -23,7 +23,9 @@ class _ToolSettingsWidgetState extends State<ToolSettingsWidget> {
   @override
   void initState() {
     super.initState();
-    _apiKeyController = TextEditingController(text: widget.config.jinaApiKey ?? '');
+    _apiKeyController = TextEditingController(
+      text: widget.config.jinaApiKey ?? '',
+    );
   }
 
   @override
@@ -75,7 +77,8 @@ class _ToolSettingsWidgetState extends State<ToolSettingsWidget> {
           title: const Text('Enable Tool Calling'),
           subtitle: const Text('Allow AI to use tools like web search'),
           value: widget.config.enabled,
-          onChanged: (value) => _updateConfig((c) => c.copyWith(enabled: value)),
+          onChanged: (value) =>
+              _updateConfig((c) => c.copyWith(enabled: value)),
         ),
 
         if (widget.config.enabled) ...[
@@ -123,10 +126,15 @@ class _ToolSettingsWidgetState extends State<ToolSettingsWidget> {
                         children: [
                           IconButton(
                             icon: Icon(
-                              _showApiKey ? Icons.visibility_off : Icons.visibility,
+                              _showApiKey
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
                             ),
-                            onPressed: () => setState(() => _showApiKey = !_showApiKey),
-                            tooltip: _showApiKey ? 'Hide API key' : 'Show API key',
+                            onPressed: () =>
+                                setState(() => _showApiKey = !_showApiKey),
+                            tooltip: _showApiKey
+                                ? 'Hide API key'
+                                : 'Show API key',
                           ),
                           IconButton(
                             icon: const Icon(Icons.save),
@@ -152,7 +160,8 @@ class _ToolSettingsWidgetState extends State<ToolSettingsWidget> {
                     onSubmitted: (value) {
                       final key = value.trim();
                       _updateConfig(
-                        (c) => c.copyWith(jinaApiKey: key.isNotEmpty ? key : null),
+                        (c) =>
+                            c.copyWith(jinaApiKey: key.isNotEmpty ? key : null),
                       );
                     },
                   ),
@@ -194,8 +203,9 @@ class _ToolSettingsWidgetState extends State<ToolSettingsWidget> {
                 max: 10,
                 divisions: 9,
                 label: widget.config.maxSearchResults.toString(),
-                onChanged: (value) =>
-                    _updateConfig((c) => c.copyWith(maxSearchResults: value.round())),
+                onChanged: (value) => _updateConfig(
+                  (c) => c.copyWith(maxSearchResults: value.round()),
+                ),
               ),
               trailing: Text(
                 '${widget.config.maxSearchResults}',
@@ -206,7 +216,9 @@ class _ToolSettingsWidgetState extends State<ToolSettingsWidget> {
             // Cache results toggle
             SwitchListTile(
               title: const Text('Cache Search Results'),
-              subtitle: const Text('Cache results for 24 hours to save API calls'),
+              subtitle: const Text(
+                'Cache results for 24 hours to save API calls',
+              ),
               value: widget.config.cacheSearchResults,
               onChanged: (value) =>
                   _updateConfig((c) => c.copyWith(cacheSearchResults: value)),
@@ -227,7 +239,11 @@ class _ToolSettingsWidgetState extends State<ToolSettingsWidget> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.info_outline, size: 16, color: colorScheme.primary),
+                      Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: colorScheme.primary,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'About Tool Calling',

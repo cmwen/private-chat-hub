@@ -6,11 +6,7 @@ class ToolBadge extends StatelessWidget {
   final ToolCall toolCall;
   final VoidCallback? onTap;
 
-  const ToolBadge({
-    super.key,
-    required this.toolCall,
-    this.onTap,
-  });
+  const ToolBadge({super.key, required this.toolCall, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -78,11 +74,7 @@ class ToolBadge extends StatelessWidget {
           color: Colors.green.shade600,
         );
       case ToolCallStatus.failed:
-        return Icon(
-          Icons.error_outline,
-          size: 12,
-          color: Colors.red.shade600,
-        );
+        return Icon(Icons.error_outline, size: 12, color: Colors.red.shade600);
     }
   }
 
@@ -105,11 +97,7 @@ class SearchResultsCard extends StatelessWidget {
   final SearchResults results;
   final VoidCallback? onViewMore;
 
-  const SearchResultsCard({
-    super.key,
-    required this.results,
-    this.onViewMore,
-  });
+  const SearchResultsCard({super.key, required this.results, this.onViewMore});
 
   @override
   Widget build(BuildContext context) {
@@ -131,11 +119,7 @@ class SearchResultsCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
             child: Row(
               children: [
-                Icon(
-                  Icons.search,
-                  size: 16,
-                  color: colorScheme.primary,
-                ),
+                Icon(Icons.search, size: 16, color: colorScheme.primary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -150,7 +134,10 @@ class SearchResultsCard extends StatelessWidget {
                 ),
                 if (results.isCached)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: colorScheme.secondaryContainer,
                       borderRadius: BorderRadius.circular(4),
@@ -168,7 +155,9 @@ class SearchResultsCard extends StatelessWidget {
           ),
 
           // Results list
-          ...results.results.take(3).map((result) => _SearchResultTile(result: result)),
+          ...results.results
+              .take(3)
+              .map((result) => _SearchResultTile(result: result)),
 
           // View more button
           if (results.results.length > 3)
@@ -245,10 +234,7 @@ class _SearchResultTile extends StatelessWidget {
 class ToolCallDetails extends StatefulWidget {
   final ToolCall toolCall;
 
-  const ToolCallDetails({
-    super.key,
-    required this.toolCall,
-  });
+  const ToolCallDetails({super.key, required this.toolCall});
 
   @override
   State<ToolCallDetails> createState() => _ToolCallDetailsState();
@@ -370,17 +356,15 @@ class _ToolCallDetailsState extends State<ToolCallDetails> {
   }
 }
 
-/// Widget showing model capabilities (vision, tools, code).
+/// Widget showing model capabilities (vision, tools).
 class ModelCapabilitiesChips extends StatelessWidget {
   final bool supportsVision;
   final bool supportsTools;
-  final bool supportsCode;
 
   const ModelCapabilitiesChips({
     super.key,
     required this.supportsVision,
     required this.supportsTools,
-    required this.supportsCode,
   });
 
   @override
@@ -400,12 +384,6 @@ class ModelCapabilitiesChips extends StatelessWidget {
             icon: Icons.build_outlined,
             label: 'Tools',
             color: Colors.blue,
-          ),
-        if (supportsCode)
-          _CapabilityChip(
-            icon: Icons.code,
-            label: 'Code',
-            color: Colors.green,
           ),
       ],
     );

@@ -145,10 +145,27 @@ class ToolCall {
   }
 
   factory ToolCall.fromJson(Map<String, dynamic> json) {
+    // Debug: log the raw JSON to see what Ollama returns
+    // ignore: avoid_print
+    print('[ToolCall.fromJson] Raw JSON: $json');
+
+    // Helper to convert Map<dynamic, dynamic> to Map<String, dynamic>
+    Map<String, dynamic> toStringKeyMap(dynamic value) {
+      if (value is Map<String, dynamic>) {
+        return value;
+      } else if (value is Map) {
+        return Map<String, dynamic>.from(value);
+      }
+      return {};
+    }
+
     return ToolCall(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      arguments: json['arguments'] as Map<String, dynamic>,
+      id: json['id'] as String? ?? '',
+      name:
+          json['name'] as String? ?? json['function']?['name'] as String? ?? '',
+      arguments: toStringKeyMap(
+        json['arguments'] ?? json['function']?['arguments'],
+      ),
       index: json['index'] as int?,
     );
   }

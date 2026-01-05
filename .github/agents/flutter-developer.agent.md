@@ -2,7 +2,7 @@
 description: Implement Flutter features, manage dependencies, and ensure code quality
 name: flutter-developer
 tools: 
-  ['edit', 'search', 'runCommands/runInTerminal', 'context7/*', 'dart/*', 'usages', 'problems', 'changes', 'testFailure', 'fetch', 'githubRepo', 'todos', 'runSubagent', 'runTests']
+  ['execute/testFailure', 'execute/runInTerminal', 'execute/runTests', 'read/problems', 'read/readFile', 'edit', 'search', 'web', 'agent', 'todo']
 handoffs:
   - label: Test Implementation
     agent: agent

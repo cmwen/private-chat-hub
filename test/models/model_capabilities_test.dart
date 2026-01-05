@@ -1,98 +1,105 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:private_chat_hub/models/model_capabilities.dart';
+import 'package:private_chat_hub/ollama_toolkit/models/ollama_model.dart';
 
 void main() {
   group('ModelCapabilities', () {
-    test('should have correct default values', () {
-      const capabilities = ModelCapabilities();
+    test('should have correct properties', () {
+      const capabilities = ModelCapabilities(
+        supportsToolCalling: true,
+        supportsVision: false,
+        supportsThinking: false,
+        contextWindow: 128000,
+        modelFamily: 'llama',
+        description: 'Test model',
+      );
       expect(capabilities.supportsVision, false);
-      expect(capabilities.supportsTools, false);
-      expect(capabilities.supportsCode, false);
-      expect(capabilities.contextLength, 4096);
-      expect(capabilities.description, '');
-      expect(capabilities.family, 'unknown');
-    });
-
-    test('unknown should have default capabilities', () {
-      expect(ModelCapabilities.unknown.supportsVision, false);
-      expect(ModelCapabilities.unknown.supportsTools, false);
-      expect(ModelCapabilities.unknown.supportsCode, false);
-      expect(ModelCapabilities.unknown.family, 'unknown');
+      expect(capabilities.supportsToolCalling, true);
+      expect(capabilities.supportsTools, true); // Alias
+      expect(capabilities.supportsThinking, false);
+      expect(capabilities.contextWindow, 128000);
+      expect(capabilities.contextLength, 128000); // Alias
+      expect(capabilities.description, 'Test model');
+      expect(capabilities.modelFamily, 'llama');
+      expect(capabilities.family, 'llama'); // Alias
     });
   });
 
-  group('ModelCapabilitiesRegistry', () {
+  group('ModelRegistry', () {
     test('should return capabilities for exact match', () {
-      final caps = ModelCapabilitiesRegistry.getCapabilities('llama3.3');
-      expect(caps.supportsTools, true);
-      expect(caps.supportsCode, true);
+      final caps = ModelRegistry.getCapabilities('llama3.3');
+      expect(caps, isNotNull);
+      expect(caps!.supportsToolCalling, true);
       expect(caps.supportsVision, false);
-      expect(caps.family, 'llama');
+      expect(caps.modelFamily, 'llama');
     });
 
     test('should return capabilities for model with tag', () {
-      final caps = ModelCapabilitiesRegistry.getCapabilities('llama3.3:70b');
-      expect(caps.supportsTools, true);
-      expect(caps.family, 'llama');
+      final caps = ModelRegistry.getCapabilities('llama3.3:70b');
+      expect(caps, isNotNull);
+      expect(caps!.supportsToolCalling, true);
+      expect(caps.modelFamily, 'llama');
     });
 
     test('should return capabilities for vision model', () {
-      final caps = ModelCapabilitiesRegistry.getCapabilities('llava');
-      expect(caps.supportsVision, true);
-      expect(caps.family, 'llava');
+      final caps = ModelRegistry.getCapabilities('gemma3');
+      expect(caps, isNotNull);
+      expect(caps!.supportsVision, true);
+      expect(caps.modelFamily, 'gemma');
     });
 
     test('should return capabilities for qwen models', () {
-      final caps = ModelCapabilitiesRegistry.getCapabilities('qwen2.5-coder:7b');
-      expect(caps.supportsTools, true);
-      expect(caps.supportsCode, true);
-      expect(caps.family, 'qwen');
+      final caps = ModelRegistry.getCapabilities('qwen2.5-coder:7b');
+      expect(caps, isNotNull);
+      expect(caps!.supportsToolCalling, true);
+      expect(caps.modelFamily, 'qwen');
     });
 
-    test('should return unknown for unrecognized model', () {
-      final caps = ModelCapabilitiesRegistry.getCapabilities('totally-unknown-model');
-      expect(caps, ModelCapabilities.unknown);
+    test('should return null for unrecognized model', () {
+      final caps = ModelRegistry.getCapabilities('totally-unknown-model');
+      expect(caps, isNull);
     });
 
     test('should check vision support correctly', () {
-      expect(ModelCapabilitiesRegistry.supportsVision('llava'), true);
-      expect(ModelCapabilitiesRegistry.supportsVision('gemma3'), true);
-      expect(ModelCapabilitiesRegistry.supportsVision('llama3.3'), false);
+      expect(ModelRegistry.supportsVision('llama3.2'), true);
+      expect(ModelRegistry.supportsVision('gemma3'), true);
+      expect(ModelRegistry.supportsVision('llama3.3'), false);
     });
 
-    test('should check tools support correctly', () {
-      expect(ModelCapabilitiesRegistry.supportsTools('llama3.3'), true);
-      expect(ModelCapabilitiesRegistry.supportsTools('qwen3'), true);
-      expect(ModelCapabilitiesRegistry.supportsTools('llama2'), false);
+    test('should check tool calling support correctly', () {
+      expect(ModelRegistry.supportsToolCalling('llama3.3'), true);
+      expect(ModelRegistry.supportsToolCalling('qwen3'), true);
+      expect(ModelRegistry.supportsToolCalling('gemma3'), false);
     });
 
-    test('should check code support correctly', () {
-      expect(ModelCapabilitiesRegistry.supportsCode('codestral'), true);
-      expect(ModelCapabilitiesRegistry.supportsCode('deepseek-coder'), true);
-      expect(ModelCapabilitiesRegistry.supportsCode('falcon'), false);
+    test('should check thinking support correctly', () {
+      expect(ModelRegistry.supportsThinking('deepseek-v3'), true);
+      expect(ModelRegistry.supportsThinking('qwen3'), true);
+      expect(ModelRegistry.supportsThinking('llama3.3'), false);
     });
 
-    test('should get context length correctly', () {
-      expect(ModelCapabilitiesRegistry.getContextLength('llama3.3'), 131072);
-      expect(ModelCapabilitiesRegistry.getContextLength('llama2'), 4096);
+    test('should list known model names', () {
+      final models = ModelRegistry.getAllModelNames();
+      expect(models.isNotEmpty, true);
+      expect(models.contains('llama3.3'), true);
+      expect(models.contains('qwen3'), true);
     });
 
-    test('should list known model families', () {
-      final families = ModelCapabilitiesRegistry.knownModelFamilies;
+    test('should list model families', () {
+      final families = ModelRegistry.getAllModelFamilies();
       expect(families.isNotEmpty, true);
-      expect(families.contains('llama3.3'), true);
-      expect(families.contains('qwen3'), true);
+      expect(families.contains('llama'), true);
+      expect(families.contains('qwen'), true);
     });
 
-    test('should get models with specific capability', () {
-      final visionModels = ModelCapabilitiesRegistry.getModelsWithCapability(vision: true);
-      expect(visionModels.contains('llava'), true);
+    test('should find models with specific capability', () {
+      final visionModels = ModelRegistry.findModelsByCapability(supportsVision: true);
+      expect(visionModels.contains('llama3.2'), true);
       expect(visionModels.contains('gemma3'), true);
       expect(visionModels.contains('llama3.3'), false);
 
-      final toolModels = ModelCapabilitiesRegistry.getModelsWithCapability(tools: true);
+      final toolModels = ModelRegistry.findModelsByCapability(supportsToolCalling: true);
       expect(toolModels.contains('llama3.3'), true);
-      expect(toolModels.contains('llama2'), false);
+      expect(toolModels.contains('gemma3'), false);
     });
   });
 }

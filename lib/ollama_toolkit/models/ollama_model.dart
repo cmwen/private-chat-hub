@@ -35,6 +35,15 @@ class ModelCapabilities {
     this.useCases,
   });
 
+  /// UI-friendly alias for supportsToolCalling
+  bool get supportsTools => supportsToolCalling;
+
+  /// Context length alias for UI compatibility
+  int get contextLength => contextWindow;
+
+  /// Model family alias for UI compatibility
+  String get family => modelFamily ?? 'unknown';
+
   @override
   String toString() {
     final features = <String>[];
@@ -73,13 +82,14 @@ class ModelRegistry {
     ),
     'llama3.3': ModelCapabilities(
       supportsToolCalling: true,
-      supportsVision: true,
+      supportsVision: false,
       supportsThinking: false,
       contextWindow: 128000,
       modelFamily: 'llama',
       aliases: ['llama3.3:70b'],
-      description: 'Latest Llama 3.3 with improved capabilities',
-      useCases: ['long context', 'multimodal', 'tool calling'],
+      description:
+          'Latest Llama 3.3 with improved multilingual and tool support',
+      useCases: ['long context', 'tool calling', 'multilingual'],
     ),
 
     // Qwen 2.x series - Alibaba
@@ -199,14 +209,14 @@ class ModelRegistry {
 
     // Gemma series - Google
     'gemma2': ModelCapabilities(
-      supportsToolCalling: true,
+      supportsToolCalling: false,
       supportsVision: false,
       supportsThinking: false,
-      contextWindow: 128000,
+      contextWindow: 8192,
       modelFamily: 'gemma',
       aliases: ['gemma2:2b', 'gemma2:9b', 'gemma2:27b'],
       description: 'Google Gemma 2 - lightweight and efficient',
-      useCases: ['edge deployment', 'function calling', 'custom applications'],
+      useCases: ['edge deployment', 'efficient inference'],
     ),
 
     // Phi series - Microsoft
@@ -304,7 +314,7 @@ class ModelRegistry {
       useCases: ['reasoning', 'agentic workflows', 'tool calling'],
     ),
     'gemma3': ModelCapabilities(
-      supportsToolCalling: true,
+      supportsToolCalling: false,
       supportsVision: true,
       supportsThinking: false,
       contextWindow: 131072,
@@ -317,14 +327,14 @@ class ModelRegistry {
         'gemma3:27b',
       ],
       description:
-          'Gemma 3 - efficient family from Google DeepMind with vision variants',
-      useCases: ['multimodal', 'edge deployment', 'tool calling'],
+          'Gemma 3 - multimodal family from Google with vision variants and strong multilingual/reasoning performance',
+      useCases: ['multimodal', 'edge deployment', 'reasoning'],
     ),
     'qwen3': ModelCapabilities(
       supportsToolCalling: true,
       supportsVision: false,
       supportsThinking: true,
-      contextWindow: 131072,
+      contextWindow: 262144,
       modelFamily: 'qwen',
       aliases: [
         'qwen3:0.6b',
@@ -338,15 +348,36 @@ class ModelRegistry {
       description: 'Qwen 3 - latest Qwen series with dense and MoE variants',
       useCases: ['long-context tasks', 'tool calling', 'reasoning'],
     ),
+    'qwen3-vl': ModelCapabilities(
+      supportsToolCalling: true,
+      supportsVision: true,
+      supportsThinking: true,
+      contextWindow: 131072,
+      modelFamily: 'qwen',
+      aliases: ['qwen3-vl'],
+      description:
+          'Qwen3 vision-language variant with strong multimodal and tool support',
+      useCases: ['vision-language', 'tool calling', 'multimodal'],
+    ),
+    'mistral-nemo': ModelCapabilities(
+      supportsToolCalling: true,
+      supportsVision: false,
+      supportsThinking: false,
+      contextWindow: 131072,
+      modelFamily: 'mistral',
+      aliases: ['mistral-nemo:12b'],
+      description: 'Mistral Nemo - 12B model with 128K context window',
+      useCases: ['long context', 'fast inference', 'edge deployment'],
+    ),
     'ministral-3': ModelCapabilities(
       supportsToolCalling: true,
       supportsVision: true,
       supportsThinking: false,
-      contextWindow: 131072,
+      contextWindow: 262144,
       modelFamily: 'ministral',
       aliases: ['ministral-3:3b', 'ministral-3:8b', 'ministral-3:14b'],
       description:
-          'Ministral 3 - edge-focused family with vision and tool support (listed on Ollama)',
+          'Ministral 3 - edge-optimized multimodal models with agentic/function-calling capabilities and 256K context',
       useCases: ['edge deployment', 'multimodal', 'tool calling'],
     ),
   };

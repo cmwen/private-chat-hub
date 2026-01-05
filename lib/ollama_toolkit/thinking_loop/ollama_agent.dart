@@ -1,5 +1,7 @@
 import '../services/ollama_client.dart';
 import '../models/ollama_message.dart';
+import '../models/ollama_tool.dart';
+import '../models/ollama_response.dart';
 import 'agent.dart';
 import 'memory.dart';
 import 'tools.dart';
@@ -43,18 +45,60 @@ class OllamaAgent implements Agent {
 
       String finalResponse = '';
       var iteration = 0;
+      bool modelSupportsTools = tools.isNotEmpty; // Assume it does initially
 
       while (iteration < maxIterations) {
         iteration++;
 
         // Call Ollama with current conversation and tools
-        final response = await client.chat(
-          model,
-          memory.getMessages(),
-          options: tools.isNotEmpty
-              ? {'tools': tools.map((t) => t.toDefinition()).toList()}
-              : null,
-          think: enableThinking,
+        final toolDefinitions = modelSupportsTools && tools.isNotEmpty
+            ? tools
+                  .map(
+                    (t) => ToolDefinition(
+                      name: t.name,
+                      description: t.description,
+                      parameters: t.parameters,
+                    ),
+                  )
+                  .toList()
+            : null;
+
+        // Debug: log tools being sent
+        print(
+          '[OllamaAgent] Iteration $iteration: Sending ${toolDefinitions?.length ?? 0} tools to model $model',
+        );
+        if (toolDefinitions != null) {
+          for (final tool in toolDefinitions) {
+            print('[OllamaAgent] Tool: ${tool.name}');
+          }
+        }
+
+        print('[OllamaAgent] About to call client.chat()...');
+        late OllamaChatResponse response;
+        try {
+          response = await client.chat(
+            model,
+            memory.getMessages(),
+            think: enableThinking,
+            tools: toolDefinitions,
+          );
+        } catch (e) {
+          // Check if error is about tools not being supported
+          if (e.toString().contains('does not support tools') &&
+              modelSupportsTools) {
+            print(
+              '[OllamaAgent] Model $model does not support tools. Retrying without tools...',
+            );
+            modelSupportsTools = false;
+            // Retry this iteration without tools
+            continue;
+          }
+          // Re-throw other errors
+          rethrow;
+        }
+
+        print(
+          '[OllamaAgent] Response received: toolCalls=${response.message.toolCalls?.length ?? 0}, content length=${response.message.content.length}',
         );
 
         final message = response.message;
@@ -70,6 +114,19 @@ class OllamaAgent implements Agent {
           // Execute tools in parallel for better performance
           final toolResults = await Future.wait(
             message.toolCalls!.map((toolCall) async {
+              // Skip tool calls with empty names BEFORE adding step
+              if (toolCall.name.isEmpty) {
+                print(
+                  '[OllamaAgent] Skipping tool call with empty name (index: ${toolCall.index})',
+                );
+                return {
+                  'toolName': '',
+                  'result': 'Tool call had empty name',
+                  'toolId': toolCall.id ?? '',
+                  'skip': true,
+                };
+              }
+
               steps.add(
                 AgentStep(
                   type: 'tool_call',
@@ -79,12 +136,25 @@ class OllamaAgent implements Agent {
                 ),
               );
 
-              // Find and execute the tool
-              final tool = tools.firstWhere(
-                (t) => t.name == toolCall.name,
-                orElse: () =>
-                    throw Exception('Tool not found: ${toolCall.name}'),
-              );
+              // Find tool, or null if not found
+              Tool? tool;
+              try {
+                tool = tools.firstWhere((t) => t.name == toolCall.name);
+              } catch (e) {
+                tool = null;
+              }
+
+              if (tool == null) {
+                print(
+                  '[OllamaAgent] Tool not found: ${toolCall.name}. Available tools: ${tools.map((t) => t.name).join(", ")}',
+                );
+                return {
+                  'toolName': toolCall.name,
+                  'result': 'Tool not found: ${toolCall.name}',
+                  'toolId': toolCall.id ?? '',
+                  'skip': false,
+                };
+              }
 
               final result = await tool.execute(toolCall.arguments);
 
@@ -99,20 +169,32 @@ class OllamaAgent implements Agent {
               return {
                 'result': result,
                 'toolName': toolCall.name,
-                'toolId': toolCall.id,
+                'toolId': toolCall.id ?? '',
+                'skip': false,
               };
             }),
           );
 
           // Add all tool results to memory with proper format
           for (final toolResult in toolResults) {
-            memory.addMessage(
-              OllamaMessage.tool(
-                toolResult['result'] as String,
-                toolName: toolResult['toolName'] as String,
-                toolId: toolResult['toolId'] as String,
-              ),
-            );
+            // Skip if marked to skip (empty tool name)
+            if (toolResult['skip'] == true) {
+              continue;
+            }
+
+            final toolName = toolResult['toolName'] as String?;
+            final toolId = toolResult['toolId'] as String?;
+            final result = toolResult['result'] as String?;
+
+            if (toolName != null && toolName.isNotEmpty && result != null) {
+              memory.addMessage(
+                OllamaMessage.tool(
+                  result,
+                  toolName: toolName,
+                  toolId: toolId ?? '',
+                ),
+              );
+            }
           }
 
           // Continue loop to get next response
@@ -126,13 +208,15 @@ class OllamaAgent implements Agent {
       }
 
       if (iteration >= maxIterations) {
+        final errorMessage = finalResponse.isEmpty
+            ? 'The model reached the maximum number of iterations ($maxIterations) without providing a final answer. This may indicate the model is having difficulty completing the task or tool calls are not being processed correctly.'
+            : finalResponse;
+
         return AgentResponse(
-          response: finalResponse.isEmpty
-              ? 'Max iterations reached without final answer'
-              : finalResponse,
+          response: errorMessage,
           steps: steps,
           success: false,
-          error: 'Max iterations reached',
+          error: 'Max iterations reached ($maxIterations)',
         );
       }
 
@@ -141,7 +225,9 @@ class OllamaAgent implements Agent {
         steps: steps,
         success: true,
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('[OllamaAgent] ERROR: $e');
+      print('[OllamaAgent] Stack trace: $stackTrace');
       return AgentResponse(
         response: '',
         steps: steps,

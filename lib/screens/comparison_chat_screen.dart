@@ -132,17 +132,21 @@ class _ComparisonChatScreenState extends State<ComparisonChatScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
   Future<void> _handleStopGeneration() async {
     if (widget.chatService != null && _conversation != null) {
       await widget.chatService!.cancelMessageGeneration(_conversation!.id);
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -204,6 +208,12 @@ class _ComparisonChatScreenState extends State<ComparisonChatScreen> {
           MessageInput(
             onSendMessage: _handleSendMessage,
             onSendMessageWithAttachments: _handleSendMessageWithAttachments,
+            supportsVision:
+                _conversation?.model1Capabilities.supportsVision == true ||
+                _conversation?.model2Capabilities.supportsVision == true,
+            supportsTools:
+                _conversation?.model1Capabilities.supportsTools == true ||
+                _conversation?.model2Capabilities.supportsTools == true,
             isLoading: _isLoading,
           ),
         ],

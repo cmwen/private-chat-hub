@@ -456,23 +456,17 @@ class _ModelCard extends StatelessWidget {
                       spacing: 4,
                       runSpacing: 4,
                       children: [
-                        if (model.capabilities.supportsVision)
+                        if (model.capabilities?.supportsVision == true)
                           _SmallCapabilityChip(
                             icon: Icons.visibility,
                             label: 'Vision',
                             color: Colors.purple,
                           ),
-                        if (model.capabilities.supportsTools)
+                        if (model.capabilities?.supportsTools == true)
                           _SmallCapabilityChip(
                             icon: Icons.build,
                             label: 'Tools',
                             color: Colors.blue,
-                          ),
-                        if (model.capabilities.supportsCode)
-                          _SmallCapabilityChip(
-                            icon: Icons.code,
-                            label: 'Code',
-                            color: Colors.green,
                           ),
                       ],
                     ),
@@ -822,36 +816,31 @@ class _ModelDetailsSheetState extends State<_ModelDetailsSheet> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    if (widget.model.capabilities.supportsVision)
+                    if (widget.model.capabilities?.supportsVision == true)
                       _CapabilityChip(
                         icon: Icons.visibility,
                         label: 'Vision',
                         color: Colors.purple,
                       ),
-                    if (widget.model.capabilities.supportsTools)
+                    if (widget.model.capabilities?.supportsTools == true)
                       _CapabilityChip(
                         icon: Icons.build,
                         label: 'Tools',
                         color: Colors.blue,
                       ),
-                    if (widget.model.capabilities.supportsCode)
-                      _CapabilityChip(
-                        icon: Icons.code,
-                        label: 'Code',
-                        color: Colors.green,
-                      ),
                     _CapabilityChip(
                       icon: Icons.storage,
                       label:
-                          '${(widget.model.capabilities.contextLength / 1024).toStringAsFixed(0)}K context',
+                          '${((widget.model.capabilities?.contextLength ?? 4096) / 1024).toStringAsFixed(0)}K context',
                       color: Colors.orange,
                     ),
                   ],
                 ),
-                if (widget.model.capabilities.description.isNotEmpty) ...[
+                if (widget.model.capabilities?.description?.isNotEmpty ==
+                    true) ...[
                   const SizedBox(height: 8),
                   Text(
-                    widget.model.capabilities.description,
+                    widget.model.capabilities!.description!,
                     style: TextStyle(color: Colors.grey[600], fontSize: 14),
                   ),
                 ],

@@ -25,10 +25,7 @@ class ToolConfigService {
       final json = jsonDecode(configJson) as Map<String, dynamic>;
       // Get API key separately (more secure)
       final apiKey = _prefs.getString(_jinaApiKeyKey);
-      return ToolConfig.fromJson({
-        ...json,
-        'jinaApiKey': apiKey,
-      });
+      return ToolConfig.fromJson({...json, 'jinaApiKey': apiKey});
     } catch (e) {
       return const ToolConfig();
     }

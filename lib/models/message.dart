@@ -84,9 +84,12 @@ class Message {
   final String? errorMessage;
   final List<Attachment> attachments;
   final ModelSource? modelSource;
-  
+
   /// Tool calls made during this message generation (for assistant messages).
   final List<ToolCall> toolCalls;
+
+  /// Current step/status message during message generation.
+  final String? statusMessage;
 
   const Message({
     required this.id,
@@ -100,10 +103,32 @@ class Message {
     this.attachments = const [],
     this.modelSource,
     this.toolCalls = const [],
+    this.statusMessage,
   });
 
   /// Whether this message has any tool calls.
   bool get hasToolCalls => toolCalls.isNotEmpty;
+
+  /// Gets web search references (URLs from search results).
+  List<String> get webSearchReferences {
+    final urls = <String>[];
+    for (final toolCall in toolCalls) {
+      if (toolCall.toolName == 'web_search' &&
+          toolCall.result != null &&
+          toolCall.result!.data != null) {
+        try {
+          final searchResults =
+              SearchResults.fromJson(toolCall.result!.data!);
+          for (final result in searchResults.results) {
+            urls.add(result.url);
+          }
+        } catch (e) {
+          // Ignore parsing errors
+        }
+      }
+    }
+    return urls;
+  }
 
   /// Whether this message has image attachments.
   bool get hasImages => attachments.any((a) => a.isImage);
@@ -222,6 +247,7 @@ class Message {
               ?.map((tc) => ToolCall.fromJson(tc as Map<String, dynamic>))
               .toList() ??
           const [],
+      statusMessage: json['statusMessage'] as String?,
     );
   }
 
@@ -239,6 +265,7 @@ class Message {
       'attachments': attachments.map((a) => a.toJson()).toList(),
       'modelSource': modelSource?.name,
       'toolCalls': toolCalls.map((tc) => tc.toJson()).toList(),
+      'statusMessage': statusMessage,
     };
   }
 
@@ -286,6 +313,7 @@ class Message {
     List<Attachment>? attachments,
     ModelSource? modelSource,
     List<ToolCall>? toolCalls,
+    String? statusMessage,
   }) {
     return Message(
       id: id ?? this.id,
@@ -299,6 +327,7 @@ class Message {
       attachments: attachments ?? this.attachments,
       modelSource: modelSource ?? this.modelSource,
       toolCalls: toolCalls ?? this.toolCalls,
+      statusMessage: statusMessage ?? this.statusMessage,
     );
   }
 

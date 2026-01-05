@@ -1,4 +1,5 @@
 import 'ollama_message.dart';
+import 'ollama_model.dart';
 
 /// Response from Ollama generate API
 class OllamaGenerateResponse {
@@ -167,6 +168,12 @@ class OllamaModelInfo {
   /// Returns the parameter count if available (e.g., "8B").
   String? get parameterCount {
     return details?['parameter_size'] as String?;
+  }
+
+  /// Returns the capabilities of this model based on its name.
+  /// Uses ModelRegistry to look up known capabilities.
+  ModelCapabilities? get capabilities {
+    return ModelRegistry.getCapabilities(name);
   }
 
   @override

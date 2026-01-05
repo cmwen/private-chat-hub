@@ -2,6 +2,10 @@
 //
 // Since Ollama API doesn't expose capability information,
 // we maintain a curated list of known capabilities for popular models.
+//
+// NOTE: This file should be kept in sync with lib/ollama_toolkit/models/ollama_model.dart
+// which is the source of truth for model capabilities (vision, tool calling, thinking).
+// The supportsCode field is UI-specific and indicates models optimized for code tasks.
 
 /// Represents the capabilities of an AI model.
 class ModelCapabilities {
@@ -11,7 +15,8 @@ class ModelCapabilities {
   /// Whether the model supports tool/function calling.
   final bool supportsTools;
 
-  /// Whether the model is suitable for code generation.
+  /// Whether the model is optimized for code generation tasks.
+  /// This is a UI-only capability indicating coding-focused models.
   final bool supportsCode;
 
   /// Context window size in tokens.
@@ -58,11 +63,12 @@ class ModelCapabilitiesRegistry {
       supportsTools: true,
       supportsCode: true,
       contextLength: 131072,
-      description: 'Meta Llama 3.3 - Best open source model for reasoning and coding',
+      description:
+          'Meta Llama 3.3 - Best open source model for reasoning and coding',
       family: 'llama',
     ),
     'llama3.2': ModelCapabilities(
-      supportsVision: true,  // 11b and 90b vision variants
+      supportsVision: true, // 11b and 90b vision variants
       supportsTools: true,
       supportsCode: true,
       contextLength: 131072,
@@ -223,10 +229,18 @@ class ModelCapabilitiesRegistry {
     // === Gemma Family (Google) ===
     'gemma3': ModelCapabilities(
       supportsVision: true,
-      supportsTools: true,
-      supportsCode: true,
+      supportsTools: false,  // Per ollama_model.dart - gemma3 does NOT support tool calling
+      supportsCode: false,   // Gemma3 is not specialized for code
       contextLength: 131072,
       description: 'Google Gemma 3 - Multimodal with vision',
+      family: 'gemma',
+    ),
+    'gemma3n': ModelCapabilities(
+      supportsVision: false,
+      supportsTools: false,
+      supportsCode: true,
+      contextLength: 131072,
+      description: 'Google Gemma 3 Nano - Lightweight without vision/tools',
       family: 'gemma',
     ),
     'gemma2': ModelCapabilities(
@@ -651,7 +665,8 @@ class ModelCapabilitiesRegistry {
       supportsTools: true,
       supportsCode: true,
       contextLength: 131072,
-      description: 'GPT-OSS (Ollama) - Open-weight models with agentic/function-calling support. See https://ollama.com/library/gpt-oss (128K context)',
+      description:
+          'GPT-OSS (Ollama) - Open-weight models with agentic/function-calling support. See https://ollama.com/library/gpt-oss (128K context)',
       family: 'gpt-oss',
     ),
   };

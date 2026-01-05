@@ -546,23 +546,17 @@ class _ModelSelectorSheet extends StatelessWidget {
                           spacing: 4,
                           runSpacing: 2,
                           children: [
-                            if (model.capabilities.supportsVision)
+                            if (model.capabilities?.supportsVision == true)
                               _CapabilityBadge(
                                 icon: Icons.visibility,
                                 label: 'Vision',
                                 color: Colors.purple,
                               ),
-                            if (model.capabilities.supportsTools)
+                            if (model.capabilities?.supportsTools == true)
                               _CapabilityBadge(
                                 icon: Icons.build,
                                 label: 'Tools',
                                 color: Colors.blue,
-                              ),
-                            if (model.capabilities.supportsCode)
-                              _CapabilityBadge(
-                                icon: Icons.code,
-                                label: 'Code',
-                                color: Colors.green,
                               ),
                           ],
                         ),

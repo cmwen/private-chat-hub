@@ -38,21 +38,12 @@ class Tool {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'name': name,
-      'description': description,
-      'parameters': parameters,
-    };
+    return {'name': name, 'description': description, 'parameters': parameters};
   }
 }
 
 /// Status of a tool call execution.
-enum ToolCallStatus {
-  pending,
-  executing,
-  success,
-  failed,
-}
+enum ToolCallStatus { pending, executing, success, failed }
 
 /// Represents a tool call made by an AI model.
 class ToolCall {
@@ -166,11 +157,7 @@ class ToolResult {
   /// Human-readable summary of the result.
   final String? summary;
 
-  const ToolResult({
-    required this.success,
-    this.data,
-    this.summary,
-  });
+  const ToolResult({required this.success, this.data, this.summary});
 
   factory ToolResult.fromJson(Map<String, dynamic> json) {
     return ToolResult(
@@ -181,11 +168,7 @@ class ToolResult {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'success': success,
-      'data': data,
-      'summary': summary,
-    };
+    return {'success': success, 'data': data, 'summary': summary};
   }
 }
 
@@ -214,18 +197,14 @@ class SearchResult {
     return SearchResult(
       title: json['title'] as String? ?? '',
       url: json['url'] as String? ?? '',
-      snippet: json['snippet'] as String? ?? json['description'] as String? ?? '',
+      snippet:
+          json['snippet'] as String? ?? json['description'] as String? ?? '',
       favicon: json['favicon'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'title': title,
-      'url': url,
-      'snippet': snippet,
-      'favicon': favicon,
-    };
+    return {'title': title, 'url': url, 'snippet': snippet, 'favicon': favicon};
   }
 
   @override
@@ -265,7 +244,8 @@ class SearchResults {
   }
 
   factory SearchResults.fromJson(Map<String, dynamic> json) {
-    final resultsJson = json['results'] as List<dynamic>? ??
+    final resultsJson =
+        json['results'] as List<dynamic>? ??
         json['data'] as List<dynamic>? ??
         [];
     return SearchResults(
@@ -338,7 +318,10 @@ class ToolConfig {
 
   /// Whether web search is available (enabled and has API key).
   bool get webSearchAvailable =>
-      enabled && webSearchEnabled && jinaApiKey != null && jinaApiKey!.isNotEmpty;
+      enabled &&
+      webSearchEnabled &&
+      jinaApiKey != null &&
+      jinaApiKey!.isNotEmpty;
 
   ToolConfig copyWith({
     bool? enabled,
@@ -414,7 +397,8 @@ class AvailableTools {
       'properties': {
         'timezone': {
           'type': 'string',
-          'description': 'Timezone (e.g., "UTC", "America/New_York"). Default is local time.',
+          'description':
+              'Timezone (e.g., "UTC", "America/New_York"). Default is local time.',
         },
       },
     },
@@ -429,10 +413,7 @@ class AvailableTools {
     parameters: {
       'type': 'object',
       'properties': {
-        'url': {
-          'type': 'string',
-          'description': 'The URL to fetch and read',
-        },
+        'url': {'type': 'string', 'description': 'The URL to fetch and read'},
       },
       'required': ['url'],
     },
@@ -442,10 +423,10 @@ class AvailableTools {
   static List<Tool> get all => [webSearch, currentDateTime, readUrl];
 
   /// Tools that require an API key.
-    static List<Tool> get requiresApiKey => [webSearch, readUrl];
+  static List<Tool> get requiresApiKey => [webSearch, readUrl];
 
   /// Gets a tool by name.
-  /// 
+  ///
   /// Throws [ArgumentError] if the tool is not found.
   static Tool getByName(String name) {
     for (final tool in all) {

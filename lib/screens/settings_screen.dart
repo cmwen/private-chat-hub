@@ -254,16 +254,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: EdgeInsets.all(16),
                   child: Text(
                     'Appearance',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
                 ListTile(
                   leading: const Icon(Icons.palette_outlined),
                   title: const Text('Theme Mode'),
-                  subtitle: Text(_getThemeModeLabel(widget.currentThemeMode ?? ThemeMode.system)),
+                  subtitle: Text(
+                    _getThemeModeLabel(
+                      widget.currentThemeMode ?? ThemeMode.system,
+                    ),
+                  ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _showThemeModeDialog,
                 ),
@@ -306,7 +307,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showThemeModeDialog() {
     final currentMode = widget.currentThemeMode ?? ThemeMode.system;
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -503,10 +504,12 @@ class AddConnectionDialog extends StatefulWidget {
   const AddConnectionDialog({
     super.key,
     required this.onAdd,
-    required this.ollamaManager,  });
+    required this.ollamaManager,
+  });
 
   @override
-  State<AddConnectionDialog> createState() => _AddConnectionDialogState();}
+  State<AddConnectionDialog> createState() => _AddConnectionDialogState();
+}
 
 class _AddConnectionDialogState extends State<AddConnectionDialog> {
   final _formKey = GlobalKey<FormState>();

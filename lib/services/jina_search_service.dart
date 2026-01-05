@@ -27,35 +27,31 @@ class JinaException implements Exception {
 /// Service for interacting with Jina AI APIs for web search.
 ///
 /// Jina provides:
-/// - `/search` endpoint for web search
-/// - `r.jina.ai` for fetching and parsing URLs
-/// - `/qa` endpoint for Q&A over context
+/// - `s.jina.ai` for web search (POST)
+/// - `r.jina.ai` for fetching and parsing URLs (POST)
 class JinaSearchService {
-  static const String _baseUrl = 'https://api.jina.ai';
-  static const String _readerUrl = 'https://r.jina.ai';
+  static const String _searchUrl = 'https://s.jina.ai/';
+  static const String _readerUrl = 'https://r.jina.ai/';
 
   final String apiKey;
   final http.Client _httpClient;
 
-  // Rate limiting tracking (100 requests/minute)
+  // Rate limiting tracking (100 requests/minute for search, 500 for reader)
   final List<DateTime> _requestTimestamps = [];
   static const int _rateLimitPerMinute = 100;
 
   // In-memory cache for search results (for session)
   final Map<String, SearchResults> _searchCache = {};
 
-  JinaSearchService({
-    required this.apiKey,
-    http.Client? httpClient,
-  }) : _httpClient = httpClient ?? http.Client();
+  JinaSearchService({required this.apiKey, http.Client? httpClient})
+    : _httpClient = httpClient ?? http.Client();
 
-  /// Performs a web search using Jina API.
+  /// Performs a web search using Jina Search API (s.jina.ai).
   ///
   /// Parameters:
   /// - [query]: Search query string
   /// - [limit]: Number of results (1-50, default 5)
   /// - [lang]: Language code (default "en")
-  /// - [fresh]: Freshness filter ("d" day, "w" week, "m" month, or null)
   ///
   /// Returns [SearchResults] with title, URL, snippet for each result.
   ///
@@ -64,7 +60,6 @@ class JinaSearchService {
     String query, {
     int limit = 5,
     String lang = 'en',
-    String? fresh,
   }) async {
     // Validate inputs
     if (query.trim().isEmpty) {
@@ -75,7 +70,7 @@ class JinaSearchService {
     }
 
     // Check cache first
-    final cacheKey = _getCacheKey(query, lang, fresh);
+    final cacheKey = _getCacheKey(query, lang);
     final cached = _searchCache[cacheKey];
     if (cached != null && !cached.isExpired) {
       return cached;
@@ -84,26 +79,26 @@ class JinaSearchService {
     // Check rate limiting
     await _checkRateLimit();
 
-    // Build request URL
-    final uri = Uri.parse('$_baseUrl/search').replace(
-      queryParameters: {
-        'q': query,
-        'limit': limit.toString(),
-        'lang': lang,
-        if (fresh != null) 'fresh': fresh,
-      },
-    );
+    // Build request body for s.jina.ai (uses POST with JSON body)
+    final requestBody = {
+      'q': query,
+      'num': limit,
+      if (lang != 'en') 'hl': lang,
+    };
 
     try {
-      // Make request with timeout
-      final response = await _httpClient.get(
-        uri,
-        headers: {
-          'Authorization': 'Bearer $apiKey',
-          'User-Agent': 'PrivateChatHub/1.0',
-          'Accept': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 30));
+      // Make POST request to s.jina.ai
+      final response = await _httpClient
+          .post(
+            Uri.parse(_searchUrl),
+            headers: {
+              'Authorization': 'Bearer $apiKey',
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode(requestBody),
+          )
+          .timeout(const Duration(seconds: 30));
 
       // Track request for rate limiting
       _requestTimestamps.add(DateTime.now());
@@ -113,7 +108,16 @@ class JinaSearchService {
         throw const JinaException('Invalid API key', statusCode: 401);
       }
       if (response.statusCode == 429) {
-        throw const JinaException('Rate limit exceeded. Please wait.', statusCode: 429);
+        throw const JinaException(
+          'Rate limit exceeded. Please wait.',
+          statusCode: 429,
+        );
+      }
+      if (response.statusCode == 404) {
+        throw JinaException(
+          'Jina Search API endpoint not found. Make sure you have a valid subscription.',
+          statusCode: 404,
+        );
       }
       if (response.statusCode != 200) {
         throw JinaException(
@@ -122,12 +126,24 @@ class JinaSearchService {
         );
       }
 
-      // Parse response
+      // Parse response - Jina returns {code, status, data: [...]}
       final json = jsonDecode(response.body) as Map<String, dynamic>;
+
+      // Extract search results from data array
+      final data = json['data'] as List<dynamic>?;
+      if (data == null || data.isEmpty) {
+        return SearchResults(
+          query: query,
+          results: [],
+          searchTime: (json['searchTime'] as num?)?.toDouble() ?? 0,
+          cachedAt: DateTime.now(),
+        );
+      }
+
       final results = SearchResults.fromJson({
         'query': query,
-        'data': json['data'],
-        'searchTime': json['searchTime'],
+        'data': data,
+        'searchTime': json['searchTime'] ?? 0,
         'cachedAt': DateTime.now().toIso8601String(),
       });
 
@@ -136,7 +152,10 @@ class JinaSearchService {
 
       return results;
     } on TimeoutException {
-      throw const JinaException('Request timeout after 30 seconds', statusCode: -1);
+      throw const JinaException(
+        'Request timeout after 30 seconds',
+        statusCode: -1,
+      );
     } on JinaException {
       rethrow;
     } catch (e) {
@@ -164,13 +183,15 @@ class JinaSearchService {
 
     try {
       final readerUri = Uri.parse('$_readerUrl/$url');
-      final response = await _httpClient.get(
-        readerUri,
-        headers: {
-          'User-Agent': 'PrivateChatHub/1.0',
-          'Accept': 'text/plain',
-        },
-      ).timeout(const Duration(seconds: 60));
+      final response = await _httpClient
+          .get(
+            readerUri,
+            headers: {
+              'User-Agent': 'PrivateChatHub/1.0',
+              'Accept': 'text/plain',
+            },
+          )
+          .timeout(const Duration(seconds: 60));
 
       _requestTimestamps.add(DateTime.now());
 
@@ -183,7 +204,10 @@ class JinaSearchService {
 
       return response.body;
     } on TimeoutException {
-      throw const JinaException('Request timeout after 60 seconds', statusCode: -1);
+      throw const JinaException(
+        'Request timeout after 60 seconds',
+        statusCode: -1,
+      );
     } on JinaException {
       rethrow;
     } catch (e) {
@@ -191,66 +215,9 @@ class JinaSearchService {
     }
   }
 
-  /// Answers a question using provided context via Jina Q&A endpoint.
-  ///
-  /// Parameters:
-  /// - [question]: The question to answer
-  /// - [context]: The context to use for answering
-  ///
-  /// Returns the answer text.
-  Future<String> answerQuestion(String question, String context) async {
-    if (question.trim().isEmpty) {
-      throw const JinaException('Question cannot be empty');
-    }
-    if (context.trim().isEmpty) {
-      throw const JinaException('Context cannot be empty');
-    }
-
-    await _checkRateLimit();
-
-    try {
-      final response = await _httpClient.post(
-        Uri.parse('$_baseUrl/qa'),
-        headers: {
-          'Authorization': 'Bearer $apiKey',
-          'Content-Type': 'application/json',
-          'User-Agent': 'PrivateChatHub/1.0',
-        },
-        body: jsonEncode({
-          'question': question,
-          'context': context,
-        }),
-      ).timeout(const Duration(seconds: 30));
-
-      _requestTimestamps.add(DateTime.now());
-
-      if (response.statusCode == 401) {
-        throw const JinaException('Invalid API key', statusCode: 401);
-      }
-      if (response.statusCode == 429) {
-        throw const JinaException('Rate limit exceeded', statusCode: 429);
-      }
-      if (response.statusCode != 200) {
-        throw JinaException(
-          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
-          statusCode: response.statusCode,
-        );
-      }
-
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      return json['answer'] as String? ?? '';
-    } on TimeoutException {
-      throw const JinaException('Request timeout', statusCode: -1);
-    } on JinaException {
-      rethrow;
-    } catch (e) {
-      throw JinaException('Error answering question: $e');
-    }
-  }
-
   /// Generates a cache key for search results.
-  String _getCacheKey(String query, String lang, String? fresh) {
-    return '${query.toLowerCase()}_${lang}_${fresh ?? 'all'}';
+  String _getCacheKey(String query, String lang) {
+    return '${query.toLowerCase()}_$lang';
   }
 
   /// Checks if we're within rate limits, waits if necessary.
@@ -262,12 +229,15 @@ class JinaSearchService {
     // If at limit, wait
     if (_requestTimestamps.length >= _rateLimitPerMinute) {
       final oldestInWindow = _requestTimestamps.first;
-      final waitTime = oldestInWindow.add(const Duration(minutes: 1)).difference(DateTime.now());
+      final waitTime = oldestInWindow
+          .add(const Duration(minutes: 1))
+          .difference(DateTime.now());
       if (waitTime.isNegative == false) {
         await Future<void>.delayed(waitTime);
         // Clean up again after waiting
         _requestTimestamps.removeWhere(
-          (ts) => ts.isBefore(DateTime.now().subtract(const Duration(minutes: 1))),
+          (ts) =>
+              ts.isBefore(DateTime.now().subtract(const Duration(minutes: 1))),
         );
       }
     }
@@ -276,7 +246,9 @@ class JinaSearchService {
   /// Gets current rate limit status.
   Map<String, dynamic> getRateLimitStatus() {
     final oneMinuteAgo = DateTime.now().subtract(const Duration(minutes: 1));
-    final recentRequests = _requestTimestamps.where((ts) => ts.isAfter(oneMinuteAgo)).length;
+    final recentRequests = _requestTimestamps
+        .where((ts) => ts.isAfter(oneMinuteAgo))
+        .length;
     return {
       'requestsInLastMinute': recentRequests,
       'limit': _rateLimitPerMinute,

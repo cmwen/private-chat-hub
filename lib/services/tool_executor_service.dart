@@ -100,7 +100,8 @@ class ToolExecutorService {
     if (_jinaService == null) {
       return const ToolResult(
         success: false,
-        summary: 'Web search is not configured. Please add a Jina API key in settings.',
+        summary:
+            '⚙️ Web search is not configured. Please:\n1. Get a free API key at https://jina.ai/?sui=apikey\n2. Add it in Settings > Tools Configuration\n3. Enable "Web Search" toggle\n4. Restart the app',
       );
     }
 
@@ -112,7 +113,8 @@ class ToolExecutorService {
       );
     }
 
-    final numResults = (arguments['num_results'] as int?) ?? config.maxSearchResults;
+    final numResults =
+        (arguments['num_results'] as int?) ?? config.maxSearchResults;
 
     try {
       final results = await _jinaService.search(
@@ -129,18 +131,35 @@ class ToolExecutorService {
       if (e.isAuthError) {
         return const ToolResult(
           success: false,
-          summary: 'Invalid Jina API key. Please check your settings.',
+          summary:
+              '❌ Invalid Jina API key. Please check your settings and ensure the key is correct.',
         );
       }
       if (e.isRateLimited) {
         return const ToolResult(
           success: false,
-          summary: 'Search rate limit exceeded. Please try again in a moment.',
+          summary:
+              '⏱️ Search rate limit exceeded. Please wait a moment and try again.',
+        );
+      }
+      if (e.statusCode == 404) {
+        return const ToolResult(
+          success: false,
+          summary:
+              '❌ Jina API endpoint not accessible. Your API key may not have web search enabled or subscription is invalid. Check https://jina.ai/?sui=apikey',
+        );
+      }
+      if (e.isNetworkError) {
+        return ToolResult(
+          success: false,
+          summary:
+              '🌐 Network error: ${e.message}\n\nPlease check your internet connection and try again.',
         );
       }
       return ToolResult(
         success: false,
-        summary: 'Search failed: ${e.message}',
+        summary:
+            '❌ Search failed: ${e.message}\n\nTroubleshooting: Check your Jina API key in Settings > Tools Configuration',
       );
     }
   }
@@ -177,16 +196,14 @@ class ToolExecutorService {
     if (_jinaService == null) {
       return const ToolResult(
         success: false,
-        summary: 'URL reading is not configured. Please add a Jina API key in settings.',
+        summary:
+            'URL reading is not configured. Please add a Jina API key in settings.',
       );
     }
 
     final url = arguments['url'] as String?;
     if (url == null || url.trim().isEmpty) {
-      return const ToolResult(
-        success: false,
-        summary: 'URL is required.',
-      );
+      return const ToolResult(success: false, summary: 'URL is required.');
     }
 
     try {
@@ -249,15 +266,18 @@ class ToolExecutorService {
     final toolCalls = message['tool_calls'] as List<dynamic>?;
     if (toolCalls == null || toolCalls.isEmpty) return [];
 
-    return toolCalls.map((tc) {
-      final function = tc['function'] as Map<String, dynamic>?;
-      if (function == null) return <String, dynamic>{};
+    return toolCalls
+        .map((tc) {
+          final function = tc['function'] as Map<String, dynamic>?;
+          if (function == null) return <String, dynamic>{};
 
-      return <String, dynamic>{
-        'name': function['name'] as String? ?? '',
-        'arguments': function['arguments'] as Map<String, dynamic>? ?? {},
-      };
-    }).where((tc) => tc.isNotEmpty).toList();
+          return <String, dynamic>{
+            'name': function['name'] as String? ?? '',
+            'arguments': function['arguments'] as Map<String, dynamic>? ?? {},
+          };
+        })
+        .where((tc) => tc.isNotEmpty)
+        .toList();
   }
 
   /// Checks if a response contains tool calls.

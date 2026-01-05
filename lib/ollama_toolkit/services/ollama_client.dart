@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../models/ollama_message.dart';
 import '../models/ollama_request.dart';
 import '../models/ollama_response.dart';
+import '../models/ollama_tool.dart';
 
 /// Exception thrown when Ollama API request fails
 class OllamaException implements Exception {
@@ -93,6 +94,7 @@ class OllamaClient {
     List<OllamaMessage> messages, {
     Map<String, dynamic>? options,
     dynamic think,
+    List<ToolDefinition>? tools,
   }) async {
     final request = OllamaChatRequest(
       model: model,
@@ -100,9 +102,30 @@ class OllamaClient {
       stream: false,
       options: options,
       think: think,
+      tools: tools,
     );
 
-    final response = await _post('/api/chat', request.toJson());
+    final requestJson = request.toJson();
+
+    // Debug: log request details
+    print('[OllamaClient.chat] Model: $model');
+    print('[OllamaClient.chat] Tools count: ${tools?.length ?? 0}');
+    if (tools != null && tools.isNotEmpty) {
+      print(
+        '[OllamaClient.chat] Tool names: ${tools.map((t) => t.name).join(", ")}',
+      );
+    }
+    print(
+      '[OllamaClient.chat] Request JSON keys: ${requestJson.keys.join(", ")}',
+    );
+
+    final response = await _postWithCustomTimeout(
+      '/api/chat',
+      requestJson,
+      tools != null && tools.isNotEmpty
+          ? const Duration(seconds: 180)
+          : timeout,
+    );
     return OllamaChatResponse.fromJson(response);
   }
 
@@ -112,6 +135,7 @@ class OllamaClient {
     List<OllamaMessage> messages, {
     Map<String, dynamic>? options,
     dynamic think,
+    List<ToolDefinition>? tools,
   }) {
     final request = OllamaChatRequest(
       model: model,
@@ -119,6 +143,7 @@ class OllamaClient {
       stream: true,
       options: options,
       think: think,
+      tools: tools,
     );
 
     return _postStream(
@@ -217,6 +242,15 @@ class OllamaClient {
     String path,
     Map<String, dynamic> body,
   ) async {
+    return _postWithCustomTimeout(path, body, timeout);
+  }
+
+  /// POST request with custom timeout
+  Future<Map<String, dynamic>> _postWithCustomTimeout(
+    String path,
+    Map<String, dynamic> body,
+    Duration customTimeout,
+  ) async {
     try {
       final uri = Uri.parse('$baseUrl$path');
       final response = await _httpClient
@@ -225,7 +259,7 @@ class OllamaClient {
             headers: {'Content-Type': 'application/json'},
             body: json.encode(body),
           )
-          .timeout(timeout);
+          .timeout(customTimeout);
 
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
@@ -236,7 +270,9 @@ class OllamaClient {
         );
       }
     } on TimeoutException {
-      throw OllamaException('Request timeout after ${timeout.inSeconds}s');
+      throw OllamaException(
+        'Request timeout after ${customTimeout.inSeconds}s',
+      );
     } catch (e) {
       if (e is OllamaException) rethrow;
       throw OllamaException('Request failed: $e', originalError: e);
