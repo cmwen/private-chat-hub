@@ -1,16 +1,17 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
-import 'package:private_chat_hub/services/ollama_service.dart';
+import 'package:private_chat_hub/services/ollama_connection_manager.dart';
+import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
 
 /// Screen for managing Ollama models.
 class ModelsScreen extends StatefulWidget {
-  final OllamaService ollamaService;
+  final OllamaConnectionManager ollamaManager;
   final ConnectionService connectionService;
 
   const ModelsScreen({
     super.key,
-    required this.ollamaService,
+    required this.ollamaManager,
     required this.connectionService,
   });
 
@@ -19,7 +20,7 @@ class ModelsScreen extends StatefulWidget {
 }
 
 class _ModelsScreenState extends State<ModelsScreen> {
-  List<OllamaModel> _models = [];
+  List<OllamaModelInfo> _models = [];
   bool _isLoading = true;
   String? _error;
   String? _selectedModel;
@@ -49,15 +50,9 @@ class _ModelsScreenState extends State<ModelsScreen> {
         return;
       }
 
-      widget.ollamaService.setConnection(
-        OllamaConnection(
-          host: connection.host,
-          port: connection.port,
-          useHttps: connection.useHttps,
-        ),
-      );
+      widget.ollamaManager.setConnection(connection);
 
-      final models = await widget.ollamaService.listModels();
+      final models = await widget.ollamaManager.listModels();
       setState(() {
         _models = models;
         _isLoading = false;
@@ -70,7 +65,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
     }
   }
 
-  Future<void> _deleteModel(OllamaModel model) async {
+  Future<void> _deleteModel(OllamaModelInfo model) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -95,7 +90,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
 
     if (confirmed == true) {
       try {
-        await widget.ollamaService.deleteModel(model.name);
+        await widget.ollamaManager.deleteModel(model.name);
         await _loadModels();
         if (mounted) {
           ScaffoldMessenger.of(
@@ -115,7 +110,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
     }
   }
 
-  Future<void> _selectModel(OllamaModel model) async {
+  Future<void> _selectModel(OllamaModelInfo model) async {
     await widget.connectionService.setSelectedModel(model.name);
     setState(() => _selectedModel = model.name);
     if (mounted) {
@@ -143,42 +138,28 @@ class _ModelsScreenState extends State<ModelsScreen> {
     });
 
     try {
-      await for (final progress in widget.ollamaService.pullModel(modelName)) {
-        final status = progress['status'] as String? ?? '';
-        final total = progress['total'] as int?;
-        final completed = progress['completed'] as int?;
-
-        double? progressPercent;
-        if (total != null && completed != null && total > 0) {
-          progressPercent = completed / total;
-        }
-
-        setState(() {
-          _downloadProgress[modelName] = _DownloadProgress(
-            status: status,
-            progress: progressPercent,
-          );
-        });
-
-        if (status == 'success') {
+      await widget.ollamaManager.pullModel(
+        modelName,
+        onProgress: (progress) {
           setState(() {
-            _downloadProgress.remove(modelName);
-          });
-          await _loadModels();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('$modelName downloaded successfully')),
+            _downloadProgress[modelName] = _DownloadProgress(
+              status: 'Downloading...',
+              progress: progress,
             );
-          }
-          return;
-        }
-      }
+          });
+        },
+      );
 
       // Download complete
       setState(() {
         _downloadProgress.remove(modelName);
       });
       await _loadModels();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$modelName downloaded successfully')),
+        );
+      }
     } catch (e) {
       setState(() {
         _downloadProgress.remove(modelName);
@@ -194,7 +175,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
     }
   }
 
-  void _showModelDetails(OllamaModel model) async {
+  void _showModelDetails(OllamaModelInfo model) async {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -205,7 +186,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
         expand: false,
         builder: (context, scrollController) => _ModelDetailsSheet(
           model: model,
-          ollamaService: widget.ollamaService,
+          ollamaManager: widget.ollamaManager,
           scrollController: scrollController,
         ),
       ),
@@ -380,7 +361,7 @@ class _DownloadProgress {
 }
 
 class _ModelCard extends StatelessWidget {
-  final OllamaModel model;
+  final OllamaModelInfo model;
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback onSelect;
@@ -470,6 +451,25 @@ class _ModelCard extends StatelessWidget {
                         ],
                       ],
                     ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: [
+                        if (model.capabilities?.supportsVision == true)
+                          _SmallCapabilityChip(
+                            icon: Icons.visibility,
+                            label: 'Vision',
+                            color: Colors.purple,
+                          ),
+                        if (model.capabilities?.supportsTools == true)
+                          _SmallCapabilityChip(
+                            icon: Icons.build,
+                            label: 'Tools',
+                            color: Colors.blue,
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -535,6 +535,84 @@ class _InfoChip extends StatelessWidget {
           Icon(icon, size: 12, color: Colors.grey[600]),
           const SizedBox(width: 4),
           Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+        ],
+      ),
+    );
+  }
+}
+
+class _CapabilityChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _CapabilityChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SmallCapabilityChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _SmallCapabilityChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 0.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -649,13 +727,13 @@ class _PullModelDialogState extends State<_PullModelDialog> {
 }
 
 class _ModelDetailsSheet extends StatefulWidget {
-  final OllamaModel model;
-  final OllamaService ollamaService;
+  final OllamaModelInfo model;
+  final OllamaConnectionManager ollamaManager;
   final ScrollController scrollController;
 
   const _ModelDetailsSheet({
     required this.model,
-    required this.ollamaService,
+    required this.ollamaManager,
     required this.scrollController,
   });
 
@@ -675,9 +753,9 @@ class _ModelDetailsSheetState extends State<_ModelDetailsSheet> {
 
   Future<void> _loadDetails() async {
     try {
-      final details = await widget.ollamaService.showModel(widget.model.name);
+      final details = await widget.ollamaManager.showModel(widget.model.name);
       setState(() {
-        _details = details;
+        _details = details.details ?? {};
         _isLoading = false;
       });
     } catch (e) {
@@ -730,6 +808,45 @@ class _ModelDetailsSheetState extends State<_ModelDetailsSheet> {
           if (_isLoading)
             const Center(child: CircularProgressIndicator())
           else if (_details != null) ...[
+            // Capabilities badges
+            _DetailSection(
+              title: 'Capabilities',
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (widget.model.capabilities?.supportsVision == true)
+                      _CapabilityChip(
+                        icon: Icons.visibility,
+                        label: 'Vision',
+                        color: Colors.purple,
+                      ),
+                    if (widget.model.capabilities?.supportsTools == true)
+                      _CapabilityChip(
+                        icon: Icons.build,
+                        label: 'Tools',
+                        color: Colors.blue,
+                      ),
+                    _CapabilityChip(
+                      icon: Icons.storage,
+                      label:
+                          '${((widget.model.capabilities?.contextLength ?? 4096) / 1024).toStringAsFixed(0)}K context',
+                      color: Colors.orange,
+                    ),
+                  ],
+                ),
+                if (widget.model.capabilities?.description?.isNotEmpty ==
+                    true) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.model.capabilities!.description!,
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 16),
             _DetailSection(
               title: 'Model Information',
               children: [

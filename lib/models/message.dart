@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:private_chat_hub/models/tool_models.dart';
 
 /// The role of a message sender.
 enum MessageRole { user, assistant, system, tool }
@@ -84,6 +85,12 @@ class Message {
   final List<Attachment> attachments;
   final ModelSource? modelSource;
 
+  /// Tool calls made during this message generation (for assistant messages).
+  final List<ToolCall> toolCalls;
+
+  /// Current step/status message during message generation.
+  final String? statusMessage;
+
   const Message({
     required this.id,
     required this.text,
@@ -95,7 +102,32 @@ class Message {
     this.errorMessage,
     this.attachments = const [],
     this.modelSource,
+    this.toolCalls = const [],
+    this.statusMessage,
   });
+
+  /// Whether this message has any tool calls.
+  bool get hasToolCalls => toolCalls.isNotEmpty;
+
+  /// Gets web search references (URLs from search results).
+  List<String> get webSearchReferences {
+    final urls = <String>[];
+    for (final toolCall in toolCalls) {
+      if (toolCall.toolName == 'web_search' &&
+          toolCall.result != null &&
+          toolCall.result!.data != null) {
+        try {
+          final searchResults = SearchResults.fromJson(toolCall.result!.data!);
+          for (final result in searchResults.results) {
+            urls.add(result.url);
+          }
+        } catch (e) {
+          // Ignore parsing errors
+        }
+      }
+    }
+    return urls;
+  }
 
   /// Whether this message has image attachments.
   bool get hasImages => attachments.any((a) => a.isImage);
@@ -185,6 +217,7 @@ class Message {
   factory Message.fromJson(Map<String, dynamic> json) {
     final attachmentsJson = json['attachments'] as List<dynamic>?;
     final modelSourceStr = json['modelSource'] as String?;
+    final toolCallsJson = json['toolCalls'] as List<dynamic>?;
     return Message(
       id: json['id'] as String,
       text: json['text'] as String,
@@ -208,6 +241,12 @@ class Message {
               orElse: () => ModelSource.user,
             )
           : null,
+      toolCalls:
+          toolCallsJson
+              ?.map((tc) => ToolCall.fromJson(tc as Map<String, dynamic>))
+              .toList() ??
+          const [],
+      statusMessage: json['statusMessage'] as String?,
     );
   }
 
@@ -224,6 +263,8 @@ class Message {
       'errorMessage': errorMessage,
       'attachments': attachments.map((a) => a.toJson()).toList(),
       'modelSource': modelSource?.name,
+      'toolCalls': toolCalls.map((tc) => tc.toJson()).toList(),
+      'statusMessage': statusMessage,
     };
   }
 
@@ -270,6 +311,8 @@ class Message {
     String? errorMessage,
     List<Attachment>? attachments,
     ModelSource? modelSource,
+    List<ToolCall>? toolCalls,
+    String? statusMessage,
   }) {
     return Message(
       id: id ?? this.id,
@@ -282,6 +325,8 @@ class Message {
       errorMessage: errorMessage ?? this.errorMessage,
       attachments: attachments ?? this.attachments,
       modelSource: modelSource ?? this.modelSource,
+      toolCalls: toolCalls ?? this.toolCalls,
+      statusMessage: statusMessage ?? this.statusMessage,
     );
   }
 

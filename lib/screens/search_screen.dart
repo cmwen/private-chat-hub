@@ -289,7 +289,7 @@ class _SearchResultTile extends StatelessWidget {
           size: 20,
         ),
       ),
-      title: _buildHighlightedText(result.highlightedText, query),
+      title: _buildHighlightedText(context, result.highlightedText, query),
       subtitle: Text(
         DateFormat('MMM d, y • HH:mm').format(result.message.timestamp),
         style: TextStyle(fontSize: 12, color: Colors.grey[500]),
@@ -298,7 +298,11 @@ class _SearchResultTile extends StatelessWidget {
     );
   }
 
-  Widget _buildHighlightedText(String text, String query) {
+  Widget _buildHighlightedText(
+    BuildContext context,
+    String text,
+    String query,
+  ) {
     final lowerText = text.toLowerCase();
     final lowerQuery = query.toLowerCase();
     final spans = <TextSpan>[];
@@ -332,7 +336,10 @@ class _SearchResultTile extends StatelessWidget {
 
     return RichText(
       text: TextSpan(
-        style: const TextStyle(color: Colors.black87, fontSize: 14),
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface,
+          fontSize: 14,
+        ),
         children: spans,
       ),
       maxLines: 2,

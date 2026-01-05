@@ -4,7 +4,8 @@ import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/project.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
-import 'package:private_chat_hub/services/ollama_service.dart';
+import 'package:private_chat_hub/services/ollama_connection_manager.dart';
+import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
 import 'package:private_chat_hub/services/project_service.dart';
 
 /// Screen showing project details and its conversations.
@@ -13,7 +14,7 @@ class ProjectDetailScreen extends StatefulWidget {
   final ProjectService projectService;
   final ChatService chatService;
   final ConnectionService connectionService;
-  final OllamaService ollamaService;
+  final OllamaConnectionManager ollamaManager;
   final Function(Conversation) onConversationSelected;
   final VoidCallback onProjectUpdated;
 
@@ -23,7 +24,7 @@ class ProjectDetailScreen extends StatefulWidget {
     required this.projectService,
     required this.chatService,
     required this.connectionService,
-    required this.ollamaService,
+    required this.ollamaManager,
     required this.onConversationSelected,
     required this.onProjectUpdated,
   });
@@ -35,7 +36,7 @@ class ProjectDetailScreen extends StatefulWidget {
 class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   late Project _project;
   List<Conversation> _conversations = [];
-  List<OllamaModel> _models = [];
+  List<OllamaModelInfo> _models = [];
   String? _selectedModel;
   bool _isLoading = true;
 
@@ -56,14 +57,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     final connection = widget.connectionService.getDefaultConnection();
     if (connection != null) {
       try {
-        widget.ollamaService.setConnection(
-          OllamaConnection(
-            host: connection.host,
-            port: connection.port,
-            useHttps: connection.useHttps,
-          ),
-        );
-        _models = await widget.ollamaService.listModels();
+        widget.ollamaManager.setConnection(connection);
+        _models = await widget.ollamaManager.listModels();
       } catch (_) {
         _models = [];
       }
@@ -251,9 +246,12 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'This context is automatically applied to all conversations in this project:',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 if (_project.systemPrompt != null) ...[
@@ -266,12 +264,15 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.grey[100],
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       _project.systemPrompt!,
-                      style: const TextStyle(fontSize: 13),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -286,12 +287,15 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.grey[100],
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       _project.instructions!,
-                      style: const TextStyle(fontSize: 13),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                     ),
                   ),
                 ],

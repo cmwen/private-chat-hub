@@ -3,7 +3,7 @@ import 'package:private_chat_hub/models/project.dart';
 import 'package:private_chat_hub/screens/project_detail_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
-import 'package:private_chat_hub/services/ollama_service.dart';
+import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/project_service.dart';
 import 'package:private_chat_hub/models/conversation.dart';
 
@@ -12,7 +12,7 @@ class ProjectsScreen extends StatefulWidget {
   final ProjectService projectService;
   final ChatService chatService;
   final ConnectionService connectionService;
-  final OllamaService ollamaService;
+  final OllamaConnectionManager ollamaManager;
   final Function(Conversation) onConversationSelected;
 
   const ProjectsScreen({
@@ -20,7 +20,7 @@ class ProjectsScreen extends StatefulWidget {
     required this.projectService,
     required this.chatService,
     required this.connectionService,
-    required this.ollamaService,
+    required this.ollamaManager,
     required this.onConversationSelected,
   });
 
@@ -111,7 +111,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           projectService: widget.projectService,
           chatService: widget.chatService,
           connectionService: widget.connectionService,
-          ollamaService: widget.ollamaService,
+          ollamaManager: widget.ollamaManager,
           onConversationSelected: widget.onConversationSelected,
           onProjectUpdated: _loadProjects,
         ),
@@ -154,7 +154,11 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.folder_outlined, size: 80, color: Colors.grey[400]),
+            Icon(
+              Icons.folder_outlined,
+              size: 80,
+              color: Theme.of(context).colorScheme.outline,
+            ),
             const SizedBox(height: 24),
             const Text(
               'No projects yet',
@@ -163,7 +167,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             const SizedBox(height: 8),
             Text(
               'Create a project to organize your conversations\nand share context across chats',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              style: TextStyle(
+                fontSize: 16,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
           ],

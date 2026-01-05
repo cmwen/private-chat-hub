@@ -1,21 +1,32 @@
+// ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:private_chat_hub/models/connection.dart';
+import 'package:private_chat_hub/models/tool_models.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/network_discovery_service.dart';
-import 'package:private_chat_hub/services/ollama_service.dart';
+import 'package:private_chat_hub/services/ollama_connection_manager.dart';
+import 'package:private_chat_hub/services/tool_config_service.dart';
+import 'package:private_chat_hub/widgets/tool_settings_widget.dart';
 
 /// Settings screen for managing Ollama connections.
 class SettingsScreen extends StatefulWidget {
   final ConnectionService connectionService;
-  final OllamaService ollamaService;
+  final OllamaConnectionManager ollamaManager;
   final ChatService? chatService;
+  final ToolConfigService? toolConfigService;
+  final Function(ThemeMode)? onThemeModeChanged;
+  final ThemeMode? currentThemeMode;
 
   const SettingsScreen({
     super.key,
     required this.connectionService,
-    required this.ollamaService,
+    required this.ollamaManager,
     this.chatService,
+    this.toolConfigService,
+    this.onThemeModeChanged,
+    this.currentThemeMode,
   });
 
   @override
@@ -25,11 +36,22 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   List<Connection> _connections = [];
   bool _isLoading = false;
+  ToolConfig _toolConfig = const ToolConfig();
+  String _appVersion = 'Loading...';
 
   @override
   void initState() {
     super.initState();
     _loadConnections();
+    _loadToolConfig();
+    _loadAppVersion();
+  }
+
+  Future<void> _loadAppVersion() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    setState(() {
+      _appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
+    });
   }
 
   void _loadConnections() {
@@ -38,16 +60,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
+  void _loadToolConfig() {
+    if (widget.toolConfigService != null) {
+      setState(() {
+        _toolConfig = widget.toolConfigService!.getConfig();
+      });
+    }
+  }
+
+  Future<void> _saveToolConfig(ToolConfig config) async {
+    if (widget.toolConfigService != null) {
+      await widget.toolConfigService!.saveConfig(config);
+      setState(() {
+        _toolConfig = config;
+      });
+    }
+  }
+
   Future<void> _testConnection(Connection connection) async {
     setState(() => _isLoading = true);
 
-    final ollamaConnection = OllamaConnection(
-      host: connection.host,
-      port: connection.port,
-      useHttps: connection.useHttps,
-    );
-
-    final success = await widget.ollamaService.testConnection(ollamaConnection);
+    final success = await widget.ollamaManager.testConnection(connection);
 
     setState(() => _isLoading = false);
 
@@ -124,7 +157,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           );
           _loadConnections();
         },
-        ollamaService: widget.ollamaService,
+        ollamaManager: widget.ollamaManager,
       ),
     );
   }
@@ -157,7 +190,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Icon(
                             Icons.cloud_off,
                             size: 48,
-                            color: Colors.grey[400],
+                            color: Theme.of(context).colorScheme.outline,
                           ),
                           const SizedBox(height: 16),
                           const Text(
@@ -165,9 +198,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             style: TextStyle(fontSize: 16),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
+                          Text(
                             'Add an Ollama server to get started',
-                            style: TextStyle(color: Colors.grey),
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
                           ),
                           const SizedBox(height: 16),
                           ElevatedButton.icon(
@@ -211,17 +248,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
+                  if (widget.toolConfigService != null)
+                    ToolSettingsWidget(
+                      config: _toolConfig,
+                      onConfigChanged: _saveToolConfig,
+                    ),
                   const Divider(),
                 ],
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'Appearance',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.palette_outlined),
+                  title: const Text('Theme Mode'),
+                  subtitle: Text(
+                    _getThemeModeLabel(
+                      widget.currentThemeMode ?? ThemeMode.system,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _showThemeModeDialog,
+                ),
+                const Divider(),
                 ListTile(
                   leading: const Icon(Icons.info_outline),
                   title: const Text('About'),
-                  subtitle: const Text('Private Chat Hub v1.0.0'),
+                  subtitle: Text('Private Chat Hub v$_appVersion'),
                   onTap: () {
                     showAboutDialog(
                       context: context,
                       applicationName: 'Private Chat Hub',
-                      applicationVersion: '1.0.0',
+                      applicationVersion: _appVersion,
                       applicationLegalese: '© 2025',
                       children: [
                         const SizedBox(height: 16),
@@ -235,6 +296,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
+    );
+  }
+
+  String _getThemeModeLabel(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'Light';
+      case ThemeMode.dark:
+        return 'Dark';
+      case ThemeMode.system:
+        return 'System Default';
+    }
+  }
+
+  void _showThemeModeDialog() {
+    final currentMode = widget.currentThemeMode ?? ThemeMode.system;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Choose Theme'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Light'),
+              leading: Radio<ThemeMode>(
+                value: ThemeMode.light,
+                groupValue: currentMode,
+                onChanged: (_) {},
+              ),
+              onTap: () {
+                if (widget.onThemeModeChanged != null) {
+                  widget.onThemeModeChanged!(ThemeMode.light);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            ListTile(
+              title: const Text('Dark'),
+              leading: Radio<ThemeMode>(
+                value: ThemeMode.dark,
+                groupValue: currentMode,
+                onChanged: (_) {},
+              ),
+              onTap: () {
+                if (widget.onThemeModeChanged != null) {
+                  widget.onThemeModeChanged!(ThemeMode.dark);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            ListTile(
+              title: const Text('System Default'),
+              leading: Radio<ThemeMode>(
+                value: ThemeMode.system,
+                groupValue: currentMode,
+                onChanged: (_) {},
+              ),
+              onTap: () {
+                if (widget.onThemeModeChanged != null) {
+                  widget.onThemeModeChanged!(ThemeMode.system);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -374,12 +504,12 @@ class _ConnectionCard extends StatelessWidget {
 class AddConnectionDialog extends StatefulWidget {
   final Future<void> Function(String name, String host, int port, bool useHttps)
   onAdd;
-  final OllamaService ollamaService;
+  final OllamaConnectionManager ollamaManager;
 
   const AddConnectionDialog({
     super.key,
     required this.onAdd,
-    required this.ollamaService,
+    required this.ollamaManager,
   });
 
   @override
@@ -446,13 +576,16 @@ class _AddConnectionDialogState extends State<AddConnectionDialog> {
       _testResult = null;
     });
 
-    final connection = OllamaConnection(
+    final connection = Connection(
+      id: 'temp',
+      name: 'temp',
       host: _hostController.text.trim(),
       port: int.tryParse(_portController.text) ?? 11434,
       useHttps: _useHttps,
+      createdAt: DateTime.now(),
     );
 
-    final success = await widget.ollamaService.testConnection(connection);
+    final success = await widget.ollamaManager.testConnection(connection);
 
     setState(() {
       _isTesting = false;

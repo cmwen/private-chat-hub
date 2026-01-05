@@ -907,18 +907,33 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'AI is thinking...',
+                    _conversation?.modelCapabilities.supportsTools == true
+                        ? 'AI is thinking with tools...'
+                        : 'AI is thinking...',
                     style: TextStyle(
                       color: colorScheme.onSurfaceVariant,
                       fontSize: 14,
                     ),
                   ),
+                  if (_conversation?.modelCapabilities.supportsTools ==
+                      true) ...[
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.build_circle,
+                      size: 16,
+                      color: colorScheme.primary,
+                    ),
+                  ],
                 ],
               ),
             ),
           MessageInput(
             onSendMessage: _handleSendMessage,
             onSendMessageWithAttachments: _handleSendMessageWithAttachments,
+            supportsVision:
+                _conversation?.modelCapabilities.supportsVision ?? false,
+            supportsTools:
+                _conversation?.modelCapabilities.supportsTools ?? false,
             isLoading: _isLoading,
             onStopGeneration: _isLoading ? _stopGeneration : null,
           ),
@@ -1232,7 +1247,7 @@ class _MarkdownMessageBubble extends StatelessWidget {
                               'Generating...',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.grey[600],
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -1249,14 +1264,14 @@ class _MarkdownMessageBubble extends StatelessWidget {
                               Icon(
                                 Icons.copy,
                                 size: 14,
-                                color: Colors.grey[600],
+                                color: colorScheme.onSurfaceVariant,
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 'Copy',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.grey[600],
+                                  color: colorScheme.onSurfaceVariant,
                                 ),
                               ),
                             ],

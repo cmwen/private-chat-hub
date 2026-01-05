@@ -1,4 +1,5 @@
 import 'package:private_chat_hub/models/message.dart';
+import 'package:private_chat_hub/ollama_toolkit/models/ollama_model.dart';
 
 /// Model parameters for controlling AI behavior.
 class ModelParameters {
@@ -110,6 +111,18 @@ class Conversation {
 
   /// Whether this conversation belongs to a project.
   bool get hasProject => projectId != null;
+
+  /// Gets the capabilities of the model used in this conversation.
+  ModelCapabilities get modelCapabilities {
+    return ModelRegistry.getCapabilities(modelName) ??
+        const ModelCapabilities(
+          supportsToolCalling: false,
+          supportsVision: false,
+          supportsThinking: false,
+          contextWindow: 4096,
+          description: 'Unknown model',
+        );
+  }
 
   /// Creates a Conversation from JSON map.
   factory Conversation.fromJson(Map<String, dynamic> json) {

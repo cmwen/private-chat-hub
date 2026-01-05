@@ -1,18 +1,24 @@
 # Private Chat Hub 🤖
 
+[![Flutter](https://img.shields.io/badge/Flutter-3.10.1+-blue.svg)](https://flutter.dev)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/Tests-192%20Passing-brightgreen.svg)](test/)
+
 A privacy-first Android app for chatting with self-hosted AI models via Ollama. Keep your conversations private, switch between models instantly, and organize chats in projects - all with a beautiful Material Design 3 interface.
 
 ## ✨ Key Features
 
 - 🔒 **Privacy First**: All conversations stay on your devices and infrastructure
-- 🤖 **Multiple AI Models**: Connect to any Ollama model (Llama, Mistral, Gemma, etc.)
-- 🔍 **Web Search**: LLMs can search the internet for current information (tool calling)
+- 🤖 **Multiple AI Models**: Connect to any Ollama model (30+ models supported)
+- 🔍 **Web Search with Progress**: LLMs can search the internet with real-time status updates
+- 📚 **Source References**: See clickable links to web search sources
 - 💬 **Conversation Management**: Organize chats, view history, export conversations
 - 📁 **Project Workspaces**: Group related conversations by topic or context
 - 🖼️ **Vision Support**: Share images with vision-capable models
+- 🔄 **Model Comparison**: Compare responses from two models side-by-side
 - 📱 **Native Android**: Built with Flutter, optimized for Android
 - 🎨 **Material Design 3**: Beautiful, accessible UI
-- 🔄 **Auto-sync**: Seamless connection to your Ollama server
+- ⚡ **Tool Calling**: Advanced AI capabilities with function calling
 
 ## 🚀 Quick Start
 

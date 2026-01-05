@@ -15,6 +15,8 @@ class MessageInput extends StatefulWidget {
   final Function(String)? onSendMessage;
   final OnSendMessageWithAttachments? onSendMessageWithAttachments;
   final bool enableAttachments;
+  final bool supportsVision;
+  final bool supportsTools;
   final bool isLoading;
   final VoidCallback? onStopGeneration;
 
@@ -23,6 +25,8 @@ class MessageInput extends StatefulWidget {
     this.onSendMessage,
     this.onSendMessageWithAttachments,
     this.enableAttachments = true,
+    this.supportsVision = true,
+    this.supportsTools = false,
     this.isLoading = false,
     this.onStopGeneration,
   });
@@ -354,17 +358,71 @@ class _MessageInputState extends State<MessageInput> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Show indicator when tools or vision are enabled
+            if (widget.supportsTools || widget.supportsVision)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  border: Border(
+                    bottom: BorderSide(color: Colors.blue[200]!, width: 1),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.supportsTools) ...[
+                      Icon(
+                        Icons.build_circle,
+                        size: 14,
+                        color: Colors.blue[700],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Tools enabled',
+                        style: TextStyle(fontSize: 11, color: Colors.blue[700]),
+                      ),
+                    ],
+                    if (widget.supportsTools && widget.supportsVision)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(
+                          '•',
+                          style: TextStyle(color: Colors.blue[700]),
+                        ),
+                      ),
+                    if (widget.supportsVision) ...[
+                      Icon(
+                        Icons.visibility,
+                        size: 14,
+                        color: Colors.purple[700],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Vision enabled',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.purple[700],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             // Attachment previews
             if (_attachments.isNotEmpty) _buildAttachmentPreviews(),
             // Input row
             Row(
               children: [
-                if (widget.enableAttachments)
+                if (widget.enableAttachments && widget.supportsVision)
                   IconButton(
                     icon: const Icon(Icons.add_circle_outline),
                     color: colorScheme.primary,
                     onPressed: _showAttachmentOptions,
-                    tooltip: 'Attach file',
+                    tooltip: 'Attach image (vision required)',
                   ),
                 Expanded(
                   child: TextField(

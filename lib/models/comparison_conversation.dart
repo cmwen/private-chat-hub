@@ -1,5 +1,6 @@
 import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
+import 'package:private_chat_hub/ollama_toolkit/models/ollama_model.dart';
 
 /// Represents a conversation comparing two AI models side-by-side.
 class ComparisonConversation extends Conversation {
@@ -40,6 +41,30 @@ class ComparisonConversation extends Conversation {
   /// Gets user messages (shared between both models).
   List<Message> get userMessages =>
       messages.where((m) => m.modelSource == ModelSource.user).toList();
+
+  /// Gets the capabilities of model1.
+  ModelCapabilities get model1Capabilities {
+    return ModelRegistry.getCapabilities(model1Name) ??
+        const ModelCapabilities(
+          supportsToolCalling: false,
+          supportsVision: false,
+          supportsThinking: false,
+          contextWindow: 4096,
+          description: 'Unknown model',
+        );
+  }
+
+  /// Gets the capabilities of model2.
+  ModelCapabilities get model2Capabilities {
+    return ModelRegistry.getCapabilities(model2Name) ??
+        const ModelCapabilities(
+          supportsToolCalling: false,
+          supportsVision: false,
+          supportsThinking: false,
+          contextWindow: 4096,
+          description: 'Unknown model',
+        );
+  }
 
   /// Creates a ComparisonConversation from JSON map.
   factory ComparisonConversation.fromJson(Map<String, dynamic> json) {

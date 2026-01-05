@@ -3,7 +3,8 @@ import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/screens/search_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
-import 'package:private_chat_hub/services/ollama_service.dart';
+import 'package:private_chat_hub/services/ollama_connection_manager.dart';
+import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
 import 'package:private_chat_hub/widgets/dual_model_selector.dart';
 import 'package:intl/intl.dart';
 
@@ -11,7 +12,7 @@ import 'package:intl/intl.dart';
 class ConversationListScreen extends StatefulWidget {
   final ChatService chatService;
   final ConnectionService connectionService;
-  final OllamaService ollamaService;
+  final OllamaConnectionManager ollamaManager;
   final Function(Conversation) onConversationSelected;
   final VoidCallback onNewConversation;
 
@@ -19,7 +20,7 @@ class ConversationListScreen extends StatefulWidget {
     super.key,
     required this.chatService,
     required this.connectionService,
-    required this.ollamaService,
+    required this.ollamaManager,
     required this.onConversationSelected,
     required this.onNewConversation,
   });
@@ -30,7 +31,7 @@ class ConversationListScreen extends StatefulWidget {
 
 class _ConversationListScreenState extends State<ConversationListScreen> {
   List<Conversation> _conversations = [];
-  List<OllamaModel> _models = [];
+  List<OllamaModelInfo> _models = [];
   String? _selectedModel;
   bool _isLoading = true;
   bool _isLoadingModels = false;
@@ -63,15 +64,9 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     setState(() => _isLoadingModels = true);
 
     try {
-      widget.ollamaService.setConnection(
-        OllamaConnection(
-          host: connection.host,
-          port: connection.port,
-          useHttps: connection.useHttps,
-        ),
-      );
+      widget.ollamaManager.setConnection(connection);
 
-      _models = await widget.ollamaService.listModels();
+      _models = await widget.ollamaManager.listModels();
 
       // If no model selected, select the first one
       if (_selectedModel == null && _models.isNotEmpty) {
@@ -458,9 +453,9 @@ class _ConversationTile extends StatelessWidget {
 }
 
 class _ModelSelectorSheet extends StatelessWidget {
-  final List<OllamaModel> models;
+  final List<OllamaModelInfo> models;
   final String? selectedModel;
-  final Function(OllamaModel) onModelSelected;
+  final Function(OllamaModelInfo) onModelSelected;
   final bool isLoading;
   final VoidCallback onRefresh;
 
@@ -540,9 +535,34 @@ class _ModelSelectorSheet extends StatelessWidget {
                       ),
                     ),
                     title: Text(model.name),
-                    subtitle: Text(
-                      '${model.sizeFormatted}${model.parameterCount != null ? ' • ${model.parameterCount}' : ''}',
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${model.sizeFormatted}${model.parameterCount != null ? ' • ${model.parameterCount}' : ''}',
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 2,
+                          children: [
+                            if (model.capabilities?.supportsVision == true)
+                              _CapabilityBadge(
+                                icon: Icons.visibility,
+                                label: 'Vision',
+                                color: Colors.purple,
+                              ),
+                            if (model.capabilities?.supportsTools == true)
+                              _CapabilityBadge(
+                                icon: Icons.build,
+                                label: 'Tools',
+                                color: Colors.blue,
+                              ),
+                          ],
+                        ),
+                      ],
                     ),
+                    isThreeLine: true,
                     trailing: isSelected
                         ? const Icon(Icons.check, color: Colors.green)
                         : null,
@@ -705,6 +725,46 @@ class _NewConversationDialogState extends State<_NewConversationDialog> {
           child: const Text('Start Chat'),
         ),
       ],
+    );
+  }
+}
+
+/// Small badge for displaying model capabilities.
+class _CapabilityBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _CapabilityBadge({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 0.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

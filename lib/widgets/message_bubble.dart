@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:private_chat_hub/models/message.dart';
+import 'package:private_chat_hub/widgets/tool_widgets.dart';
 import 'package:intl/intl.dart';
 
 /// A chat message bubble widget.
@@ -29,7 +30,10 @@ class MessageBubble extends StatelessWidget {
             child: Center(
               child: Text(
                 _formatTimestamp(message.timestamp),
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ),
@@ -66,6 +70,12 @@ class MessageBubble extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Display status message if present
+                    if (message.statusMessage != null)
+                      _buildStatusMessage(context),
+                    // Display tool badges for assistant messages
+                    if (!message.isMe && message.hasToolCalls)
+                      _buildToolBadges(context),
                     // Display image attachments if present
                     if (message.hasImages) _buildImageAttachments(context),
                     // Display text file attachments if present
@@ -77,6 +87,9 @@ class MessageBubble extends StatelessWidget {
                         fontSize: 15,
                       ),
                     ),
+                    // Display web search references if present
+                    if (!message.isMe && message.webSearchReferences.isNotEmpty)
+                      _buildWebReferences(context),
                     const SizedBox(height: 4),
                     Text(
                       DateFormat('HH:mm').format(message.timestamp),
@@ -96,6 +109,49 @@ class MessageBubble extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildToolBadges(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        children: message.toolCalls.map((toolCall) {
+          return ToolBadge(
+            toolCall: toolCall,
+            onTap: () => _showToolCallDetails(context, toolCall),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  void _showToolCallDetails(BuildContext context, toolCall) {
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                ToolBadge(toolCall: toolCall),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(sheetContext),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ToolCallDetails(toolCall: toolCall),
+          ],
+        ),
+      ),
     );
   }
 
@@ -264,7 +320,10 @@ class MessageBubble extends StatelessWidget {
               ),
               Text(
                 attachment.formattedSize,
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
+                ),
               ),
               const Divider(height: 24),
               Expanded(
@@ -274,14 +333,17 @@ class MessageBubble extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.grey[100],
+                      color: Theme.of(
+                        sheetContext,
+                      ).colorScheme.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: SelectableText(
                       content,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12,
+                        color: Theme.of(sheetContext).colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -332,5 +394,160 @@ class MessageBubble extends StatelessWidget {
     } else {
       return DateFormat('MMM d, y').format(timestamp);
     }
+  }
+
+  Widget _buildStatusMessage(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                message.isMe ? Colors.white70 : Colors.grey[600]!,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              message.statusMessage!,
+              style: TextStyle(
+                color: message.isMe ? Colors.white70 : Colors.grey[600],
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWebReferences(BuildContext context) {
+    final references = message.webSearchReferences;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.link,
+                size: 14,
+                color: message.isMe ? Colors.white70 : Colors.grey[600],
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Sources (${references.length})',
+                style: TextStyle(
+                  color: message.isMe ? Colors.white70 : Colors.grey[600],
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: references.take(5).map((url) {
+              // Extract domain from URL
+              final uri = Uri.tryParse(url);
+              final domain = uri?.host.replaceFirst('www.', '') ?? url;
+
+              return InkWell(
+                onTap: () => _launchUrl(context, url),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: message.isMe
+                        ? Colors.white.withValues(alpha: 0.2)
+                        : Colors.grey[400],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.open_in_new,
+                        size: 10,
+                        color: message.isMe ? Colors.white : Colors.black87,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          domain,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: message.isMe ? Colors.white : Colors.black87,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          if (references.length > 5)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '+${references.length - 5} more',
+                style: TextStyle(
+                  color: message.isMe ? Colors.white60 : Colors.grey[500],
+                  fontSize: 10,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _launchUrl(BuildContext context, String url) {
+    // Show URL in a bottom sheet with copy option
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Source URL',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            SelectableText(url, style: const TextStyle(fontSize: 14)),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(sheetContext),
+                  child: const Text('Close'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
