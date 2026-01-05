@@ -5,6 +5,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
+import 'package:private_chat_hub/widgets/capability_widgets.dart';
 import 'package:private_chat_hub/widgets/message_bubble.dart';
 import 'package:private_chat_hub/widgets/message_input.dart';
 
@@ -395,6 +396,54 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     }
+  }
+
+  void _toggleToolCalling(bool enabled) {
+    if (widget.chatService == null || _conversation == null) return;
+
+    setState(() {
+      _conversation = _conversation!.copyWith(
+        toolCallingEnabled: enabled,
+        updatedAt: DateTime.now(),
+      );
+    });
+
+    widget.chatService!.updateConversation(_conversation!);
+
+    // Haptic feedback
+    HapticFeedback.lightImpact();
+
+    // Show feedback
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          enabled ? 'Tool calling enabled' : 'Tool calling disabled',
+        ),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
+  void _showCapabilityInfo() {
+    if (_conversation == null) return;
+
+    showCapabilityInfo(
+      context,
+      modelName: _conversation!.modelName,
+      capabilities: _conversation!.modelCapabilities,
+      toolCallingEnabled: _conversation!.toolCallingEnabled,
+      onToggleToolCalling: (enabled) {
+        Navigator.pop(context);
+        _toggleToolCalling(enabled);
+      },
+      onConfigureTools: () {
+        Navigator.pop(context);
+        // TODO: Navigate to tool settings
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tool configuration coming soon')),
+        );
+      },
+    );
   }
 
   void _showConversationInfo() {
@@ -822,13 +871,24 @@ class _ChatScreenState extends State<ChatScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  Text(
-                    _conversation?.modelName ?? 'Demo Mode',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.normal,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        _conversation?.modelName ?? 'Demo Mode',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.normal,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      if (_conversation != null) ...[
+                        const SizedBox(width: 6),
+                        CapabilityBadges(
+                          capabilities: _conversation!.modelCapabilities,
+                          onInfoTap: () => _showCapabilityInfo(),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
@@ -934,11 +994,25 @@ class _ChatScreenState extends State<ChatScreen> {
                 _conversation?.modelCapabilities.supportsVision ?? false,
             supportsTools:
                 _conversation?.modelCapabilities.supportsTools ?? false,
+            toolCallingEnabled: _conversation?.toolCallingEnabled ?? true,
             isLoading: _isLoading,
             onStopGeneration: _isLoading ? _stopGeneration : null,
+            onToggleToolCalling: _conversation != null
+                ? (enabled) => _toggleToolCalling(enabled)
+                : null,
           ),
         ],
       ),
+      floatingActionButton:
+          _conversation != null &&
+              _conversation!.modelCapabilities.supportsTools
+          ? ToolToggleFAB(
+              toolsEnabled: _conversation!.toolCallingEnabled,
+              modelSupportsTools:
+                  _conversation!.modelCapabilities.supportsTools,
+              onToggle: _toggleToolCalling,
+            )
+          : null,
     );
   }
 
