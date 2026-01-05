@@ -510,15 +510,15 @@ class _ChatScreenState extends State<ChatScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: Theme.of(context).colorScheme.surfaceContainer,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   _conversation!.systemPrompt ?? 'No system prompt set',
                   style: TextStyle(
                     color: _conversation!.systemPrompt != null
-                        ? Colors.black87
-                        : Colors.grey,
+                        ? Theme.of(context).colorScheme.onSurface
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
                     fontStyle: _conversation!.systemPrompt != null
                         ? FontStyle.normal
                         : FontStyle.italic,
@@ -1003,16 +1003,6 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
-      floatingActionButton:
-          _conversation != null &&
-              _conversation!.modelCapabilities.supportsTools
-          ? ToolToggleFAB(
-              toolsEnabled: _conversation!.toolCallingEnabled,
-              modelSupportsTools:
-                  _conversation!.modelCapabilities.supportsTools,
-              onToggle: _toggleToolCalling,
-            )
-          : null,
     );
   }
 
@@ -1021,16 +1011,26 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[400]),
+          Icon(
+            Icons.chat_bubble_outline,
+            size: 64,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(height: 16),
           Text(
             'No messages yet',
-            style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+            style: TextStyle(
+              fontSize: 18,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Start the conversation!',
-            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -1150,8 +1150,16 @@ class _ChatScreenState extends State<ChatScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.copy),
-              title: const Text('Copy'),
+              leading: Icon(
+                Icons.copy,
+                color: Theme.of(sheetContext).colorScheme.onSurface,
+              ),
+              title: Text(
+                'Copy',
+                style: TextStyle(
+                  color: Theme.of(sheetContext).colorScheme.onSurface,
+                ),
+              ),
               onTap: () {
                 Navigator.pop(sheetContext);
                 _copyMessage(message);
@@ -1159,9 +1167,22 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             if (message.role == MessageRole.user)
               ListTile(
-                leading: const Icon(Icons.edit),
-                title: const Text('Edit & Resend'),
-                subtitle: const Text('Creates a new message'),
+                leading: Icon(
+                  Icons.edit,
+                  color: Theme.of(sheetContext).colorScheme.onSurface,
+                ),
+                title: Text(
+                  'Edit & Resend',
+                  style: TextStyle(
+                    color: Theme.of(sheetContext).colorScheme.onSurface,
+                  ),
+                ),
+                subtitle: Text(
+                  'Creates a new message',
+                  style: TextStyle(
+                    color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _editMessage(message);
@@ -1169,16 +1190,32 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             if (message.role == MessageRole.user && message.isError)
               ListTile(
-                leading: const Icon(Icons.refresh),
-                title: const Text('Retry'),
+                leading: Icon(
+                  Icons.refresh,
+                  color: Theme.of(sheetContext).colorScheme.onSurface,
+                ),
+                title: Text(
+                  'Retry',
+                  style: TextStyle(
+                    color: Theme.of(sheetContext).colorScheme.onSurface,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _retryMessage(message);
                 },
               ),
             ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Delete', style: TextStyle(color: Colors.red)),
+              leading: Icon(
+                Icons.delete,
+                color: Theme.of(sheetContext).colorScheme.error,
+              ),
+              title: Text(
+                'Delete',
+                style: TextStyle(
+                  color: Theme.of(sheetContext).colorScheme.error,
+                ),
+              ),
               onTap: () {
                 Navigator.pop(sheetContext);
                 _deleteMessage(message);
@@ -1249,7 +1286,10 @@ class _MarkdownMessageBubble extends StatelessWidget {
             child: Center(
               child: Text(
                 _formatTimestamp(message.timestamp),
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ),
@@ -1275,7 +1315,7 @@ class _MarkdownMessageBubble extends StatelessWidget {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.grey[200],
+                  color: Theme.of(context).colorScheme.surfaceContainerHigh,
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(20),
                     topRight: Radius.circular(20),
@@ -1290,14 +1330,19 @@ class _MarkdownMessageBubble extends StatelessWidget {
                       data: message.text,
                       selectable: true,
                       styleSheet: MarkdownStyleSheet(
-                        p: const TextStyle(fontSize: 15, color: Colors.black87),
+                        p: TextStyle(
+                          fontSize: 15,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
                         code: TextStyle(
-                          backgroundColor: Colors.grey[300],
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainer,
                           fontFamily: 'monospace',
                           fontSize: 13,
                         ),
                         codeblockDecoration: BoxDecoration(
-                          color: Colors.grey[300],
+                          color: Theme.of(context).colorScheme.surfaceContainer,
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
@@ -1430,7 +1475,7 @@ class _ParameterDisplay extends StatelessWidget {
             child: Text(
               label,
               style: TextStyle(
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -1440,7 +1485,10 @@ class _ParameterDisplay extends StatelessWidget {
           Expanded(
             child: Text(
               description,
-              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         ],
@@ -1517,7 +1565,10 @@ class _ParameterSlider extends StatelessWidget {
         ),
         Text(
           description,
-          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     );

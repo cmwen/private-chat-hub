@@ -229,7 +229,11 @@ class _ModelsScreenState extends State<ModelsScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Theme.of(context).colorScheme.error,
+              ),
               const SizedBox(height: 16),
               const Text(
                 'Failed to load models',
@@ -239,7 +243,9 @@ class _ModelsScreenState extends State<ModelsScreen> {
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey[600]),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
@@ -263,7 +269,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
               Icon(
                 Icons.psychology_outlined,
                 size: 80,
-                color: Colors.grey[400],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               const SizedBox(height: 24),
               const Text(
@@ -273,7 +279,9 @@ class _ModelsScreenState extends State<ModelsScreen> {
               const SizedBox(height: 8),
               Text(
                 'Pull a model to get started chatting with AI',
-                style: TextStyle(color: Colors.grey[600]),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -294,7 +302,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
         ..._downloadProgress.entries.map(
           (entry) => Container(
             padding: const EdgeInsets.all(16),
-            color: Colors.blue[50],
+            color: Theme.of(context).colorScheme.surfaceContainer,
             child: Row(
               children: [
                 const SizedBox(
@@ -313,7 +321,10 @@ class _ModelsScreenState extends State<ModelsScreen> {
                       ),
                       Text(
                         entry.value.status,
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
                       ),
                       if (entry.value.progress != null) ...[
                         const SizedBox(height: 4),
@@ -392,10 +403,12 @@ class _ModelCard extends StatelessWidget {
                 radius: 24,
                 backgroundColor: isSelected
                     ? colorScheme.primary
-                    : Colors.grey[200],
+                    : Theme.of(context).colorScheme.surfaceContainerHighest,
                 child: Icon(
                   Icons.psychology,
-                  color: isSelected ? Colors.white : Colors.grey[600],
+                  color: isSelected
+                      ? Colors.white
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(width: 16),
@@ -526,15 +539,25 @@ class _InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: Theme.of(context).colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: Colors.grey[600]),
+          Icon(
+            icon,
+            size: 12,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(width: 4),
-          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
         ],
       ),
     );
@@ -700,7 +723,10 @@ class _PullModelDialogState extends State<_PullModelDialog> {
               const SizedBox(height: 8),
               Text(
                 'Enter the model name from ollama.com/library',
-                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                ),
               ),
             ],
           ],
@@ -797,7 +823,9 @@ class _ModelDetailsSheetState extends State<_ModelDetailsSheet> {
                     ),
                     Text(
                       widget.model.sizeFormatted,
-                      style: TextStyle(color: Colors.grey[600]),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -841,7 +869,10 @@ class _ModelDetailsSheetState extends State<_ModelDetailsSheet> {
                   const SizedBox(height: 8),
                   Text(
                     widget.model.capabilities!.description!,
-                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ],
@@ -875,7 +906,7 @@ class _ModelDetailsSheetState extends State<_ModelDetailsSheet> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.grey[100],
+                      color: Theme.of(context).colorScheme.surfaceContainer,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -932,7 +963,12 @@ class _DetailRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 120,
-            child: Text(label, style: TextStyle(color: Colors.grey[600])),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
           Expanded(child: Text(value)),
         ],

@@ -250,7 +250,9 @@ class _ProjectCard extends StatelessWidget {
                             child: Icon(
                               Icons.push_pin,
                               size: 14,
-                              color: Colors.grey[600],
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         Expanded(
@@ -270,7 +272,10 @@ class _ProjectCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         project.description!,
-                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -467,16 +472,20 @@ class _CreateProjectDialogState extends State<_CreateProjectDialog> {
                               height: 32,
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? Colors.grey[300]
-                                    : Colors.grey[100],
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.surfaceContainerHighest,
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Icon(
                                 _getIconData(iconName),
                                 size: 18,
                                 color: isSelected
-                                    ? Colors.black
-                                    : Colors.grey[600],
+                                    ? Colors.white
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
                               ),
                             ),
                           );

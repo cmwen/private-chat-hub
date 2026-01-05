@@ -235,24 +235,31 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.grey[100],
+                      color: Theme.of(context).colorScheme.surfaceContainer,
                       border: Border(
-                        bottom: BorderSide(color: Colors.grey[300]!),
+                        bottom: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
                       ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.psychology, color: Colors.blueAccent),
+                        Icon(
+                          Icons.psychology,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'Active Model',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                 ),
                               ),
                               Text(
@@ -265,7 +272,10 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                             ],
                           ),
                         ),
-                        const Icon(Icons.chevron_right, color: Colors.grey),
+                        Icon(
+                          Icons.chevron_right,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ],
                     ),
                   ),
@@ -321,7 +331,11 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.chat_bubble_outline, size: 80, color: Colors.grey[400]),
+            Icon(
+              Icons.chat_bubble_outline,
+              size: 80,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(height: 24),
             const Text(
               'No conversations yet',
@@ -330,7 +344,10 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
             const SizedBox(height: 8),
             Text(
               'Start a new chat with your AI assistant',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              style: TextStyle(
+                fontSize: 16,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
@@ -340,17 +357,21 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                   Icon(
                     Icons.warning_amber_rounded,
                     size: 40,
-                    color: Colors.orange[400],
+                    color: Theme.of(context).colorScheme.tertiary,
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'No Ollama connection configured',
-                    style: TextStyle(color: Colors.orange),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.tertiary,
+                    ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Go to Settings to add a connection',
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -409,21 +430,33 @@ class _ConversationTile extends StatelessWidget {
               conversation.lastMessagePreview,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.grey[600]),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 4),
             Row(
               children: [
-                Icon(Icons.psychology, size: 12, color: Colors.grey[500]),
+                Icon(
+                  Icons.psychology,
+                  size: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   conversation.modelName,
-                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 const Spacer(),
                 Text(
                   _formatDate(conversation.updatedAt),
-                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -433,7 +466,10 @@ class _ConversationTile extends StatelessWidget {
         onTap: onTap,
         trailing: Text(
           '${conversation.messageCount}',
-          style: TextStyle(color: Colors.grey[500], fontSize: 12),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 12,
+          ),
         ),
       ),
     );
@@ -528,10 +564,14 @@ class _ModelSelectorSheet extends StatelessWidget {
                     leading: CircleAvatar(
                       backgroundColor: isSelected
                           ? Theme.of(context).colorScheme.primary
-                          : Colors.grey[300],
+                          : Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
                       child: Icon(
                         Icons.psychology,
-                        color: isSelected ? Colors.white : Colors.grey[600],
+                        color: isSelected
+                            ? Colors.white
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                     title: Text(model.name),
@@ -641,7 +681,9 @@ class _NewConversationDialogState extends State<_NewConversationDialog> {
           children: [
             Text(
               'Model: ${widget.modelName}',
-              style: TextStyle(color: Colors.grey[600]),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 16),
             TextField(

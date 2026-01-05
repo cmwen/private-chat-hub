@@ -212,7 +212,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                         if (_project.description != null)
                           Text(
                             _project.description!,
-                            style: TextStyle(color: Colors.grey[600]),
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
                           ),
                       ],
                     ),
@@ -305,12 +309,15 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.orange[50],
+                    color: Theme.of(context).colorScheme.tertiaryContainer,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.orange[700]),
+                      Icon(
+                        Icons.info_outline,
+                        color: Theme.of(context).colorScheme.tertiary,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -320,7 +327,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                               'No context set',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: Colors.orange[700],
+                                color: Theme.of(context).colorScheme.tertiary,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -328,7 +335,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                               'Add a system prompt or instructions to share context across all conversations in this project.',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.orange[700],
+                                color: Theme.of(context).colorScheme.tertiary,
                               ),
                             ),
                           ],
@@ -460,7 +467,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[400]),
+            Icon(
+              Icons.chat_bubble_outline,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(height: 24),
             const Text(
               'No conversations yet',
@@ -469,7 +480,10 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             const SizedBox(height: 8),
             Text(
               'Start a new chat in this project\nto use the shared context',
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -493,7 +507,12 @@ class _InfoRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 120,
-            child: Text(label, style: TextStyle(color: Colors.grey[600])),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
           Expanded(child: Text(value)),
         ],
@@ -552,21 +571,34 @@ class _ConversationTile extends StatelessWidget {
               conversation.lastMessagePreview,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.grey[600], fontSize: 13),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 13,
+              ),
             ),
             const SizedBox(height: 4),
             Row(
               children: [
-                Icon(Icons.psychology, size: 12, color: Colors.grey[500]),
+                Icon(
+                  Icons.psychology,
+                  size: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   conversation.modelName,
-                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 const Spacer(),
                 Text(
                   _formatDate(conversation.updatedAt),
-                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -576,7 +608,10 @@ class _ConversationTile extends StatelessWidget {
         onTap: onTap,
         trailing: Text(
           '${conversation.messageCount}',
-          style: TextStyle(color: Colors.grey[500], fontSize: 12),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 12,
+          ),
         ),
       ),
     );
@@ -635,11 +670,16 @@ class _NewProjectConversationDialogState
           children: [
             Text(
               'Project: ${widget.projectName}',
-              style: TextStyle(color: Colors.grey[600]),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             Text(
               'Model: ${widget.modelName}',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
             ),
             if (widget.hasProjectContext)
               Padding(
@@ -647,7 +687,7 @@ class _NewProjectConversationDialogState
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.green[50],
+                    color: Theme.of(context).colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
@@ -655,7 +695,7 @@ class _NewProjectConversationDialogState
                       Icon(
                         Icons.check_circle,
                         size: 16,
-                        color: Colors.green[700],
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -663,7 +703,7 @@ class _NewProjectConversationDialogState
                           'Project context will be applied',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.green[700],
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
                       ),
@@ -713,7 +753,10 @@ class _NewProjectConversationDialogState
               const SizedBox(height: 4),
               Text(
                 'These will be added to the project context',
-                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ],
@@ -861,8 +904,10 @@ class _EditProjectDialogState extends State<_EditProjectDialog> {
                               height: 28,
                               decoration: BoxDecoration(
                                 color: iconName == _selectedIcon
-                                    ? Colors.grey[300]
-                                    : Colors.grey[100],
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.surfaceContainerHighest,
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Icon(_getIconData(iconName), size: 16),
@@ -885,7 +930,10 @@ class _EditProjectDialogState extends State<_EditProjectDialog> {
             const SizedBox(height: 4),
             Text(
               'Shared with all conversations in this project',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 12),
             TextField(

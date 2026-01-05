@@ -450,7 +450,7 @@ class _MessageInputState extends State<MessageInput> {
                         borderSide: BorderSide.none,
                       ),
                       filled: true,
-                      fillColor: Colors.grey[100],
+                      fillColor: colorScheme.surfaceContainer,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 20,
                         vertical: 10,
@@ -466,7 +466,7 @@ class _MessageInputState extends State<MessageInput> {
                   ElevatedButton(
                     onPressed: widget.onStopGeneration,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red[400],
+                      backgroundColor: Theme.of(context).colorScheme.error,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -489,11 +489,13 @@ class _MessageInputState extends State<MessageInput> {
                   CircleAvatar(
                     backgroundColor: _canSend
                         ? colorScheme.primary
-                        : Colors.grey[300],
+                        : colorScheme.surfaceContainerHighest,
                     child: IconButton(
                       icon: Icon(
                         _canSend ? Icons.send : Icons.mic,
-                        color: Colors.white,
+                        color: _canSend
+                            ? Colors.white
+                            : colorScheme.onSurfaceVariant,
                         size: 20,
                       ),
                       onPressed: _canSend ? _handleSend : () {},
@@ -614,7 +616,7 @@ class _AttachmentPreview extends StatelessWidget {
                 : Container(
                     width: 80,
                     height: 80,
-                    color: Colors.grey[200],
+                    color: Theme.of(context).colorScheme.surfaceContainer,
                     padding: const EdgeInsets.all(4),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -625,14 +627,19 @@ class _AttachmentPreview extends StatelessWidget {
                           attachment.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 9),
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                         Text(
                           attachment.formattedSize,
                           style: TextStyle(
                             fontSize: 8,
-                            color: Colors.grey[600],
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],

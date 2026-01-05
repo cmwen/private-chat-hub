@@ -157,6 +157,8 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildBody() {
+    final colorScheme = Theme.of(context).colorScheme;
+
     if (_isSearching) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -166,16 +168,22 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search, size: 64, color: Colors.grey[400]),
+            Icon(Icons.search, size: 64, color: colorScheme.onSurfaceVariant),
             const SizedBox(height: 16),
             Text(
               'Search your conversations',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              style: TextStyle(
+                fontSize: 16,
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               'Find messages across all chats',
-              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+              style: TextStyle(
+                fontSize: 14,
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -187,16 +195,26 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+            Icon(
+              Icons.search_off,
+              size: 64,
+              color: colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(height: 16),
             Text(
               'No results for "$_lastQuery"',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              style: TextStyle(
+                fontSize: 16,
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               'Try different keywords',
-              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+              style: TextStyle(
+                fontSize: 14,
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -226,7 +244,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   Icon(
                     Icons.chat_bubble_outline,
                     size: 16,
-                    color: Colors.grey[600],
+                    color: colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -234,13 +252,16 @@ class _SearchScreenState extends State<SearchScreen> {
                       conversation.title,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey[700],
+                        color: colorScheme.onSurface,
                       ),
                     ),
                   ),
                   Text(
                     '${results.length} match${results.length > 1 ? 'es' : ''}',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -278,21 +299,23 @@ class _SearchResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: result.message.isMe
-            ? Theme.of(context).colorScheme.primary
-            : Colors.grey[300],
+            ? colorScheme.primary
+            : colorScheme.surfaceContainer,
         child: Icon(
           result.message.isMe ? Icons.person : Icons.psychology,
-          color: result.message.isMe ? Colors.white : Colors.grey[700],
+          color: result.message.isMe ? Colors.white : colorScheme.onSurface,
           size: 20,
         ),
       ),
       title: _buildHighlightedText(context, result.highlightedText, query),
       subtitle: Text(
         DateFormat('MMM d, y • HH:mm').format(result.message.timestamp),
-        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
       ),
       onTap: onTap,
     );
