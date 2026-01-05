@@ -1,13 +1,15 @@
-# Pre-Release Checklist - v1.0.0
+# Pre-Release Checklist - v1.0.1
 
 ## ✅ Code Quality
 
 - [x] All tests passing (192/192)
 - [x] Zero compilation errors
-- [x] Flutter analyze completed (27 warnings, all non-blocking)
-- [x] Release APK builds successfully (52.8MB)
+- [x] Flutter analyze completed (0 issues)
+- [x] Code formatted (dart format: 63 files checked)
+- [x] Release APK builds successfully
 - [x] No critical bugs or crashes
-- [x] setState() lifecycle bugs fixed
+- [x] Tools toggle bug fixed
+- [x] FAB overlap issue resolved
 - [x] Proper null-safety throughout
 
 ## ✅ Features Complete

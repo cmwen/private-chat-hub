@@ -17,8 +17,10 @@ class MessageInput extends StatefulWidget {
   final bool enableAttachments;
   final bool supportsVision;
   final bool supportsTools;
+  final bool toolCallingEnabled;
   final bool isLoading;
   final VoidCallback? onStopGeneration;
+  final ValueChanged<bool>? onToggleToolCalling;
 
   const MessageInput({
     super.key,
@@ -27,8 +29,10 @@ class MessageInput extends StatefulWidget {
     this.enableAttachments = true,
     this.supportsVision = true,
     this.supportsTools = false,
+    this.toolCallingEnabled = true,
     this.isLoading = false,
     this.onStopGeneration,
+    this.onToggleToolCalling,
   });
 
   @override
@@ -340,14 +344,15 @@ class _MessageInputState extends State<MessageInput> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isDark = colorScheme.brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? colorScheme.surface : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.2),
+            color: colorScheme.shadow.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 3,
             offset: const Offset(0, -1),
@@ -358,57 +363,68 @@ class _MessageInputState extends State<MessageInput> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Show indicator when tools or vision are enabled
+            // Interactive capability chips
             if (widget.supportsTools || widget.supportsVision)
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  border: Border(
-                    bottom: BorderSide(color: Colors.blue[200]!, width: 1),
-                  ),
+                  vertical: 8,
                 ),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (widget.supportsTools) ...[
-                      Icon(
-                        Icons.build_circle,
-                        size: 14,
-                        color: Colors.blue[700],
+                    if (widget.supportsTools)
+                      FilterChip(
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.build_circle,
+                              size: 14,
+                              color: widget.toolCallingEnabled
+                                  ? colorScheme.onPrimaryContainer
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 4),
+                            const Text('Tools'),
+                          ],
+                        ),
+                        selected: widget.toolCallingEnabled,
+                        onSelected: widget.onToggleToolCalling != null
+                            ? (selected) =>
+                                  widget.onToggleToolCalling!(selected)
+                            : null,
+                        backgroundColor: colorScheme.surfaceContainerHighest,
+                        selectedColor: colorScheme.primaryContainer,
+                        checkmarkColor: colorScheme.onPrimaryContainer,
+                        labelStyle: TextStyle(
+                          fontSize: 12,
+                          color: widget.toolCallingEnabled
+                              ? colorScheme.onPrimaryContainer
+                              : colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Tools enabled',
-                        style: TextStyle(fontSize: 11, color: Colors.blue[700]),
-                      ),
-                    ],
                     if (widget.supportsTools && widget.supportsVision)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Text(
-                          '•',
-                          style: TextStyle(color: Colors.blue[700]),
+                      const SizedBox(width: 8),
+                    if (widget.supportsVision)
+                      Chip(
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.visibility,
+                              size: 14,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 4),
+                            const Text('Vision'),
+                          ],
+                        ),
+                        backgroundColor: colorScheme.surfaceContainerHighest,
+                        labelStyle: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
-                    if (widget.supportsVision) ...[
-                      Icon(
-                        Icons.visibility,
-                        size: 14,
-                        color: Colors.purple[700],
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Vision enabled',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.purple[700],
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -434,7 +450,7 @@ class _MessageInputState extends State<MessageInput> {
                         borderSide: BorderSide.none,
                       ),
                       filled: true,
-                      fillColor: Colors.grey[100],
+                      fillColor: colorScheme.surfaceContainer,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 20,
                         vertical: 10,
@@ -450,7 +466,7 @@ class _MessageInputState extends State<MessageInput> {
                   ElevatedButton(
                     onPressed: widget.onStopGeneration,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red[400],
+                      backgroundColor: Theme.of(context).colorScheme.error,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -473,11 +489,13 @@ class _MessageInputState extends State<MessageInput> {
                   CircleAvatar(
                     backgroundColor: _canSend
                         ? colorScheme.primary
-                        : Colors.grey[300],
+                        : colorScheme.surfaceContainerHighest,
                     child: IconButton(
                       icon: Icon(
                         _canSend ? Icons.send : Icons.mic,
-                        color: Colors.white,
+                        color: _canSend
+                            ? Colors.white
+                            : colorScheme.onSurfaceVariant,
                         size: 20,
                       ),
                       onPressed: _canSend ? _handleSend : () {},
@@ -598,7 +616,7 @@ class _AttachmentPreview extends StatelessWidget {
                 : Container(
                     width: 80,
                     height: 80,
-                    color: Colors.grey[200],
+                    color: Theme.of(context).colorScheme.surfaceContainer,
                     padding: const EdgeInsets.all(4),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -609,14 +627,19 @@ class _AttachmentPreview extends StatelessWidget {
                           attachment.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 9),
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                         Text(
                           attachment.formattedSize,
                           style: TextStyle(
                             fontSize: 8,
-                            color: Colors.grey[600],
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],

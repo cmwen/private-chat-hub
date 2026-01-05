@@ -96,6 +96,7 @@ class Conversation {
   final String? systemPrompt;
   final ModelParameters parameters;
   final String? projectId;
+  final bool toolCallingEnabled;
 
   const Conversation({
     required this.id,
@@ -107,6 +108,7 @@ class Conversation {
     this.systemPrompt,
     this.parameters = const ModelParameters(),
     this.projectId,
+    this.toolCallingEnabled = true,
   });
 
   /// Whether this conversation belongs to a project.
@@ -141,6 +143,7 @@ class Conversation {
           ? ModelParameters.fromJson(json['parameters'] as Map<String, dynamic>)
           : const ModelParameters(),
       projectId: json['projectId'] as String?,
+      toolCallingEnabled: json['toolCallingEnabled'] as bool? ?? true,
     );
   }
 
@@ -156,6 +159,7 @@ class Conversation {
       'systemPrompt': systemPrompt,
       'parameters': parameters.toJson(),
       'projectId': projectId,
+      'toolCallingEnabled': toolCallingEnabled,
     };
   }
 
@@ -185,6 +189,7 @@ class Conversation {
     ModelParameters? parameters,
     String? projectId,
     bool clearProjectId = false,
+    bool? toolCallingEnabled,
   }) {
     return Conversation(
       id: id ?? this.id,
@@ -196,6 +201,7 @@ class Conversation {
       systemPrompt: systemPrompt ?? this.systemPrompt,
       parameters: parameters ?? this.parameters,
       projectId: clearProjectId ? null : (projectId ?? this.projectId),
+      toolCallingEnabled: toolCallingEnabled ?? this.toolCallingEnabled,
     );
   }
 

@@ -117,6 +117,7 @@ class ComparisonConversation extends Conversation {
     ModelParameters? parameters2,
     String? projectId,
     bool clearProjectId = false,
+    bool? toolCallingEnabled,
   }) {
     return ComparisonConversation(
       id: id ?? this.id,

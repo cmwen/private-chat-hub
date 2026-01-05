@@ -413,17 +413,19 @@ class ChatService {
     // Check model capabilities
     final modelCapabilities = conversation.modelCapabilities;
     final supportsTools = modelCapabilities.supportsTools;
+    final toolCallingEnabled = conversation.toolCallingEnabled;
 
     // Debug logging
     _log('Starting message generation for model: ${conversation.modelName}');
     _log(
       'Model capabilities: tools=$supportsTools, vision=${modelCapabilities.supportsVision}',
     );
+    _log('Tool calling enabled: $toolCallingEnabled');
     _log('Tool executor available: ${_toolExecutor != null}');
 
     try {
-      // If model supports tools and we have a tool executor, use agent-based approach
-      if (supportsTools && _toolExecutor != null) {
+      // If model supports tools, user has enabled them, and we have a tool executor, use agent-based approach
+      if (supportsTools && toolCallingEnabled && _toolExecutor != null) {
         _log('Using agent-based approach with tools');
         await _generateWithTools(
           conversationId,

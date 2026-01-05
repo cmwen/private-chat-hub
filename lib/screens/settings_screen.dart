@@ -392,10 +392,12 @@ class _ConnectionCard extends StatelessWidget {
             leading: CircleAvatar(
               backgroundColor: connection.isDefault
                   ? Theme.of(context).colorScheme.primary
-                  : Colors.grey[300],
+                  : Theme.of(context).colorScheme.surfaceContainer,
               child: Icon(
                 Icons.cloud,
-                color: connection.isDefault ? Colors.white : Colors.grey[600],
+                color: connection.isDefault
+                    ? Colors.white
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             title: Row(
@@ -473,11 +475,18 @@ class _ConnectionCard extends StatelessWidget {
               padding: const EdgeInsets.only(left: 72, right: 16, bottom: 12),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle, size: 14, color: Colors.green[600]),
+                  Icon(
+                    Icons.check_circle,
+                    size: 14,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     'Last connected: ${_formatDate(connection.lastConnectedAt!)}',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -621,7 +630,7 @@ class _AddConnectionDialogState extends State<AddConnectionDialog> {
             children: [
               // Auto-discover section
               Card(
-                color: Colors.blue[50],
+                color: Theme.of(context).colorScheme.primaryContainer,
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Column(
@@ -629,7 +638,10 @@ class _AddConnectionDialogState extends State<AddConnectionDialog> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.wifi_find, color: Colors.blue[700]),
+                          Icon(
+                            Icons.wifi_find,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
                           const SizedBox(width: 8),
                           const Text(
                             'Auto-Discover',
@@ -651,9 +663,14 @@ class _AddConnectionDialogState extends State<AddConnectionDialog> {
                       ),
                       if (_discoveredInstances.isNotEmpty) ...[
                         const SizedBox(height: 8),
-                        const Text(
+                        Text(
                           'Found:',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         ...(_discoveredInstances.map(
@@ -671,7 +688,9 @@ class _AddConnectionDialogState extends State<AddConnectionDialog> {
                                     '(${instance.address})',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.grey[600],
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                 ],
@@ -680,11 +699,16 @@ class _AddConnectionDialogState extends State<AddConnectionDialog> {
                           ),
                         )),
                       ] else if (_isDiscovering)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 8),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
                           child: Text(
                             'Scanning local network...',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
                     ],

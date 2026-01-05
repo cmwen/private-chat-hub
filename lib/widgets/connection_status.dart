@@ -99,7 +99,7 @@ class ConnectionBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: Colors.orange[100],
+      color: Theme.of(context).colorScheme.tertiaryContainer,
       child: Row(
         children: [
           const Icon(Icons.warning_amber, color: Colors.orange, size: 20),
