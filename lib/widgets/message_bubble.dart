@@ -30,7 +30,10 @@ class MessageBubble extends StatelessWidget {
             child: Center(
               child: Text(
                 _formatTimestamp(message.timestamp),
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ),
@@ -317,7 +320,10 @@ class MessageBubble extends StatelessWidget {
               ),
               Text(
                 attachment.formattedSize,
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
+                ),
               ),
               const Divider(height: 24),
               Expanded(
@@ -327,14 +333,15 @@ class MessageBubble extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.grey[100],
+                      color: Theme.of(sheetContext).colorScheme.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: SelectableText(
                       content,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12,
+                        color: Theme.of(sheetContext).colorScheme.onSurface,
                       ),
                     ),
                   ),

@@ -154,7 +154,11 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.folder_outlined, size: 80, color: Colors.grey[400]),
+            Icon(
+              Icons.folder_outlined,
+              size: 80,
+              color: Theme.of(context).colorScheme.outline,
+            ),
             const SizedBox(height: 24),
             const Text(
               'No projects yet',
@@ -163,7 +167,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             const SizedBox(height: 8),
             Text(
               'Create a project to organize your conversations\nand share context across chats',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              style: TextStyle(
+                fontSize: 16,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
           ],

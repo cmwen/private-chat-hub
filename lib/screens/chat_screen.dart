@@ -1247,7 +1247,7 @@ class _MarkdownMessageBubble extends StatelessWidget {
                               'Generating...',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.grey[600],
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -1264,14 +1264,14 @@ class _MarkdownMessageBubble extends StatelessWidget {
                               Icon(
                                 Icons.copy,
                                 size: 14,
-                                color: Colors.grey[600],
+                                color: colorScheme.onSurfaceVariant,
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 'Copy',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.grey[600],
+                                  color: colorScheme.onSurfaceVariant,
                                 ),
                               ),
                             ],

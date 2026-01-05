@@ -1,3 +1,4 @@
+// ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:private_chat_hub/models/connection.dart';
@@ -189,7 +190,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Icon(
                             Icons.cloud_off,
                             size: 48,
-                            color: Colors.grey[400],
+                            color: Theme.of(context).colorScheme.outline,
                           ),
                           const SizedBox(height: 16),
                           const Text(
@@ -197,9 +198,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             style: TextStyle(fontSize: 16),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
+                          Text(
                             'Add an Ollama server to get started',
-                            style: TextStyle(color: Colors.grey),
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
                           ),
                           const SizedBox(height: 16),
                           ElevatedButton.icon(
@@ -320,7 +323,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: Radio<ThemeMode>(
                 value: ThemeMode.light,
                 groupValue: currentMode,
-                onChanged: null,
+                onChanged: (_) {},
               ),
               onTap: () {
                 if (widget.onThemeModeChanged != null) {
@@ -334,7 +337,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: Radio<ThemeMode>(
                 value: ThemeMode.dark,
                 groupValue: currentMode,
-                onChanged: null,
+                onChanged: (_) {},
               ),
               onTap: () {
                 if (widget.onThemeModeChanged != null) {
@@ -348,7 +351,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: Radio<ThemeMode>(
                 value: ThemeMode.system,
                 groupValue: currentMode,
-                onChanged: null,
+                onChanged: (_) {},
               ),
               onTap: () {
                 if (widget.onThemeModeChanged != null) {

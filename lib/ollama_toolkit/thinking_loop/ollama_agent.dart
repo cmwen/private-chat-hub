@@ -122,7 +122,7 @@ class OllamaAgent implements Agent {
                 return {
                   'toolName': '',
                   'result': 'Tool call had empty name',
-                  'toolId': toolCall.id ?? '',
+                  'toolId': toolCall.id,
                   'skip': true,
                 };
               }
@@ -151,7 +151,7 @@ class OllamaAgent implements Agent {
                 return {
                   'toolName': toolCall.name,
                   'result': 'Tool not found: ${toolCall.name}',
-                  'toolId': toolCall.id ?? '',
+                  'toolId': toolCall.id,
                   'skip': false,
                 };
               }
@@ -169,7 +169,7 @@ class OllamaAgent implements Agent {
               return {
                 'result': result,
                 'toolName': toolCall.name,
-                'toolId': toolCall.id ?? '',
+                'toolId': toolCall.id,
                 'skip': false,
               };
             }),
