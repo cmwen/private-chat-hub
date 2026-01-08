@@ -873,19 +873,28 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   Row(
                     children: [
-                      Text(
-                        _conversation?.modelName ?? 'Demo Mode',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.normal,
-                          color: colorScheme.onSurfaceVariant,
+                      Expanded(
+                        child: Text(
+                          _conversation?.modelName ?? 'Demo Mode',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.normal,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (_conversation != null) ...[
                         const SizedBox(width: 6),
-                        CapabilityBadges(
-                          capabilities: _conversation!.modelCapabilities,
-                          onInfoTap: () => _showCapabilityInfo(),
+                        Flexible(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: CapabilityBadges(
+                              capabilities: _conversation!.modelCapabilities,
+                              onInfoTap: () => _showCapabilityInfo(),
+                            ),
+                          ),
                         ),
                       ],
                     ],
