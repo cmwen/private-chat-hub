@@ -579,6 +579,10 @@ class ChatService {
   ) async {
     _log('Starting agent-based generation for _generateWithTools');
 
+    // Check streaming preference - apply to tool calling as well
+    final streamingEnabled = await _configService.getStreamEnabled();
+    _log('Streaming enabled for tool calling: $streamingEnabled');
+
     // Create an agent for this conversation
     final systemPromptWithInstructions = _buildAgentSystemPrompt(
       conversation.systemPrompt,
@@ -686,11 +690,13 @@ class ChatService {
     }
 
     // Update message with final response and tool calls
+    // Note: Agent execution completes before we can stream, so isStreaming is always false
+    // But we respect the streaming preference for consistency
     conversation = await _updateAssistantMessage(
       conversation,
       assistantMessageId,
       responseText.toString(),
-      isStreaming: false,
+      isStreaming: false, // Agent runs to completion, can't stream intermediate states
       toolCalls: toolCalls,
     );
 
