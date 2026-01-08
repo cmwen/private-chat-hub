@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:private_chat_hub/models/connection.dart';
 import 'package:private_chat_hub/models/tool_models.dart';
+import 'package:private_chat_hub/ollama_toolkit/services/ollama_config_service.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/network_discovery_service.dart';
@@ -38,6 +39,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoading = false;
   ToolConfig _toolConfig = const ToolConfig();
   String _appVersion = 'Loading...';
+  bool _streamingEnabled = true;
+  final OllamaConfigService _ollamaConfigService = OllamaConfigService();
 
   @override
   void initState() {
@@ -45,12 +48,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadConnections();
     _loadToolConfig();
     _loadAppVersion();
+    _loadStreamingPreference();
   }
 
   Future<void> _loadAppVersion() async {
     final packageInfo = await PackageInfo.fromPlatform();
     setState(() {
       _appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
+    });
+  }
+
+  Future<void> _loadStreamingPreference() async {
+    final enabled = await _ollamaConfigService.getStreamEnabled();
+    setState(() {
+      _streamingEnabled = enabled;
+    });
+  }
+
+  Future<void> _setStreamingPreference(bool enabled) async {
+    await _ollamaConfigService.setStreamEnabled(enabled);
+    setState(() {
+      _streamingEnabled = enabled;
     });
   }
 
@@ -246,6 +264,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.stream),
+                    title: const Text('Streaming Mode'),
+                    subtitle: Text(
+                      _streamingEnabled
+                          ? 'Responses stream in real-time (may cause more UI updates)'
+                          : 'Responses load all at once (reduces UI pressure)',
+                    ),
+                    trailing: Switch(
+                      value: _streamingEnabled,
+                      onChanged: _setStreamingPreference,
                     ),
                   ),
                   if (widget.toolConfigService != null)

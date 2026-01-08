@@ -17,6 +17,7 @@ class ChatService {
   final OllamaConnectionManager _ollamaManager;
   final StorageService _storage;
   final ToolExecutorService? _toolExecutor;
+  final OllamaConfigService _configService = OllamaConfigService();
   static const String _conversationsKey = 'conversations';
   static const String _currentConversationKey = 'current_conversation_id';
   static const bool _debugLogging = true; // Set to false to disable debug logs
@@ -471,63 +472,101 @@ class ChatService {
       excludeMessageId: assistantMessageId,
     );
 
-    // Stream the response
-    final buffer = StringBuffer();
-    final subscription = client
-        .chatStream(
+    // Check streaming preference
+    final streamingEnabled = await _configService.getStreamEnabled();
+
+    if (streamingEnabled) {
+      // Stream the response
+      final buffer = StringBuffer();
+      final subscription = client
+          .chatStream(
+            conversation.modelName,
+            ollamaMessages,
+            options: conversation.parameters.toOllamaOptions(),
+          )
+          .listen(
+            (response) async {
+              if (streamController.isClosed) return;
+
+              final content = response.message.content;
+              if (content.isNotEmpty) {
+                buffer.write(content);
+              }
+
+              conversation = await _updateAssistantMessage(
+                conversation,
+                assistantMessageId,
+                buffer.toString(),
+                isStreaming: true,
+              );
+
+              if (!streamController.isClosed) {
+                streamController.add(conversation);
+              }
+            },
+            onError: (error) {
+              _handleError(
+                conversationId,
+                conversation,
+                assistantMessageId,
+                streamController,
+                error.toString(),
+              );
+            },
+            onDone: () async {
+              if (streamController.isClosed) return;
+
+              conversation = await _updateAssistantMessage(
+                conversation,
+                assistantMessageId,
+                buffer.toString(),
+                isStreaming: false,
+              );
+
+              if (!streamController.isClosed) {
+                streamController.add(conversation);
+                streamController.close();
+              }
+
+              _activeSubscriptions.remove(conversationId);
+            },
+          );
+
+      _activeSubscriptions[conversationId] = subscription;
+    } else {
+      // Non-streaming mode: get complete response at once
+      try {
+        final response = await client.chat(
           conversation.modelName,
           ollamaMessages,
           options: conversation.parameters.toOllamaOptions(),
-        )
-        .listen(
-          (response) async {
-            if (streamController.isClosed) return;
-
-            final content = response.message.content;
-            if (content.isNotEmpty) {
-              buffer.write(content);
-            }
-
-            conversation = await _updateAssistantMessage(
-              conversation,
-              assistantMessageId,
-              buffer.toString(),
-              isStreaming: true,
-            );
-
-            if (!streamController.isClosed) {
-              streamController.add(conversation);
-            }
-          },
-          onError: (error) {
-            _handleError(
-              conversationId,
-              conversation,
-              assistantMessageId,
-              streamController,
-              error.toString(),
-            );
-          },
-          onDone: () async {
-            if (streamController.isClosed) return;
-
-            conversation = await _updateAssistantMessage(
-              conversation,
-              assistantMessageId,
-              buffer.toString(),
-              isStreaming: false,
-            );
-
-            if (!streamController.isClosed) {
-              streamController.add(conversation);
-              streamController.close();
-            }
-
-            _activeSubscriptions.remove(conversationId);
-          },
         );
 
-    _activeSubscriptions[conversationId] = subscription;
+        if (streamController.isClosed) return;
+
+        conversation = await _updateAssistantMessage(
+          conversation,
+          assistantMessageId,
+          response.message.content,
+          isStreaming: false,
+        );
+
+        if (!streamController.isClosed) {
+          streamController.add(conversation);
+          streamController.close();
+        }
+
+        _activeSubscriptions.remove(conversationId);
+      } catch (error) {
+        _handleError(
+          conversationId,
+          conversation,
+          assistantMessageId,
+          streamController,
+          error.toString(),
+        );
+      }
+    }
   }
 
   /// Generates response using agent with tool calling support.
@@ -765,6 +804,9 @@ class ChatService {
       return;
     }
 
+    // Check streaming preference
+    final streamingEnabled = await _configService.getStreamEnabled();
+
     bool model1Done = false;
     bool model2Done = false;
 
@@ -794,96 +836,159 @@ class ChatService {
       }
     }
 
-    // Model 1 stream
-    final buffer1 = StringBuffer();
-    final subscription1 = client
-        .chatStream(
-          conversation.model1Name,
-          ollamaMessages,
-          options: conversation.parameters1.toOllamaOptions(),
-        )
-        .listen(
-          (response) async {
-            final content = response.message.content;
-            if (content.isNotEmpty) {
-              buffer1.write(content);
-            }
+    if (streamingEnabled) {
+      // Streaming mode - original implementation
+      // Model 1 stream
+      final buffer1 = StringBuffer();
+      final subscription1 = client
+          .chatStream(
+            conversation.model1Name,
+            ollamaMessages,
+            options: conversation.parameters1.toOllamaOptions(),
+          )
+          .listen(
+            (response) async {
+              final content = response.message.content;
+              if (content.isNotEmpty) {
+                buffer1.write(content);
+              }
 
-            var model1Message = conversation.messages
-                .firstWhere((m) => m.id == model1MessageId)
-                .copyWith(text: buffer1.toString());
-            await updateConversationSafely(model1Message);
-          },
-          onError: (error) async {
-            var model1Message = Message.error(
-              id: model1MessageId,
-              errorMessage: error.toString(),
-              timestamp: DateTime.now(),
-            ).copyWith(modelSource: ModelSource.model1);
-            await updateConversationSafely(model1Message);
-            model1Done = true;
-            if (model2Done) _cleanupStream(conversationId);
-          },
-          onDone: () async {
-            var model1Message = conversation.messages
-                .firstWhere((m) => m.id == model1MessageId)
-                .copyWith(isStreaming: false);
-            await updateConversationSafely(model1Message);
-            model1Done = true;
-            if (model2Done) {
-              _cleanupStream(conversationId);
-              await streamController.close();
-            }
-          },
-          cancelOnError: true,
-        );
+              var model1Message = conversation.messages
+                  .firstWhere((m) => m.id == model1MessageId)
+                  .copyWith(text: buffer1.toString());
+              await updateConversationSafely(model1Message);
+            },
+            onError: (error) async {
+              var model1Message = Message.error(
+                id: model1MessageId,
+                errorMessage: error.toString(),
+                timestamp: DateTime.now(),
+              ).copyWith(modelSource: ModelSource.model1);
+              await updateConversationSafely(model1Message);
+              model1Done = true;
+              if (model2Done) _cleanupStream(conversationId);
+            },
+            onDone: () async {
+              var model1Message = conversation.messages
+                  .firstWhere((m) => m.id == model1MessageId)
+                  .copyWith(isStreaming: false);
+              await updateConversationSafely(model1Message);
+              model1Done = true;
+              if (model2Done) {
+                _cleanupStream(conversationId);
+                await streamController.close();
+              }
+            },
+            cancelOnError: true,
+          );
 
-    // Model 2 stream
-    final buffer2 = StringBuffer();
-    final subscription2 = client
-        .chatStream(
-          conversation.model2Name,
-          ollamaMessages,
-          options: conversation.parameters2.toOllamaOptions(),
-        )
-        .listen(
-          (response) async {
-            final content = response.message.content;
-            if (content.isNotEmpty) {
-              buffer2.write(content);
-            }
+      // Model 2 stream
+      final buffer2 = StringBuffer();
+      final subscription2 = client
+          .chatStream(
+            conversation.model2Name,
+            ollamaMessages,
+            options: conversation.parameters2.toOllamaOptions(),
+          )
+          .listen(
+            (response) async {
+              final content = response.message.content;
+              if (content.isNotEmpty) {
+                buffer2.write(content);
+              }
 
-            var model2Message = conversation.messages
-                .firstWhere((m) => m.id == model2MessageId)
-                .copyWith(text: buffer2.toString());
-            await updateConversationSafely(model2Message);
-          },
-          onError: (error) async {
-            var model2Message = Message.error(
-              id: model2MessageId,
-              errorMessage: error.toString(),
-              timestamp: DateTime.now(),
-            ).copyWith(modelSource: ModelSource.model2);
-            await updateConversationSafely(model2Message);
-            model2Done = true;
-            if (model1Done) _cleanupStream(conversationId);
-          },
-          onDone: () async {
-            var model2Message = conversation.messages
-                .firstWhere((m) => m.id == model2MessageId)
-                .copyWith(isStreaming: false);
-            await updateConversationSafely(model2Message);
-            model2Done = true;
-            if (model1Done) {
-              _cleanupStream(conversationId);
-              await streamController.close();
-            }
-          },
-          cancelOnError: true,
-        );
+              var model2Message = conversation.messages
+                  .firstWhere((m) => m.id == model2MessageId)
+                  .copyWith(text: buffer2.toString());
+              await updateConversationSafely(model2Message);
+            },
+            onError: (error) async {
+              var model2Message = Message.error(
+                id: model2MessageId,
+                errorMessage: error.toString(),
+                timestamp: DateTime.now(),
+              ).copyWith(modelSource: ModelSource.model2);
+              await updateConversationSafely(model2Message);
+              model2Done = true;
+              if (model1Done) _cleanupStream(conversationId);
+            },
+            onDone: () async {
+              var model2Message = conversation.messages
+                  .firstWhere((m) => m.id == model2MessageId)
+                  .copyWith(isStreaming: false);
+              await updateConversationSafely(model2Message);
+              model2Done = true;
+              if (model1Done) {
+                _cleanupStream(conversationId);
+                await streamController.close();
+              }
+            },
+            cancelOnError: true,
+          );
 
-    _activeSubscriptions[conversationId] = subscription1;
-    _activeSubscriptions['${conversationId}_model2'] = subscription2;
+      _activeSubscriptions[conversationId] = subscription1;
+      _activeSubscriptions['${conversationId}_model2'] = subscription2;
+    } else {
+      // Non-streaming mode: get complete responses at once
+      try {
+        // Generate both responses in parallel
+        final responses = await Future.wait([
+          client.chat(
+            conversation.model1Name,
+            ollamaMessages,
+            options: conversation.parameters1.toOllamaOptions(),
+          ),
+          client.chat(
+            conversation.model2Name,
+            ollamaMessages,
+            options: conversation.parameters2.toOllamaOptions(),
+          ),
+        ]);
+
+        if (streamController.isClosed) return;
+
+        // Update model 1 message
+        var model1Message = conversation.messages
+            .firstWhere((m) => m.id == model1MessageId)
+            .copyWith(
+              text: responses[0].message.content,
+              isStreaming: false,
+            );
+        await updateConversationSafely(model1Message);
+
+        // Update model 2 message
+        var model2Message = conversation.messages
+            .firstWhere((m) => m.id == model2MessageId)
+            .copyWith(
+              text: responses[1].message.content,
+              isStreaming: false,
+            );
+        await updateConversationSafely(model2Message);
+
+        _cleanupStream(conversationId);
+        await streamController.close();
+      } catch (error) {
+        if (streamController.isClosed) return;
+
+        // Handle error for both models
+        var model1Message = Message.error(
+          id: model1MessageId,
+          errorMessage: error.toString(),
+          timestamp: DateTime.now(),
+        ).copyWith(modelSource: ModelSource.model1);
+        await updateConversationSafely(model1Message);
+
+        var model2Message = Message.error(
+          id: model2MessageId,
+          errorMessage: error.toString(),
+          timestamp: DateTime.now(),
+        ).copyWith(modelSource: ModelSource.model2);
+        await updateConversationSafely(model2Message);
+
+        _cleanupStream(conversationId);
+        await streamController.close();
+      }
+    }
   }
 
   // ============================================================================
