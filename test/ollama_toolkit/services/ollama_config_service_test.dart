@@ -31,11 +31,11 @@ void main() {
     test('should persist streaming preference', () async {
       // Set to false
       await configService.setStreamEnabled(false);
-      
+
       // Create new instance (simulating app restart)
       final newConfigService = OllamaConfigService();
       final enabled = await newConfigService.getStreamEnabled();
-      
+
       expect(enabled, isFalse);
     });
 

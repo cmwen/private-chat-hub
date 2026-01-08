@@ -950,19 +950,13 @@ class ChatService {
         // Update model 1 message
         var model1Message = conversation.messages
             .firstWhere((m) => m.id == model1MessageId)
-            .copyWith(
-              text: responses[0].message.content,
-              isStreaming: false,
-            );
+            .copyWith(text: responses[0].message.content, isStreaming: false);
         await updateConversationSafely(model1Message);
 
         // Update model 2 message
         var model2Message = conversation.messages
             .firstWhere((m) => m.id == model2MessageId)
-            .copyWith(
-              text: responses[1].message.content,
-              isStreaming: false,
-            );
+            .copyWith(text: responses[1].message.content, isStreaming: false);
         await updateConversationSafely(model2Message);
 
         _cleanupStream(conversationId);
