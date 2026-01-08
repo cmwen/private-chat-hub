@@ -696,7 +696,8 @@ class ChatService {
       conversation,
       assistantMessageId,
       responseText.toString(),
-      isStreaming: false, // Agent runs to completion, can't stream intermediate states
+      isStreaming:
+          false, // Agent runs to completion, can't stream intermediate states
       toolCalls: toolCalls,
     );
 
