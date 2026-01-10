@@ -17,6 +17,7 @@ class ChatService {
   final OllamaConnectionManager _ollamaManager;
   final StorageService _storage;
   final ToolExecutorService? _toolExecutor;
+  final app_tools.ToolConfig? _toolConfig;
   final OllamaConfigService _configService = OllamaConfigService();
   static const String _conversationsKey = 'conversations';
   static const String _currentConversationKey = 'current_conversation_id';
@@ -30,7 +31,9 @@ class ChatService {
     this._ollamaManager,
     this._storage, {
     ToolExecutorService? toolExecutor,
-  }) : _toolExecutor = toolExecutor;
+    app_tools.ToolConfig? toolConfig,
+  })  : _toolExecutor = toolExecutor,
+        _toolConfig = toolConfig;
 
   void _log(String message) {
     _debugLog(message);
@@ -587,11 +590,12 @@ class ChatService {
     final systemPromptWithInstructions = _buildAgentSystemPrompt(
       conversation.systemPrompt,
     );
+    final maxIterations = _toolConfig?.maxToolCalls ?? 15;
     final agent = OllamaAgent(
       client: client,
       model: conversation.modelName,
       systemPrompt: systemPromptWithInstructions,
-      maxIterations: 15,
+      maxIterations: maxIterations,
     );
 
     // Get available tools

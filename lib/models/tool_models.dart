@@ -308,12 +308,20 @@ class ToolConfig {
   /// Whether to cache search results.
   final bool cacheSearchResults;
 
+  /// Maximum number of tool calls (iterations) allowed.
+  final int maxToolCalls;
+
+  /// TTS speech rate (0.0 to 1.0, where 0.5 is normal speed).
+  final double ttsSpeed;
+
   const ToolConfig({
     this.enabled = false,
     this.webSearchEnabled = false,
     this.jinaApiKey,
     this.maxSearchResults = 5,
     this.cacheSearchResults = true,
+    this.maxToolCalls = 20,
+    this.ttsSpeed = 0.5,
   });
 
   /// Whether web search is available (enabled and has API key).
@@ -329,6 +337,8 @@ class ToolConfig {
     String? jinaApiKey,
     int? maxSearchResults,
     bool? cacheSearchResults,
+    int? maxToolCalls,
+    double? ttsSpeed,
   }) {
     return ToolConfig(
       enabled: enabled ?? this.enabled,
@@ -336,6 +346,8 @@ class ToolConfig {
       jinaApiKey: jinaApiKey ?? this.jinaApiKey,
       maxSearchResults: maxSearchResults ?? this.maxSearchResults,
       cacheSearchResults: cacheSearchResults ?? this.cacheSearchResults,
+      maxToolCalls: maxToolCalls ?? this.maxToolCalls,
+      ttsSpeed: ttsSpeed ?? this.ttsSpeed,
     );
   }
 
@@ -346,6 +358,8 @@ class ToolConfig {
       jinaApiKey: json['jinaApiKey'] as String?,
       maxSearchResults: json['maxSearchResults'] as int? ?? 5,
       cacheSearchResults: json['cacheSearchResults'] as bool? ?? true,
+      maxToolCalls: json['maxToolCalls'] as int? ?? 20,
+      ttsSpeed: (json['ttsSpeed'] as num?)?.toDouble() ?? 0.5,
     );
   }
 
@@ -356,6 +370,8 @@ class ToolConfig {
       'jinaApiKey': jinaApiKey,
       'maxSearchResults': maxSearchResults,
       'cacheSearchResults': cacheSearchResults,
+      'maxToolCalls': maxToolCalls,
+      'ttsSpeed': ttsSpeed,
     };
   }
 }

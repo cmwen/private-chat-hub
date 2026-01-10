@@ -226,6 +226,81 @@ class _ToolSettingsWidgetState extends State<ToolSettingsWidget> {
           ],
         ],
 
+        // Max Tool Calls setting
+        ListTile(
+          title: const Text('Max Tool Calls'),
+          subtitle: Text(
+            'Maximum iterations for tool calling (currently ${widget.config.maxToolCalls})',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _showMaxToolCallsDialog(context),
+        ),
+
+        const Divider(height: 1),
+
+        // TTS Speed section
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Icon(Icons.volume_up_outlined,
+                  size: 20, color: colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Text-to-Speech',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // TTS Speed slider
+        ListTile(
+          title: const Text('Speech Speed'),
+          subtitle: Text(
+            '${(widget.config.ttsSpeed * 2).toStringAsFixed(1)}x '
+            '(${_getTtsSpeedLabel(widget.config.ttsSpeed)})',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            children: [
+              Slider(
+                value: widget.config.ttsSpeed,
+                min: 0.5,
+                max: 2.0,
+                divisions: 15,
+                label:
+                    '${(widget.config.ttsSpeed * 2).toStringAsFixed(1)}x',
+                onChanged: (value) =>
+                    _updateConfig((c) => c.copyWith(ttsSpeed: value)),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Slow',
+                    style: theme.textTheme.labelSmall,
+                  ),
+                  Text(
+                    'Normal',
+                    style: theme.textTheme.labelSmall,
+                  ),
+                  Text(
+                    'Fast',
+                    style: theme.textTheme.labelSmall,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
         // Info card
         Padding(
           padding: const EdgeInsets.all(16),
@@ -271,6 +346,86 @@ class _ToolSettingsWidgetState extends State<ToolSettingsWidget> {
           ),
         ),
       ],
+    );
+  }
+
+  String _getTtsSpeedLabel(double speed) {
+    if (speed < 0.8) return 'Very Slow';
+    if (speed < 1.0) return 'Slow';
+    if (speed < 1.2) return 'Normal';
+    if (speed < 1.5) return 'Fast';
+    return 'Very Fast';
+  }
+
+  void _showMaxToolCallsDialog(BuildContext context) {
+    int tempValue = widget.config.maxToolCalls;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Max Tool Calls'),
+        content: StatefulBuilder(
+          builder: (context, setState) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  '$tempValue',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+              ),
+              Slider(
+                value: tempValue.toDouble(),
+                min: 5,
+                max: 50,
+                divisions: 45,
+                label: '$tempValue',
+                onChanged: (value) {
+                  setState(() {
+                    tempValue = value.toInt();
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+              Card(
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'About max tool calls:',
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Controls how many times the model can call tools in a single request. '
+                        'Higher values allow more complex reasoning but may take longer. '
+                        'Default is 20 (recommended).',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              _updateConfig((c) => c.copyWith(maxToolCalls: tempValue));
+              Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
     );
   }
 }

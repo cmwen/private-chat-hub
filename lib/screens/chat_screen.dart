@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
+import 'package:private_chat_hub/models/tool_models.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/tts_service.dart';
 import 'package:private_chat_hub/widgets/capability_widgets.dart';
@@ -15,12 +16,14 @@ class ChatScreen extends StatefulWidget {
   final ChatService? chatService;
   final Conversation? conversation;
   final VoidCallback? onBack;
+  final ToolConfig? toolConfig;
 
   const ChatScreen({
     super.key,
     this.chatService,
     this.conversation,
     this.onBack,
+    this.toolConfig,
   });
 
   @override
@@ -42,6 +45,12 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _conversation = widget.conversation;
     _ttsService.initialize();
+    // Register callback to rebuild UI when TTS state changes
+    _ttsService.setOnStateChanged(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
     _loadMessages();
   }
 
@@ -455,14 +464,20 @@ class _ChatScreenState extends State<ChatScreen> {
     final success = await _ttsService.speak(
       message.text,
       messageId: message.id,
+      speed: widget.toolConfig?.ttsSpeed,
     );
-    if (!success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to initialize text-to-speech'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+    
+    if (mounted) {
+      setState(() {});
+      
+      if (!success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to initialize text-to-speech'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
