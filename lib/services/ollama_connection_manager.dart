@@ -8,6 +8,7 @@ import 'package:private_chat_hub/models/connection.dart';
 class OllamaConnectionManager {
   Connection? _connection;
   OllamaClient? _client;
+  Duration _timeout = const Duration(seconds: 120); // Default: 2 minutes
 
   /// Gets the current connection configuration.
   Connection? get connection => _connection;
@@ -15,12 +16,27 @@ class OllamaConnectionManager {
   /// Gets the configured OllamaClient, or null if no connection is set.
   OllamaClient? get client => _client;
 
+  /// Gets the current timeout duration
+  Duration get timeout => _timeout;
+
+  /// Sets the timeout for requests
+  void setTimeout(Duration timeout) {
+    _timeout = timeout;
+    // Recreate client with new timeout if connection is set
+    if (_connection != null) {
+      _client = OllamaClient(
+        baseUrl: _connection!.url,
+        timeout: _timeout,
+      );
+    }
+  }
+
   /// Sets the connection and creates a new OllamaClient.
   void setConnection(Connection connection) {
     _connection = connection;
     _client = OllamaClient(
       baseUrl: connection.url,
-      timeout: const Duration(seconds: 60),
+      timeout: _timeout,
     );
   }
 

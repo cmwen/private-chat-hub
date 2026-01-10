@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:private_chat_hub/models/comparison_conversation.dart';
 import 'package:private_chat_hub/models/conversation.dart';
+import 'package:private_chat_hub/ollama_toolkit/services/ollama_config_service.dart';
 import 'package:private_chat_hub/screens/chat_screen.dart';
 import 'package:private_chat_hub/screens/comparison_chat_screen.dart';
 import 'package:private_chat_hub/screens/conversation_list_screen.dart';
@@ -181,6 +182,15 @@ class _HomeScreenState extends State<HomeScreen> {
     if (connection != null) {
       _ollamaManager.setConnection(connection);
     }
+    
+    // Apply configured timeout
+    _applyConfiguredTimeout();
+  }
+
+  Future<void> _applyConfiguredTimeout() async {
+    final configService = OllamaConfigService();
+    final timeout = await configService.getTimeout();
+    _ollamaManager.setTimeout(Duration(seconds: timeout));
   }
 
   @override

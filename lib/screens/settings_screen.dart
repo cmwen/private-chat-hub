@@ -40,6 +40,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   ToolConfig _toolConfig = const ToolConfig();
   String _appVersion = 'Loading...';
   bool _streamingEnabled = true;
+  int _timeout = OllamaConfigService.defaultTimeout;
   final OllamaConfigService _ollamaConfigService = OllamaConfigService();
 
   @override
@@ -49,12 +50,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadToolConfig();
     _loadAppVersion();
     _loadStreamingPreference();
+    _loadTimeout();
   }
 
   Future<void> _loadAppVersion() async {
     final packageInfo = await PackageInfo.fromPlatform();
     setState(() {
       _appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
+    });
+  }
+
+  Future<void> _loadTimeout() async {
+    final timeout = await _ollamaConfigService.getTimeout();
+    setState(() {
+      _timeout = timeout;
+    });
+  }
+
+  Future<void> _setTimeoutPreference(int seconds) async {
+    await _ollamaConfigService.setTimeout(seconds);
+    // Apply the new timeout to the OllamaConnectionManager immediately
+    widget.ollamaManager.setTimeout(Duration(seconds: seconds));
+    setState(() {
+      _timeout = seconds;
     });
   }
 
@@ -279,6 +297,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onChanged: _setStreamingPreference,
                     ),
                   ),
+                  ListTile(
+                    leading: const Icon(Icons.schedule),
+                    title: const Text('Request Timeout'),
+                    subtitle: Text(
+                      '$_timeout seconds (${_getTimeoutLabel(_timeout)})',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: _showTimeoutDialog,
+                  ),
                   if (widget.toolConfigService != null)
                     ToolSettingsWidget(
                       config: _toolConfig,
@@ -339,6 +366,100 @@ class _SettingsScreenState extends State<SettingsScreen> {
       case ThemeMode.system:
         return 'System Default';
     }
+  }
+
+  String _getTimeoutLabel(int seconds) {
+    if (seconds < 60) return 'Less than 1 minute';
+    if (seconds < 120) return '1 minute';
+    if (seconds < 300) return 'About ${(seconds / 60).toStringAsFixed(0)} minutes';
+    if (seconds < 600) return 'About ${(seconds / 60).toStringAsFixed(0)} minutes';
+    return '10 minutes';
+  }
+
+  void _showTimeoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Request Timeout'),
+        content: StatefulBuilder(
+          builder: (context, setState) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    Text(
+                      '$_timeout seconds',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _getTimeoutLabel(_timeout),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Slider(
+                value: _timeout.toDouble(),
+                min: OllamaConfigService.minTimeout.toDouble(),
+                max: OllamaConfigService.maxTimeout.toDouble(),
+                divisions: 10,
+                label: '$_timeout s',
+                onChanged: (value) {
+                  setState(() {
+                    _timeout = value.toInt();
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Card(
+                  color: Theme.of(context).colorScheme.surfaceContainer,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'About timeout:',
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Set how long to wait for Ollama responses. '
+                          'Longer timeouts help with large models and complex tasks, '
+                          'but may feel unresponsive if the server is slow. '
+                          'Works for tools, streaming, and synchronous modes.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              _setTimeoutPreference(_timeout);
+              Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showThemeModeDialog() {

@@ -15,8 +15,14 @@ class OllamaConfigService {
   /// Default base URL for Ollama server
   static const defaultBaseUrl = 'http://localhost:11434';
 
-  /// Default timeout in seconds
-  static const defaultTimeout = 60;
+  /// Default timeout in seconds (2 minutes)
+  static const defaultTimeout = 120;
+
+  /// Maximum timeout in seconds (10 minutes)
+  static const maxTimeout = 600;
+
+  /// Minimum timeout in seconds (30 seconds)
+  static const minTimeout = 30;
 
   /// Maximum number of models to keep in history
   static const maxHistorySize = 10;
@@ -47,10 +53,12 @@ class OllamaConfigService {
     return prefs.getInt(OllamaConfigKeys.timeout) ?? defaultTimeout;
   }
 
-  /// Set timeout in seconds
+  /// Set timeout in seconds (will be clamped between minTimeout and maxTimeout)
   Future<void> setTimeout(int seconds) async {
     final prefs = await _preferences;
-    await prefs.setInt(OllamaConfigKeys.timeout, seconds);
+    // Clamp timeout between min and max values
+    final clampedSeconds = seconds.clamp(minTimeout, maxTimeout);
+    await prefs.setInt(OllamaConfigKeys.timeout, clampedSeconds);
   }
 
   /// Get default model name

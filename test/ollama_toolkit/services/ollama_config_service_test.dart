@@ -75,7 +75,7 @@ void main() {
 
     test('should get default timeout', () async {
       final timeout = await configService.getTimeout();
-      expect(timeout, 60);
+      expect(timeout, 120); // Default is now 2 minutes
     });
 
     test('should set and get timeout', () async {
@@ -108,8 +108,46 @@ void main() {
       final streamEnabled = await configService.getStreamEnabled();
 
       expect(baseUrl, 'http://localhost:11434'); // Default
-      expect(timeout, 60); // Default
+      expect(timeout, 120); // Default (2 minutes)
       expect(streamEnabled, isTrue); // Default
+    });
+  });
+
+  group('OllamaConfigService - Timeout Validation', () {
+    test('should clamp timeout below minimum to minimum', () async {
+      await configService.setTimeout(10); // Below minimum of 30
+      final timeout = await configService.getTimeout();
+      expect(timeout, OllamaConfigService.minTimeout); // Should be clamped to 30
+    });
+
+    test('should clamp timeout above maximum to maximum', () async {
+      await configService.setTimeout(900); // Above maximum of 600
+      final timeout = await configService.getTimeout();
+      expect(timeout, OllamaConfigService.maxTimeout); // Should be clamped to 600
+    });
+
+    test('should accept timeout within valid range', () async {
+      await configService.setTimeout(180); // 3 minutes, within range
+      final timeout = await configService.getTimeout();
+      expect(timeout, 180);
+    });
+
+    test('should accept minimum timeout', () async {
+      await configService.setTimeout(OllamaConfigService.minTimeout);
+      final timeout = await configService.getTimeout();
+      expect(timeout, OllamaConfigService.minTimeout);
+    });
+
+    test('should accept maximum timeout', () async {
+      await configService.setTimeout(OllamaConfigService.maxTimeout);
+      final timeout = await configService.getTimeout();
+      expect(timeout, OllamaConfigService.maxTimeout);
+    });
+
+    test('timeout constants have correct values', () {
+      expect(OllamaConfigService.minTimeout, 30); // 30 seconds
+      expect(OllamaConfigService.defaultTimeout, 120); // 2 minutes
+      expect(OllamaConfigService.maxTimeout, 600); // 10 minutes
     });
   });
 }
