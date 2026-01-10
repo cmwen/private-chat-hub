@@ -4,7 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
+import 'package:private_chat_hub/models/tool_models.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
+import 'package:private_chat_hub/services/tts_service.dart';
 import 'package:private_chat_hub/widgets/capability_widgets.dart';
 import 'package:private_chat_hub/widgets/message_bubble.dart';
 import 'package:private_chat_hub/widgets/message_input.dart';
@@ -14,12 +16,14 @@ class ChatScreen extends StatefulWidget {
   final ChatService? chatService;
   final Conversation? conversation;
   final VoidCallback? onBack;
+  final ToolConfig? toolConfig;
 
   const ChatScreen({
     super.key,
     this.chatService,
     this.conversation,
     this.onBack,
+    this.toolConfig,
   });
 
   @override
@@ -32,11 +36,21 @@ class _ChatScreenState extends State<ChatScreen> {
   Conversation? _conversation;
   bool _isLoading = false;
   StreamSubscription? _streamSubscription;
+  final TtsService _ttsService = TtsService();
+  bool _ttsStreamingEnabled = false;
+  String? _lastSpokenText;
 
   @override
   void initState() {
     super.initState();
     _conversation = widget.conversation;
+    _ttsService.initialize();
+    // Register callback to rebuild UI when TTS state changes
+    _ttsService.setOnStateChanged(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
     _loadMessages();
   }
 
@@ -52,6 +66,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _ttsService.dispose();
     // Don't cancel the stream - let it continue in the background
     _streamSubscription?.cancel();
     super.dispose();
@@ -86,6 +101,7 @@ class _ChatScreenState extends State<ChatScreen> {
             _messages = List.from(updatedConversation.messages);
           });
           _scrollToBottom();
+          _handleTtsStreaming(updatedConversation);
         },
         onError: (error) {
           if (!mounted) return;
@@ -170,6 +186,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 _messages = List.from(updatedConversation.messages);
               });
               _scrollToBottom();
+              _handleTtsStreaming(updatedConversation);
             },
             onError: (error) {
               if (!mounted) return;
@@ -352,6 +369,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 _messages = List.from(updatedConversation.messages);
               });
               _scrollToBottom();
+              _handleTtsStreaming(updatedConversation);
             },
             onError: (error) {
               if (!mounted) return;
@@ -396,6 +414,101 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     }
+  }
+
+  /// Handle TTS streaming mode - speak text as it arrives.
+  void _handleTtsStreaming(Conversation conversation) {
+    if (!_ttsStreamingEnabled) return;
+
+    // Find the last assistant message
+    final lastMessage = conversation.messages.lastWhere(
+      (m) => m.role == MessageRole.assistant,
+      orElse: () =>
+          Message.assistant(id: '', text: '', timestamp: DateTime.now()),
+    );
+
+    if (lastMessage.id.isEmpty) return;
+
+    // Only speak if the text has changed significantly
+    if (_lastSpokenText != null &&
+        lastMessage.text.startsWith(_lastSpokenText!)) {
+      // Text is still being appended, check if we have enough new content
+      final newContent = lastMessage.text
+          .substring(_lastSpokenText!.length)
+          .trim();
+
+      // Speak when we have a sentence or significant chunk
+      if (newContent.length > 50 ||
+          newContent.endsWith('.') ||
+          newContent.endsWith('!') ||
+          newContent.endsWith('?')) {
+        _lastSpokenText = lastMessage.text;
+        _ttsService.speak(newContent, messageId: lastMessage.id);
+      }
+    } else if (_lastSpokenText == null || _lastSpokenText!.isEmpty) {
+      // First chunk of text
+      _lastSpokenText = lastMessage.text;
+      if (lastMessage.text.isNotEmpty) {
+        _ttsService.speak(lastMessage.text, messageId: lastMessage.id);
+      }
+    }
+
+    // Reset when message is no longer streaming
+    if (!lastMessage.isStreaming && _lastSpokenText != null) {
+      _lastSpokenText = null;
+    }
+  }
+
+  /// Speak a complete message.
+  Future<void> _speakMessage(Message message) async {
+    final success = await _ttsService.speak(
+      message.text,
+      messageId: message.id,
+      speed: widget.toolConfig?.ttsSpeed,
+    );
+
+    if (mounted) {
+      setState(() {});
+
+      if (!success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to initialize text-to-speech'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  /// Stop TTS playback.
+  void _stopTts() {
+    _ttsService.stop();
+    setState(() {});
+  }
+
+  /// Toggle TTS streaming mode.
+  void _toggleTtsStreaming(bool enabled) {
+    setState(() {
+      _ttsStreamingEnabled = enabled;
+      if (!enabled) {
+        _ttsService.stop();
+        _lastSpokenText = null;
+      }
+    });
+
+    HapticFeedback.lightImpact();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          enabled
+              ? 'TTS streaming enabled - AI responses will be read aloud'
+              : 'TTS streaming disabled',
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   void _toggleToolCalling(bool enabled) {
@@ -911,6 +1024,17 @@ class _ChatScreenState extends State<ChatScreen> {
               onPressed: _showConversationInfo,
               tooltip: 'Conversation info',
             ),
+          IconButton(
+            icon: Icon(
+              _ttsStreamingEnabled
+                  ? Icons.record_voice_over
+                  : Icons.voice_over_off,
+            ),
+            onPressed: () => _toggleTtsStreaming(!_ttsStreamingEnabled),
+            tooltip: _ttsStreamingEnabled
+                ? 'Disable TTS streaming'
+                : 'Enable TTS streaming',
+          ),
           PopupMenuButton<String>(
             onSelected: (value) {
               switch (value) {
@@ -956,6 +1080,9 @@ class _ChatScreenState extends State<ChatScreen> {
                         showTimestamp: showTimestamp,
                         onLongPress: () => _showMessageActions(message),
                         onCopy: () => _copyMessage(message),
+                        onSpeak: () => _speakMessage(message),
+                        onStopTts: _stopTts,
+                        isSpeaking: _ttsService.isSpeakingMessage(message.id),
                       );
                     },
                   ),
@@ -1174,6 +1301,31 @@ class _ChatScreenState extends State<ChatScreen> {
                 _copyMessage(message);
               },
             ),
+            if (message.role == MessageRole.assistant)
+              ListTile(
+                leading: Icon(
+                  _ttsService.isSpeakingMessage(message.id)
+                      ? Icons.stop
+                      : Icons.volume_up,
+                  color: Theme.of(sheetContext).colorScheme.onSurface,
+                ),
+                title: Text(
+                  _ttsService.isSpeakingMessage(message.id)
+                      ? 'Stop Speaking'
+                      : 'Speak Message',
+                  style: TextStyle(
+                    color: Theme.of(sheetContext).colorScheme.onSurface,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  if (_ttsService.isSpeakingMessage(message.id)) {
+                    _stopTts();
+                  } else {
+                    _speakMessage(message);
+                  }
+                },
+              ),
             if (message.role == MessageRole.user)
               ListTile(
                 leading: Icon(
@@ -1242,12 +1394,18 @@ class _MessageItem extends StatelessWidget {
   final bool showTimestamp;
   final VoidCallback? onLongPress;
   final VoidCallback? onCopy;
+  final VoidCallback? onSpeak;
+  final VoidCallback? onStopTts;
+  final bool isSpeaking;
 
   const _MessageItem({
     required this.message,
     required this.showTimestamp,
     this.onLongPress,
     this.onCopy,
+    this.onSpeak,
+    this.onStopTts,
+    this.isSpeaking = false,
   });
 
   @override
@@ -1260,6 +1418,9 @@ class _MessageItem extends StatelessWidget {
           message: message,
           showTimestamp: showTimestamp,
           onCopy: onCopy,
+          onSpeak: onSpeak,
+          onStopTts: onStopTts,
+          isSpeaking: isSpeaking,
         ),
       );
     }
@@ -1275,11 +1436,17 @@ class _MarkdownMessageBubble extends StatelessWidget {
   final Message message;
   final bool showTimestamp;
   final VoidCallback? onCopy;
+  final VoidCallback? onSpeak;
+  final VoidCallback? onStopTts;
+  final bool isSpeaking;
 
   const _MarkdownMessageBubble({
     required this.message,
     required this.showTimestamp,
     this.onCopy,
+    this.onSpeak,
+    this.onStopTts,
+    this.isSpeaking = false,
   });
 
   @override
@@ -1384,26 +1551,59 @@ class _MarkdownMessageBubble extends StatelessWidget {
                     if (!message.isStreaming && onCopy != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
-                        child: InkWell(
-                          onTap: onCopy,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.copy,
-                                size: 14,
-                                color: colorScheme.onSurfaceVariant,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            InkWell(
+                              onTap: onCopy,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.copy,
+                                    size: 14,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Copy',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Copy',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: colorScheme.onSurfaceVariant,
+                            ),
+                            if (onSpeak != null && onStopTts != null) ...[
+                              const SizedBox(width: 16),
+                              InkWell(
+                                onTap: isSpeaking ? onStopTts : onSpeak,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isSpeaking ? Icons.stop : Icons.volume_up,
+                                      size: 14,
+                                      color: isSpeaking
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurfaceVariant,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      isSpeaking ? 'Stop' : 'Speak',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isSpeaking
+                                            ? colorScheme.primary
+                                            : colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
-                          ),
+                          ],
                         ),
                       ),
                   ],

@@ -117,13 +117,19 @@ void main() {
     test('should clamp timeout below minimum to minimum', () async {
       await configService.setTimeout(10); // Below minimum of 30
       final timeout = await configService.getTimeout();
-      expect(timeout, OllamaConfigService.minTimeout); // Should be clamped to 30
+      expect(
+        timeout,
+        OllamaConfigService.minTimeout,
+      ); // Should be clamped to 30
     });
 
     test('should clamp timeout above maximum to maximum', () async {
       await configService.setTimeout(900); // Above maximum of 600
       final timeout = await configService.getTimeout();
-      expect(timeout, OllamaConfigService.maxTimeout); // Should be clamped to 600
+      expect(
+        timeout,
+        OllamaConfigService.maxTimeout,
+      ); // Should be clamped to 600
     });
 
     test('should accept timeout within valid range', () async {

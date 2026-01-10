@@ -24,20 +24,14 @@ class OllamaConnectionManager {
     _timeout = timeout;
     // Recreate client with new timeout if connection is set
     if (_connection != null) {
-      _client = OllamaClient(
-        baseUrl: _connection!.url,
-        timeout: _timeout,
-      );
+      _client = OllamaClient(baseUrl: _connection!.url, timeout: _timeout);
     }
   }
 
   /// Sets the connection and creates a new OllamaClient.
   void setConnection(Connection connection) {
     _connection = connection;
-    _client = OllamaClient(
-      baseUrl: connection.url,
-      timeout: _timeout,
-    );
+    _client = OllamaClient(baseUrl: connection.url, timeout: _timeout);
   }
 
   /// Tests the connection to the Ollama server.

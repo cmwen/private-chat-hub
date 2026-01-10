@@ -170,6 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _ollamaManager,
       widget.storageService,
       toolExecutor: toolExecutor,
+      toolConfig: toolConfig,
     );
     _projectService = ProjectService(widget.storageService);
 
@@ -182,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (connection != null) {
       _ollamaManager.setConnection(connection);
     }
-    
+
     // Apply configured timeout
     _applyConfiguredTimeout();
   }
@@ -234,6 +235,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 chatService: _chatService,
                 conversation: _selectedConversation,
                 onBack: _onBackFromChat,
+                toolConfig: widget.toolConfigService.getConfig(),
               ),
       );
     }
