@@ -371,8 +371,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _getTimeoutLabel(int seconds) {
     if (seconds < 60) return 'Less than 1 minute';
     if (seconds < 120) return '1 minute';
-    if (seconds < 300) return 'About ${(seconds / 60).toStringAsFixed(0)} minutes';
-    if (seconds < 600) return 'About ${(seconds / 60).toStringAsFixed(0)} minutes';
+    if (seconds < 300) {
+      return 'About ${(seconds / 60).toStringAsFixed(0)} minutes';
+    }
+    if (seconds < 600) {
+      return 'About ${(seconds / 60).toStringAsFixed(0)} minutes';
+    }
     return '10 minutes';
   }
 

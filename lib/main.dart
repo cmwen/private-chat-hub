@@ -182,7 +182,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (connection != null) {
       _ollamaManager.setConnection(connection);
     }
-    
+
     // Apply configured timeout
     _applyConfiguredTimeout();
   }

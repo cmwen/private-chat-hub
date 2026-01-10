@@ -410,28 +410,28 @@ class _ChatScreenState extends State<ChatScreen> {
   /// Handle TTS streaming mode - speak text as it arrives.
   void _handleTtsStreaming(Conversation conversation) {
     if (!_ttsStreamingEnabled) return;
-    
+
     // Find the last assistant message
     final lastMessage = conversation.messages.lastWhere(
       (m) => m.role == MessageRole.assistant,
-      orElse: () => Message.assistant(
-        id: '',
-        text: '',
-        timestamp: DateTime.now(),
-      ),
+      orElse: () =>
+          Message.assistant(id: '', text: '', timestamp: DateTime.now()),
     );
-    
+
     if (lastMessage.id.isEmpty) return;
-    
+
     // Only speak if the text has changed significantly
-    if (_lastSpokenText != null && lastMessage.text.startsWith(_lastSpokenText!)) {
+    if (_lastSpokenText != null &&
+        lastMessage.text.startsWith(_lastSpokenText!)) {
       // Text is still being appended, check if we have enough new content
-      final newContent = lastMessage.text.substring(_lastSpokenText!.length).trim();
-      
+      final newContent = lastMessage.text
+          .substring(_lastSpokenText!.length)
+          .trim();
+
       // Speak when we have a sentence or significant chunk
-      if (newContent.length > 50 || 
-          newContent.endsWith('.') || 
-          newContent.endsWith('!') || 
+      if (newContent.length > 50 ||
+          newContent.endsWith('.') ||
+          newContent.endsWith('!') ||
           newContent.endsWith('?')) {
         _lastSpokenText = lastMessage.text;
         _ttsService.speak(newContent, messageId: lastMessage.id);
@@ -443,7 +443,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _ttsService.speak(lastMessage.text, messageId: lastMessage.id);
       }
     }
-    
+
     // Reset when message is no longer streaming
     if (!lastMessage.isStreaming && _lastSpokenText != null) {
       _lastSpokenText = null;
@@ -452,7 +452,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// Speak a complete message.
   Future<void> _speakMessage(Message message) async {
-    final success = await _ttsService.speak(message.text, messageId: message.id);
+    final success = await _ttsService.speak(
+      message.text,
+      messageId: message.id,
+    );
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -478,15 +481,15 @@ class _ChatScreenState extends State<ChatScreen> {
         _lastSpokenText = null;
       }
     });
-    
+
     HapticFeedback.lightImpact();
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          enabled 
-            ? 'TTS streaming enabled - AI responses will be read aloud'
-            : 'TTS streaming disabled',
+          enabled
+              ? 'TTS streaming enabled - AI responses will be read aloud'
+              : 'TTS streaming disabled',
         ),
         duration: const Duration(seconds: 2),
       ),
@@ -1007,11 +1010,15 @@ class _ChatScreenState extends State<ChatScreen> {
               tooltip: 'Conversation info',
             ),
           IconButton(
-            icon: Icon(_ttsStreamingEnabled ? Icons.record_voice_over : Icons.voice_over_off),
+            icon: Icon(
+              _ttsStreamingEnabled
+                  ? Icons.record_voice_over
+                  : Icons.voice_over_off,
+            ),
             onPressed: () => _toggleTtsStreaming(!_ttsStreamingEnabled),
-            tooltip: _ttsStreamingEnabled 
-              ? 'Disable TTS streaming'
-              : 'Enable TTS streaming',
+            tooltip: _ttsStreamingEnabled
+                ? 'Disable TTS streaming'
+                : 'Enable TTS streaming',
           ),
           PopupMenuButton<String>(
             onSelected: (value) {
@@ -1283,14 +1290,14 @@ class _ChatScreenState extends State<ChatScreen> {
               ListTile(
                 leading: Icon(
                   _ttsService.isSpeakingMessage(message.id)
-                    ? Icons.stop
-                    : Icons.volume_up,
+                      ? Icons.stop
+                      : Icons.volume_up,
                   color: Theme.of(sheetContext).colorScheme.onSurface,
                 ),
                 title: Text(
                   _ttsService.isSpeakingMessage(message.id)
-                    ? 'Stop Speaking'
-                    : 'Speak Message',
+                      ? 'Stop Speaking'
+                      : 'Speak Message',
                   style: TextStyle(
                     color: Theme.of(sheetContext).colorScheme.onSurface,
                   ),
@@ -1564,8 +1571,8 @@ class _MarkdownMessageBubble extends StatelessWidget {
                                       isSpeaking ? Icons.stop : Icons.volume_up,
                                       size: 14,
                                       color: isSpeaking
-                                        ? colorScheme.primary
-                                        : colorScheme.onSurfaceVariant,
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurfaceVariant,
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
@@ -1573,8 +1580,8 @@ class _MarkdownMessageBubble extends StatelessWidget {
                                       style: TextStyle(
                                         fontSize: 11,
                                         color: isSpeaking
-                                          ? colorScheme.primary
-                                          : colorScheme.onSurfaceVariant,
+                                            ? colorScheme.primary
+                                            : colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                   ],
