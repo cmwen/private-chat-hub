@@ -162,24 +162,15 @@ void main() {
 
   group('MarkdownCleaner - Headers', () {
     test('should remove h1 headers', () {
-      expect(
-        MarkdownCleanerTests.cleanMarkdown('# Heading 1'),
-        'Heading 1',
-      );
+      expect(MarkdownCleanerTests.cleanMarkdown('# Heading 1'), 'Heading 1');
     });
 
     test('should remove h2 headers', () {
-      expect(
-        MarkdownCleanerTests.cleanMarkdown('## Heading 2'),
-        'Heading 2',
-      );
+      expect(MarkdownCleanerTests.cleanMarkdown('## Heading 2'), 'Heading 2');
     });
 
     test('should remove h3 headers', () {
-      expect(
-        MarkdownCleanerTests.cleanMarkdown('### Heading 3'),
-        'Heading 3',
-      );
+      expect(MarkdownCleanerTests.cleanMarkdown('### Heading 3'), 'Heading 3');
     });
 
     test('should handle multiple headers', () {
@@ -227,7 +218,9 @@ void main() {
   group('MarkdownCleaner - Links', () {
     test('should remove standard links but keep text', () {
       expect(
-        MarkdownCleanerTests.cleanMarkdown('Visit [Google](https://google.com)'),
+        MarkdownCleanerTests.cleanMarkdown(
+          'Visit [Google](https://google.com)',
+        ),
         'Visit Google',
       );
     });
@@ -251,16 +244,19 @@ void main() {
 
   group('MarkdownCleaner - Images', () {
     test('should remove images', () {
-      final result =
-          MarkdownCleanerTests.cleanMarkdown('![Alt text](image.png)');
+      final result = MarkdownCleanerTests.cleanMarkdown(
+        '![Alt text](image.png)',
+      );
       // The main requirement is that it's not a literal image markdown
       // Some remnants might be left, but the image syntax should be gone
       expect(result, isNot(contains('image.png')));
-      expect(result, isNot(contains('](') ));
+      expect(result, isNot(contains('](')));
     });
 
     test('should handle images with alt text', () {
-      final result = MarkdownCleanerTests.cleanMarkdown('Before ![description](pic.jpg) after');
+      final result = MarkdownCleanerTests.cleanMarkdown(
+        'Before ![description](pic.jpg) after',
+      );
       // The main requirement is that the URL and image syntax are removed
       expect(result, isNot(contains('pic.jpg')));
       expect(result, isNot(contains('](')));
@@ -320,17 +316,11 @@ void main() {
     });
 
     test('should clean repeated punctuation', () {
-      expect(
-        MarkdownCleanerTests.cleanMarkdown('Really!!!'),
-        'Really!',
-      );
+      expect(MarkdownCleanerTests.cleanMarkdown('Really!!!'), 'Really!');
     });
 
     test('should handle repeated question marks', () {
-      expect(
-        MarkdownCleanerTests.cleanMarkdown('What???'),
-        'What?',
-      );
+      expect(MarkdownCleanerTests.cleanMarkdown('What???'), 'What?');
     });
   });
 
@@ -338,7 +328,9 @@ void main() {
     test('should attempt to remove display math', () {
       // The CRITICAL requirement is that regex replacement artifacts ($1, $2, etc)
       // do NOT appear in the output, which would cause TTS to read "ONE DOLLAR"
-      final result = MarkdownCleanerTests.cleanMarkdown('Math: \$\$x^2 + y^2 = z^2\$\$ here');
+      final result = MarkdownCleanerTests.cleanMarkdown(
+        'Math: \$\$x^2 + y^2 = z^2\$\$ here',
+      );
       // Most important: verify no regex artifacts
       expect(result, isNot(contains(r'$1')));
       expect(result, isNot(contains(r'$2')));
@@ -373,7 +365,9 @@ void main() {
 
   group('MarkdownCleaner - Whitespace', () {
     test('should normalize multiple spaces', () {
-      final result = MarkdownCleanerTests.cleanMarkdown('Text  with   multiple    spaces');
+      final result = MarkdownCleanerTests.cleanMarkdown(
+        'Text  with   multiple    spaces',
+      );
       expect(result, 'Text with multiple spaces');
     });
 
@@ -423,7 +417,8 @@ void main() {
     });
 
     test('should handle message with currency and markdown', () {
-      final input = 'Buy **great items** for \$50 or **premium pack** for \$100!';
+      final input =
+          'Buy **great items** for \$50 or **premium pack** for \$100!';
       final result = MarkdownCleanerTests.cleanMarkdown(input);
       expect(result, contains('great items'));
       expect(result, contains('50 dollars'));
@@ -454,10 +449,7 @@ void main() {
     });
 
     test('should handle text with only markdown', () {
-      expect(
-        MarkdownCleanerTests.cleanMarkdown('**bold**'),
-        'bold',
-      );
+      expect(MarkdownCleanerTests.cleanMarkdown('**bold**'), 'bold');
     });
 
     test('should not leave spaces where code was removed', () {

@@ -243,8 +243,11 @@ class _ToolSettingsWidgetState extends State<ToolSettingsWidget> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
-              Icon(Icons.volume_up_outlined,
-                  size: 20, color: colorScheme.primary),
+              Icon(
+                Icons.volume_up_outlined,
+                size: 20,
+                color: colorScheme.primary,
+              ),
               const SizedBox(width: 8),
               Text(
                 'Text-to-Speech',
@@ -275,26 +278,16 @@ class _ToolSettingsWidgetState extends State<ToolSettingsWidget> {
                 min: 0.5,
                 max: 2.0,
                 divisions: 15,
-                label:
-                    '${(widget.config.ttsSpeed * 2).toStringAsFixed(1)}x',
+                label: '${(widget.config.ttsSpeed * 2).toStringAsFixed(1)}x',
                 onChanged: (value) =>
                     _updateConfig((c) => c.copyWith(ttsSpeed: value)),
               ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Slow',
-                    style: theme.textTheme.labelSmall,
-                  ),
-                  Text(
-                    'Normal',
-                    style: theme.textTheme.labelSmall,
-                  ),
-                  Text(
-                    'Fast',
-                    style: theme.textTheme.labelSmall,
-                  ),
+                  Text('Slow', style: theme.textTheme.labelSmall),
+                  Text('Normal', style: theme.textTheme.labelSmall),
+                  Text('Fast', style: theme.textTheme.labelSmall),
                 ],
               ),
             ],

@@ -466,10 +466,10 @@ class _ChatScreenState extends State<ChatScreen> {
       messageId: message.id,
       speed: widget.toolConfig?.ttsSpeed,
     );
-    
+
     if (mounted) {
       setState(() {});
-      
+
       if (!success) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

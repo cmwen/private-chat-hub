@@ -64,11 +64,7 @@ class TtsService {
   /// [speed] - Speech rate (0.0 to 1.0, where 0.5 is normal speed)
   ///
   /// Returns true if speech started successfully, false otherwise.
-  Future<bool> speak(
-    String text, {
-    String? messageId,
-    double? speed,
-  }) async {
+  Future<bool> speak(String text, {String? messageId, double? speed}) async {
     if (!_isInitialized) {
       await initialize();
       if (!_isInitialized) return false;

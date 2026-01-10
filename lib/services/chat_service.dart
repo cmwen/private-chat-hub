@@ -32,8 +32,8 @@ class ChatService {
     this._storage, {
     ToolExecutorService? toolExecutor,
     app_tools.ToolConfig? toolConfig,
-  })  : _toolExecutor = toolExecutor,
-        _toolConfig = toolConfig;
+  }) : _toolExecutor = toolExecutor,
+       _toolConfig = toolConfig;
 
   void _log(String message) {
     _debugLog(message);
