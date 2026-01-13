@@ -209,7 +209,8 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       // Log error but don't crash the app
-      print('[HomeScreen._checkNotificationLaunch] Error: $e');
+      // ignore: avoid_print
+      debugPrint('[HomeScreen._checkNotificationLaunch] Error: $e');
     }
   }
 
