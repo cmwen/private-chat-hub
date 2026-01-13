@@ -11,6 +11,7 @@ import 'package:private_chat_hub/screens/settings_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/jina_search_service.dart';
+import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/project_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
@@ -24,6 +25,13 @@ void main() async {
   // Initialize services
   final storageService = StorageService();
   await storageService.init();
+
+  // Initialize notification service
+  final notificationService = NotificationService();
+  await notificationService.initialize();
+
+  // Request notification permissions for Android 13+
+  await notificationService.requestPermissions();
 
   // Initialize shared preferences for tool config
   final prefs = await SharedPreferences.getInstance();
@@ -176,6 +184,34 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Set up Ollama connection if one exists
     _setupConnection();
+
+    // Check if app was opened from a notification
+    _checkNotificationLaunch();
+  }
+
+  Future<void> _checkNotificationLaunch() async {
+    try {
+      final notificationService = NotificationService();
+      final conversationId = notificationService.conversationIdFromNotification;
+
+      if (conversationId != null) {
+        // Clear the notification ID
+        notificationService.clearNotificationConversationId();
+
+        // Navigate to the conversation
+        final conversation = _chatService.getConversation(conversationId);
+        if (conversation != null) {
+          setState(() {
+            _selectedConversation = conversation;
+          });
+          await _chatService.setCurrentConversation(conversation.id);
+        }
+      }
+    } catch (e) {
+      // Log error but don't crash the app
+      // ignore: avoid_print
+      debugPrint('[HomeScreen._checkNotificationLaunch] Error: $e');
+    }
   }
 
   void _setupConnection() {

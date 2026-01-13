@@ -64,6 +64,9 @@ dependencies:
   
   # Text-to-speech for reading AI responses
   flutter_tts: ^4.2.0
+  
+  # Local notifications for background task completion
+  flutter_local_notifications: ^18.0.1
 
 dev_dependencies:
   flutter_test:

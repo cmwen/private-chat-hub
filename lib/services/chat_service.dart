@@ -5,6 +5,7 @@ import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
 import 'package:private_chat_hub/models/tool_models.dart' as app_tools;
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
+import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:private_chat_hub/services/tool_executor_service.dart';
@@ -19,6 +20,7 @@ class ChatService {
   final ToolExecutorService? _toolExecutor;
   final app_tools.ToolConfig? _toolConfig;
   final OllamaConfigService _configService = OllamaConfigService();
+  final NotificationService _notificationService = NotificationService();
   static const String _conversationsKey = 'conversations';
   static const String _currentConversationKey = 'current_conversation_id';
   static const bool _debugLogging = true; // Set to false to disable debug logs
@@ -532,6 +534,12 @@ class ChatService {
               }
 
               _activeSubscriptions.remove(conversationId);
+
+              // Show notification when response completes
+              await _showResponseCompleteNotification(
+                conversation,
+                buffer.toString(),
+              );
             },
           );
 
@@ -560,6 +568,12 @@ class ChatService {
         }
 
         _activeSubscriptions.remove(conversationId);
+
+        // Show notification when response completes
+        await _showResponseCompleteNotification(
+          conversation,
+          response.message.content,
+        );
       } catch (error) {
         _handleError(
           conversationId,
@@ -711,6 +725,12 @@ class ChatService {
     }
 
     _activeSubscriptions.remove(conversationId);
+
+    // Show notification when response completes
+    await _showResponseCompleteNotification(
+      conversation,
+      responseText.toString(),
+    );
   }
 
   // ============================================================================
@@ -1162,6 +1182,25 @@ class ChatService {
         return '🕒 Getting Time';
       default:
         return toolName;
+    }
+  }
+
+  /// Show a notification when a response completes.
+  Future<void> _showResponseCompleteNotification(
+    Conversation conversation,
+    String responseText,
+  ) async {
+    try {
+      // Only show notification if response has content
+      if (responseText.trim().isEmpty) return;
+
+      await _notificationService.showResponseCompleteNotification(
+        conversationId: conversation.id,
+        conversationTitle: conversation.title,
+        responsePreview: responseText,
+      );
+    } catch (e) {
+      _log('Error showing notification: $e');
     }
   }
 
