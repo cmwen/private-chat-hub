@@ -13,6 +13,13 @@ class NotificationService {
   
   bool _initialized = false;
   String? _conversationIdFromNotification;
+  
+  // Map conversation IDs to unique notification IDs
+  final Map<String, int> _conversationNotificationIds = {};
+  int _nextNotificationId = 1;
+  
+  // Maximum length for notification preview text
+  static const int _maxPreviewLength = 100;
 
   /// Gets the conversation ID if the app was opened from a notification.
   String? get conversationIdFromNotification => _conversationIdFromNotification;
@@ -67,9 +74,15 @@ class NotificationService {
       await initialize();
     }
 
+    // Get or assign a unique notification ID for this conversation
+    final notificationId = _conversationNotificationIds.putIfAbsent(
+      conversationId,
+      () => _nextNotificationId++,
+    );
+
     // Truncate preview if too long
-    final preview = responsePreview.length > 100
-        ? '${responsePreview.substring(0, 100)}...'
+    final preview = responsePreview.length > _maxPreviewLength
+        ? '${responsePreview.substring(0, _maxPreviewLength)}...'
         : responsePreview;
 
     const androidDetails = AndroidNotificationDetails(
@@ -86,7 +99,7 @@ class NotificationService {
     const notificationDetails = NotificationDetails(android: androidDetails);
 
     await _notifications.show(
-      conversationId.hashCode, // Use conversation ID hash as notification ID
+      notificationId,
       conversationTitle,
       preview,
       notificationDetails,
@@ -96,7 +109,11 @@ class NotificationService {
 
   /// Cancel a specific notification.
   Future<void> cancelNotification(String conversationId) async {
-    await _notifications.cancel(conversationId.hashCode);
+    final notificationId = _conversationNotificationIds[conversationId];
+    if (notificationId != null) {
+      await _notifications.cancel(notificationId);
+      _conversationNotificationIds.remove(conversationId);
+    }
   }
 
   /// Cancel all notifications.

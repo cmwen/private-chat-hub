@@ -190,21 +190,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _checkNotificationLaunch() async {
-    final notificationService = NotificationService();
-    final conversationId = notificationService.conversationIdFromNotification;
-    
-    if (conversationId != null) {
-      // Clear the notification ID
-      notificationService.clearNotificationConversationId();
+    try {
+      final notificationService = NotificationService();
+      final conversationId = notificationService.conversationIdFromNotification;
       
-      // Navigate to the conversation
-      final conversation = _chatService.getConversation(conversationId);
-      if (conversation != null) {
-        setState(() {
-          _selectedConversation = conversation;
-          _chatService.setCurrentConversation(conversation.id);
-        });
+      if (conversationId != null) {
+        // Clear the notification ID
+        notificationService.clearNotificationConversationId();
+        
+        // Navigate to the conversation
+        final conversation = _chatService.getConversation(conversationId);
+        if (conversation != null) {
+          setState(() {
+            _selectedConversation = conversation;
+          });
+          await _chatService.setCurrentConversation(conversation.id);
+        }
       }
+    } catch (e) {
+      // Log error but don't crash the app
+      print('[HomeScreen._checkNotificationLaunch] Error: $e');
     }
   }
 

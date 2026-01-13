@@ -1192,7 +1192,7 @@ class ChatService {
   ) async {
     try {
       // Only show notification if response has content
-      if (responseText.isEmpty) return;
+      if (responseText.trim().isEmpty) return;
 
       await _notificationService.showResponseCompleteNotification(
         conversationId: conversation.id,
