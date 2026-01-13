@@ -10,14 +10,14 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
-  
+
   bool _initialized = false;
   String? _conversationIdFromNotification;
-  
+
   // Map conversation IDs to unique notification IDs
   final Map<String, int> _conversationNotificationIds = {};
   int _nextNotificationId = 1;
-  
+
   // Maximum length for notification preview text
   static const int _maxPreviewLength = 100;
 
@@ -33,7 +33,9 @@ class NotificationService {
   Future<void> initialize() async {
     if (_initialized) return;
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const initSettings = InitializationSettings(android: androidSettings);
 
     await _notifications.initialize(
@@ -53,14 +55,16 @@ class NotificationService {
 
   /// Request notification permissions (required for Android 13+).
   Future<bool> requestPermissions() async {
-    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    
+    final androidPlugin = _notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+
     if (androidPlugin != null) {
       final granted = await androidPlugin.requestNotificationsPermission();
       return granted ?? false;
     }
-    
+
     return false;
   }
 

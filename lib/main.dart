@@ -29,7 +29,7 @@ void main() async {
   // Initialize notification service
   final notificationService = NotificationService();
   await notificationService.initialize();
-  
+
   // Request notification permissions for Android 13+
   await notificationService.requestPermissions();
 
@@ -193,11 +193,11 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final notificationService = NotificationService();
       final conversationId = notificationService.conversationIdFromNotification;
-      
+
       if (conversationId != null) {
         // Clear the notification ID
         notificationService.clearNotificationConversationId();
-        
+
         // Navigate to the conversation
         final conversation = _chatService.getConversation(conversationId);
         if (conversation != null) {
