@@ -5,6 +5,15 @@ import 'package:private_chat_hub/models/tool_models.dart';
 /// The role of a message sender.
 enum MessageRole { user, assistant, system, tool }
 
+/// The status of a message (for offline queue support).
+enum MessageStatus {
+  draft, // Being composed
+  queued, // Waiting to send (offline)
+  sending, // Currently sending to LLM
+  sent, // Successfully sent and response received
+  failed, // Send failed after retries
+}
+
 /// The source model for comparison mode messages.
 enum ModelSource { user, model1, model2 }
 
@@ -91,6 +100,12 @@ class Message {
   /// Current step/status message during message generation.
   final String? statusMessage;
 
+  /// Message status for offline queue support.
+  final MessageStatus status;
+
+  /// Timestamp when message was queued (for offline messages).
+  final DateTime? queuedAt;
+
   const Message({
     required this.id,
     required this.text,
@@ -104,6 +119,8 @@ class Message {
     this.modelSource,
     this.toolCalls = const [],
     this.statusMessage,
+    this.status = MessageStatus.sent,
+    this.queuedAt,
   });
 
   /// Whether this message has any tool calls.
@@ -149,6 +166,8 @@ class Message {
     required DateTime timestamp,
     List<Attachment>? attachments,
     ModelSource? modelSource,
+    MessageStatus? status,
+    DateTime? queuedAt,
   }) {
     return Message(
       id: id,
@@ -158,6 +177,8 @@ class Message {
       role: MessageRole.user,
       attachments: attachments ?? const [],
       modelSource: modelSource,
+      status: status ?? MessageStatus.sent,
+      queuedAt: queuedAt,
     );
   }
 
@@ -218,6 +239,9 @@ class Message {
     final attachmentsJson = json['attachments'] as List<dynamic>?;
     final modelSourceStr = json['modelSource'] as String?;
     final toolCallsJson = json['toolCalls'] as List<dynamic>?;
+    final statusStr = json['status'] as String?;
+    final queuedAtStr = json['queuedAt'] as String?;
+
     return Message(
       id: json['id'] as String,
       text: json['text'] as String,
@@ -247,6 +271,13 @@ class Message {
               .toList() ??
           const [],
       statusMessage: json['statusMessage'] as String?,
+      status: statusStr != null
+          ? MessageStatus.values.firstWhere(
+              (s) => s.name == statusStr,
+              orElse: () => MessageStatus.sent,
+            )
+          : MessageStatus.sent,
+      queuedAt: queuedAtStr != null ? DateTime.parse(queuedAtStr) : null,
     );
   }
 
@@ -265,6 +296,8 @@ class Message {
       'modelSource': modelSource?.name,
       'toolCalls': toolCalls.map((tc) => tc.toJson()).toList(),
       'statusMessage': statusMessage,
+      'status': status.name,
+      'queuedAt': queuedAt?.toIso8601String(),
     };
   }
 
@@ -313,6 +346,8 @@ class Message {
     ModelSource? modelSource,
     List<ToolCall>? toolCalls,
     String? statusMessage,
+    MessageStatus? status,
+    DateTime? queuedAt,
   }) {
     return Message(
       id: id ?? this.id,
@@ -327,6 +362,8 @@ class Message {
       modelSource: modelSource ?? this.modelSource,
       toolCalls: toolCalls ?? this.toolCalls,
       statusMessage: statusMessage ?? this.statusMessage,
+      status: status ?? this.status,
+      queuedAt: queuedAt ?? this.queuedAt,
     );
   }
 

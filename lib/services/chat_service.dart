@@ -3,8 +3,11 @@ import 'dart:convert';
 import 'package:private_chat_hub/models/comparison_conversation.dart';
 import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
+import 'package:private_chat_hub/models/queue_item.dart';
 import 'package:private_chat_hub/models/tool_models.dart' as app_tools;
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
+import 'package:private_chat_hub/services/connectivity_service.dart';
+import 'package:private_chat_hub/services/message_queue_service.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
@@ -21,6 +24,12 @@ class ChatService {
   final app_tools.ToolConfig? _toolConfig;
   final OllamaConfigService _configService = OllamaConfigService();
   final NotificationService _notificationService = NotificationService();
+
+  // Offline mode support
+  late final ConnectivityService _connectivityService;
+  late final MessageQueueService _queueService;
+  bool _isProcessingQueue = false;
+
   static const String _conversationsKey = 'conversations';
   static const String _currentConversationKey = 'current_conversation_id';
   static const bool _debugLogging = true; // Set to false to disable debug logs
@@ -35,7 +44,19 @@ class ChatService {
     ToolExecutorService? toolExecutor,
     app_tools.ToolConfig? toolConfig,
   }) : _toolExecutor = toolExecutor,
-       _toolConfig = toolConfig;
+       _toolConfig = toolConfig {
+    // Initialize offline mode services
+    _connectivityService = ConnectivityService(_ollamaManager);
+    _queueService = MessageQueueService(_storage);
+
+    // Listen for connectivity changes and process queue when online
+    _connectivityService.statusStream.listen((status) {
+      if (status == OllamaConnectivityStatus.connected && !_isProcessingQueue) {
+        _log('Connection restored, processing message queue');
+        processMessageQueue();
+      }
+    });
+  }
 
   void _log(String message) {
     _debugLog(message);
@@ -303,18 +324,356 @@ class ChatService {
   }
 
   // ============================================================================
+  // MESSAGE QUEUE MANAGEMENT (OFFLINE MODE)
+  // ============================================================================
+
+  /// Gets the connectivity service.
+  ConnectivityService get connectivityService => _connectivityService;
+
+  /// Gets the message queue service.
+  MessageQueueService get queueService => _queueService;
+
+  /// Whether the service is currently online.
+  bool get isOnline => _connectivityService.isOnline;
+
+  /// Whether the service is currently offline.
+  bool get isOffline => _connectivityService.isOffline;
+
+  /// Gets the count of queued messages for a conversation.
+  int getQueuedMessageCount(String conversationId) {
+    return _queueService.getConversationQueueCount(conversationId);
+  }
+
+  /// Gets all queued messages for a conversation.
+  List<QueueItem> getQueuedMessages(String conversationId) {
+    return _queueService.getConversationQueue(conversationId);
+  }
+
+  /// Queues a message to be sent when connection is restored.
+  Future<Conversation> queueMessage(String conversationId, String text) async {
+    _log('Queueing message for conversation $conversationId (offline mode)');
+
+    // Add user message with queued status
+    final userMessage = Message.user(
+      id: const Uuid().v4(),
+      text: text,
+      timestamp: DateTime.now(),
+      status: MessageStatus.queued,
+      queuedAt: DateTime.now(),
+    );
+
+    var conversation = await addMessage(conversationId, userMessage);
+
+    // Add to queue
+    try {
+      await _queueService.enqueue(
+        conversationId: conversationId,
+        messageId: userMessage.id,
+      );
+      _log('Message queued successfully: ${userMessage.id}');
+    } catch (e) {
+      _log('Failed to queue message: $e');
+      // Update message status to failed
+      final failedMessage = userMessage.copyWith(status: MessageStatus.failed);
+      final messages = conversation.messages.map((m) {
+        return m.id == userMessage.id ? failedMessage : m;
+      }).toList();
+      conversation = conversation.copyWith(messages: messages);
+      await updateConversation(conversation);
+      rethrow;
+    }
+
+    return conversation;
+  }
+
+  /// Cancels a queued message.
+  Future<void> cancelQueuedMessage(String messageId) async {
+    _log('Cancelling queued message: $messageId');
+    await _queueService.removeByMessageId(messageId);
+
+    // Find and remove the message from its conversation
+    final conversations = getConversations();
+    for (final conversation in conversations) {
+      final message = conversation.messages
+          .where((m) => m.id == messageId)
+          .firstOrNull;
+      if (message != null) {
+        await deleteMessage(conversation.id, messageId);
+        break;
+      }
+    }
+  }
+
+  /// Retries a failed message.
+  Future<void> retryFailedMessage(String messageId) async {
+    _log('Retrying failed message: $messageId');
+
+    // Find the message
+    final conversations = getConversations();
+    Conversation? targetConversation;
+    Message? targetMessage;
+
+    for (final conversation in conversations) {
+      final message = conversation.messages
+          .where((m) => m.id == messageId)
+          .firstOrNull;
+      if (message != null) {
+        targetConversation = conversation;
+        targetMessage = message;
+        break;
+      }
+    }
+
+    if (targetConversation == null || targetMessage == null) {
+      throw Exception('Message not found: $messageId');
+    }
+
+    // Check if online
+    if (isOnline) {
+      // Update message status to sending
+      final messages = targetConversation.messages.map((m) {
+        return m.id == messageId
+            ? m.copyWith(status: MessageStatus.sending)
+            : m;
+      }).toList();
+      var conversation = targetConversation.copyWith(messages: messages);
+      await updateConversation(conversation);
+
+      // Try to send immediately
+      try {
+        await _sendQueuedMessageSync(targetConversation.id, targetMessage);
+      } catch (e) {
+        _log('Retry failed: $e');
+        // Mark as failed again
+        final failedMessages = conversation.messages.map((m) {
+          return m.id == messageId
+              ? m.copyWith(status: MessageStatus.failed)
+              : m;
+        }).toList();
+        conversation = conversation.copyWith(messages: failedMessages);
+        await updateConversation(conversation);
+      }
+    } else {
+      // Re-queue the message
+      await _queueService.enqueue(
+        conversationId: targetConversation.id,
+        messageId: messageId,
+      );
+
+      // Update message status to queued
+      final messages = targetConversation.messages.map((m) {
+        return m.id == messageId
+            ? m.copyWith(status: MessageStatus.queued, queuedAt: DateTime.now())
+            : m;
+      }).toList();
+      final conversation = targetConversation.copyWith(messages: messages);
+      await updateConversation(conversation);
+    }
+  }
+
+  /// Processes the message queue (sends all queued messages).
+  Future<void> processMessageQueue() async {
+    if (_isProcessingQueue) {
+      _log('Queue processing already in progress');
+      return;
+    }
+
+    if (!isOnline) {
+      _log('Cannot process queue while offline');
+      return;
+    }
+
+    _isProcessingQueue = true;
+    _log('Starting queue processing');
+
+    try {
+      while (true) {
+        final queueItem = _queueService.getNextQueueItem();
+        if (queueItem == null) {
+          _log('Queue is empty');
+          break;
+        }
+
+        _log('Processing queue item: ${queueItem.id}');
+
+        // Check if max retries exceeded
+        if (_queueService.hasExceededMaxRetries(queueItem)) {
+          _log(
+            'Max retries exceeded for ${queueItem.messageId}, marking as failed',
+          );
+          await _markMessageAsFailed(
+            queueItem.conversationId,
+            queueItem.messageId,
+          );
+          await _queueService.dequeue(queueItem.id);
+          continue;
+        }
+
+        // Apply retry delay if needed
+        if (queueItem.retryCount > 0) {
+          final delay = _queueService.getRetryDelay(queueItem.retryCount);
+          _log(
+            'Waiting ${delay.inSeconds}s before retry ${queueItem.retryCount}',
+          );
+          await Future.delayed(delay);
+        }
+
+        // Try to send the message
+        try {
+          await _processQueueItem(queueItem);
+          await _queueService.dequeue(queueItem.id);
+          _log('Successfully sent queued message: ${queueItem.messageId}');
+        } catch (e) {
+          _log('Failed to send queued message: $e');
+          await _queueService.incrementRetryCount(queueItem.id, e.toString());
+
+          // Check if we should continue or stop
+          if (!isOnline) {
+            _log('Lost connection during queue processing, stopping');
+            break;
+          }
+        }
+      }
+    } finally {
+      _isProcessingQueue = false;
+      _log('Queue processing finished');
+    }
+  }
+
+  /// Processes a single queue item.
+  Future<void> _processQueueItem(QueueItem queueItem) async {
+    final conversation = getConversation(queueItem.conversationId);
+    if (conversation == null) {
+      throw Exception('Conversation not found: ${queueItem.conversationId}');
+    }
+
+    final message = conversation.messages
+        .where((m) => m.id == queueItem.messageId)
+        .firstOrNull;
+    if (message == null) {
+      throw Exception('Message not found: ${queueItem.messageId}');
+    }
+
+    await _sendQueuedMessageSync(conversation.id, message);
+  }
+
+  /// Sends a queued message synchronously (no streaming for queued messages).
+  Future<void> _sendQueuedMessageSync(
+    String conversationId,
+    Message userMessage,
+  ) async {
+    final conversation = getConversation(conversationId);
+    if (conversation == null) {
+      throw Exception('Conversation not found');
+    }
+
+    final client = _ollamaManager.client;
+    if (client == null) {
+      throw Exception('No Ollama connection configured');
+    }
+
+    // Update message status to sending
+    await _updateMessageStatus(
+      conversationId,
+      userMessage.id,
+      MessageStatus.sending,
+    );
+
+    try {
+      // Build message history (excluding the user message being sent and any assistant responses after it)
+      final messageIndex = conversation.messages.indexWhere(
+        (m) => m.id == userMessage.id,
+      );
+      final ollamaMessages = _buildOllamaMessageHistory(
+        conversation.copyWith(
+          messages: conversation.messages.sublist(0, messageIndex + 1),
+        ),
+      );
+
+      // Send message (without tool calling for queued messages)
+      final response = await client.chat(
+        conversation.modelName,
+        ollamaMessages,
+        options: conversation.parameters.toOllamaOptions(),
+      );
+
+      // Update user message status to sent
+      await _updateMessageStatus(
+        conversationId,
+        userMessage.id,
+        MessageStatus.sent,
+      );
+
+      // Add assistant response
+      final assistantMessage = Message.assistant(
+        id: const Uuid().v4(),
+        text: response.message.content,
+        timestamp: DateTime.now(),
+      );
+      await addMessage(conversationId, assistantMessage);
+
+      _log('Successfully sent queued message: ${userMessage.id}');
+    } catch (e) {
+      _log('Error sending queued message: $e');
+      await _updateMessageStatus(
+        conversationId,
+        userMessage.id,
+        MessageStatus.failed,
+      );
+      rethrow;
+    }
+  }
+
+  /// Updates a message status.
+  Future<void> _updateMessageStatus(
+    String conversationId,
+    String messageId,
+    MessageStatus status,
+  ) async {
+    var conversation = getConversation(conversationId);
+    if (conversation == null) return;
+
+    final messages = conversation.messages.map((m) {
+      return m.id == messageId ? m.copyWith(status: status) : m;
+    }).toList();
+
+    conversation = conversation.copyWith(
+      messages: messages,
+      updatedAt: DateTime.now(),
+    );
+    await updateConversation(conversation);
+  }
+
+  /// Marks a message as failed.
+  Future<void> _markMessageAsFailed(
+    String conversationId,
+    String messageId,
+  ) async {
+    await _updateMessageStatus(conversationId, messageId, MessageStatus.failed);
+  }
+
+  // ============================================================================
   // CHAT GENERATION - SINGLE MODEL
   // ============================================================================
 
   /// Sends a message and gets a streaming response from Ollama.
   ///
   /// Returns a stream of updated conversations as the response streams in.
+  /// If offline, queues the message instead.
   Stream<Conversation> sendMessage(String conversationId, String text) async* {
     await cancelMessageGeneration(conversationId);
 
     final initialConversation = getConversation(conversationId);
     if (initialConversation == null) {
       throw Exception('Conversation not found');
+    }
+
+    // Check if offline - queue the message instead
+    if (isOffline) {
+      _log('Offline mode: queueing message');
+      final conversation = await queueMessage(conversationId, text);
+      yield conversation;
+      return;
     }
 
     // Add user message
@@ -1272,6 +1631,10 @@ class ChatService {
       }
     }
     _activeStreams.clear();
+
+    // Dispose offline mode services
+    _connectivityService.dispose();
+    _queueService.dispose();
   }
 
   // ============================================================================

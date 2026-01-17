@@ -6,10 +6,12 @@ import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
 import 'package:private_chat_hub/models/tool_models.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
+import 'package:private_chat_hub/services/connectivity_service.dart';
 import 'package:private_chat_hub/services/tts_service.dart';
 import 'package:private_chat_hub/widgets/capability_widgets.dart';
 import 'package:private_chat_hub/widgets/message_bubble.dart';
 import 'package:private_chat_hub/widgets/message_input.dart';
+import 'package:private_chat_hub/widgets/queue_status_banner.dart';
 
 /// Main chat screen displaying messages and input field.
 class ChatScreen extends StatefulWidget {
@@ -40,6 +42,13 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _ttsStreamingEnabled = false;
   String? _lastSpokenText;
 
+  // Offline mode state
+  OllamaConnectivityStatus _connectivityStatus =
+      OllamaConnectivityStatus.checking;
+  int _queuedMessageCount = 0;
+  StreamSubscription? _connectivitySubscription;
+  StreamSubscription? _queueSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -52,6 +61,8 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     });
     _loadMessages();
+    _setupConnectivityListener();
+    _setupQueueListener();
   }
 
   @override
@@ -69,6 +80,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _ttsService.dispose();
     // Don't cancel the stream - let it continue in the background
     _streamSubscription?.cancel();
+    _connectivitySubscription?.cancel();
+    _queueSubscription?.cancel();
     super.dispose();
   }
 
@@ -147,6 +160,67 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _setupConnectivityListener() {
+    if (widget.chatService == null) return;
+
+    // Get initial status
+    _connectivityStatus = widget.chatService!.connectivityService.currentStatus;
+
+    // Listen for changes
+    _connectivitySubscription = widget
+        .chatService!
+        .connectivityService
+        .statusStream
+        .listen((status) {
+          if (!mounted) return;
+          setState(() {
+            _connectivityStatus = status;
+          });
+
+          // Show snackbar when status changes
+          if (status == OllamaConnectivityStatus.connected) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Connected. Sending queued messages...'),
+                duration: Duration(seconds: 2),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } else if (status == OllamaConnectivityStatus.offline) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Connection lost. Messages will be queued.'),
+                duration: Duration(seconds: 3),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        });
+  }
+
+  void _setupQueueListener() {
+    if (widget.chatService == null || _conversation == null) return;
+
+    // Get initial count
+    _queuedMessageCount = widget.chatService!.getQueuedMessageCount(
+      _conversation!.id,
+    );
+
+    // Listen for queue updates
+    _queueSubscription = widget.chatService!.queueService.queueUpdates.listen((
+      queue,
+    ) {
+      if (!mounted || _conversation == null) return;
+
+      final newCount = queue
+          .where((item) => item.conversationId == _conversation!.id)
+          .length;
+      setState(() {
+        _queuedMessageCount = newCount;
+      });
+    });
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -208,6 +282,80 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleRetryMessage(Message message) async {
+    if (widget.chatService == null || _conversation == null) return;
+
+    try {
+      await widget.chatService!.retryFailedMessage(message.id);
+
+      // Reload messages
+      final updatedConversation = widget.chatService!.getConversation(
+        _conversation!.id,
+      );
+      if (updatedConversation != null && mounted) {
+        setState(() {
+          _conversation = updatedConversation;
+          _messages = List.from(updatedConversation.messages);
+        });
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Message retry initiated'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Retry failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleCancelMessage(Message message) async {
+    if (widget.chatService == null || _conversation == null) return;
+
+    try {
+      await widget.chatService!.cancelQueuedMessage(message.id);
+
+      // Reload messages
+      final updatedConversation = widget.chatService!.getConversation(
+        _conversation!.id,
+      );
+      if (updatedConversation != null && mounted) {
+        setState(() {
+          _conversation = updatedConversation;
+          _messages = List.from(updatedConversation.messages);
+        });
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Queued message cancelled'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Cancel failed: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -1058,6 +1206,17 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          // Queue status banner (offline mode)
+          if (widget.chatService != null && _conversation != null)
+            QueueStatusBanner(
+              queuedCount: _queuedMessageCount,
+              isProcessing:
+                  widget.chatService!.queueService.getQueueCount() > 0 &&
+                  _connectivityStatus == OllamaConnectivityStatus.connected,
+              onRetryNow: () {
+                widget.chatService!.connectivityService.refresh();
+              },
+            ),
           Expanded(
             child: _messages.isEmpty
                 ? _buildEmptyState()
@@ -1083,6 +1242,16 @@ class _ChatScreenState extends State<ChatScreen> {
                         onSpeak: () => _speakMessage(message),
                         onStopTts: _stopTts,
                         isSpeaking: _ttsService.isSpeakingMessage(message.id),
+                        onRetry:
+                            message.status == MessageStatus.failed &&
+                                widget.chatService != null
+                            ? () => _handleRetryMessage(message)
+                            : null,
+                        onCancel:
+                            message.status == MessageStatus.queued &&
+                                widget.chatService != null
+                            ? () => _handleCancelMessage(message)
+                            : null,
                       );
                     },
                   ),
@@ -1397,6 +1566,8 @@ class _MessageItem extends StatelessWidget {
   final VoidCallback? onSpeak;
   final VoidCallback? onStopTts;
   final bool isSpeaking;
+  final VoidCallback? onRetry;
+  final VoidCallback? onCancel;
 
   const _MessageItem({
     required this.message,
@@ -1406,6 +1577,8 @@ class _MessageItem extends StatelessWidget {
     this.onSpeak,
     this.onStopTts,
     this.isSpeaking = false,
+    this.onRetry,
+    this.onCancel,
   });
 
   @override
@@ -1427,7 +1600,12 @@ class _MessageItem extends StatelessWidget {
 
     return GestureDetector(
       onLongPress: onLongPress,
-      child: MessageBubble(message: message, showTimestamp: showTimestamp),
+      child: MessageBubble(
+        message: message,
+        showTimestamp: showTimestamp,
+        onRetry: onRetry,
+        onCancel: onCancel,
+      ),
     );
   }
 }

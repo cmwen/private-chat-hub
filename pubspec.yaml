@@ -67,6 +67,9 @@ dependencies:
   
   # Local notifications for background task completion
   flutter_local_notifications: ^18.0.1
+  
+  # Network connectivity monitoring for offline mode
+  connectivity_plus: ^7.0.0
 
 dev_dependencies:
   flutter_test:

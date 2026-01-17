@@ -7,11 +7,15 @@ import 'package:intl/intl.dart';
 class MessageBubble extends StatelessWidget {
   final Message message;
   final bool showTimestamp;
+  final VoidCallback? onRetry;
+  final VoidCallback? onCancel;
 
   const MessageBubble({
     super.key,
     required this.message,
     this.showTimestamp = false,
+    this.onRetry,
+    this.onCancel,
   });
 
   @override
@@ -108,7 +112,7 @@ class MessageBubble extends StatelessWidget {
             ),
             if (isMe) ...[
               const SizedBox(width: 8),
-              const Icon(Icons.done_all, size: 16, color: Colors.blue),
+              _buildMessageStatusIcon(context),
             ],
           ],
         ),
@@ -570,5 +574,90 @@ class MessageBubble extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Builds the status icon for user messages based on their status.
+  Widget _buildMessageStatusIcon(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    switch (message.status) {
+      case MessageStatus.queued:
+        return Tooltip(
+          message: 'Queued - will send when online',
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.schedule,
+                size: 16,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              if (onCancel != null) ...[
+                const SizedBox(width: 4),
+                InkWell(
+                  onTap: onCancel,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.close,
+                      size: 14,
+                      color: colorScheme.error,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+
+      case MessageStatus.sending:
+        return Tooltip(
+          message: 'Sending...',
+          child: SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+            ),
+          ),
+        );
+
+      case MessageStatus.sent:
+        return const Tooltip(
+          message: 'Sent',
+          child: Icon(Icons.done_all, size: 16, color: Colors.blue),
+        );
+
+      case MessageStatus.failed:
+        return Tooltip(
+          message: 'Failed to send',
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, size: 16, color: colorScheme.error),
+              if (onRetry != null) ...[
+                const SizedBox(width: 4),
+                InkWell(
+                  onTap: onRetry,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.refresh,
+                      size: 14,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+
+      case MessageStatus.draft:
+        return Icon(Icons.edit, size: 16, color: colorScheme.onSurfaceVariant);
+    }
   }
 }
