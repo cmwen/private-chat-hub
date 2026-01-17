@@ -25,6 +25,10 @@ class ChatService {
   final OllamaConfigService _configService = OllamaConfigService();
   final NotificationService _notificationService = NotificationService();
 
+  // Conversation update stream (for UI sync)
+  final StreamController<Conversation> _conversationUpdatesController =
+      StreamController<Conversation>.broadcast();
+
   // Offline mode support
   late final ConnectivityService _connectivityService;
   late final MessageQueueService _queueService;
@@ -37,6 +41,10 @@ class ChatService {
   // Track active message generation streams
   final Map<String, StreamController<Conversation>> _activeStreams = {};
   final Map<String, StreamSubscription> _activeSubscriptions = {};
+
+  /// Stream of conversation updates.
+  Stream<Conversation> get conversationUpdates =>
+      _conversationUpdatesController.stream;
 
   ChatService(
     this._ollamaManager,
@@ -194,6 +202,10 @@ class ChatService {
     if (index != -1) {
       conversations[index] = conversation;
       await _saveConversations(conversations);
+
+      if (!_conversationUpdatesController.isClosed) {
+        _conversationUpdatesController.add(conversation);
+      }
     }
   }
 
@@ -668,9 +680,9 @@ class ChatService {
       throw Exception('Conversation not found');
     }
 
-    // Check if offline - queue the message instead
-    if (isOffline) {
-      _log('Offline mode: queueing message');
+    // Check if not online (offline or Ollama unreachable) - queue the message instead
+    if (!isOnline) {
+      _log('Offline/disconnected mode: queueing message');
       final conversation = await queueMessage(conversationId, text);
       yield conversation;
       return;
@@ -729,6 +741,28 @@ class ChatService {
     }
 
     var conversation = initialConversation;
+
+    // If not online, queue the last user message and return
+    if (!isOnline) {
+      final lastUserMessage = conversation.messages.lastWhere(
+        (m) => m.role == MessageRole.user,
+        orElse: () => Message.user(
+          id: '',
+          text: '',
+          timestamp: DateTime.now(),
+        ),
+      );
+
+      if (lastUserMessage.id.isNotEmpty) {
+        conversation = await _queueExistingMessage(
+          conversationId,
+          lastUserMessage.id,
+        );
+      }
+
+      yield conversation;
+      return;
+    }
 
     final streamController = StreamController<Conversation>.broadcast();
     _activeStreams[conversationId] = streamController;
@@ -1251,7 +1285,7 @@ class ChatService {
             onError: (error) async {
               var model1Message = Message.error(
                 id: model1MessageId,
-                errorMessage: error.toString(),
+                errorMessage: _formatUserFacingError(error.toString()),
                 timestamp: DateTime.now(),
               ).copyWith(modelSource: ModelSource.model1);
               await updateConversationSafely(model1Message);
@@ -1295,7 +1329,7 @@ class ChatService {
             onError: (error) async {
               var model2Message = Message.error(
                 id: model2MessageId,
-                errorMessage: error.toString(),
+                errorMessage: _formatUserFacingError(error.toString()),
                 timestamp: DateTime.now(),
               ).copyWith(modelSource: ModelSource.model2);
               await updateConversationSafely(model2Message);
@@ -1357,14 +1391,14 @@ class ChatService {
         // Handle error for both models
         var model1Message = Message.error(
           id: model1MessageId,
-          errorMessage: error.toString(),
+          errorMessage: _formatUserFacingError(error.toString()),
           timestamp: DateTime.now(),
         ).copyWith(modelSource: ModelSource.model1);
         await updateConversationSafely(model1Message);
 
         var model2Message = Message.error(
           id: model2MessageId,
-          errorMessage: error.toString(),
+          errorMessage: _formatUserFacingError(error.toString()),
           timestamp: DateTime.now(),
         ).copyWith(modelSource: ModelSource.model2);
         await updateConversationSafely(model2Message);
@@ -1476,9 +1510,11 @@ class ChatService {
   ) async {
     if (streamController.isClosed) return;
 
+    final friendlyError = _formatUserFacingError(errorMessage);
+
     final errorMsg = Message.error(
       id: assistantMessageId,
-      errorMessage: errorMessage,
+      errorMessage: friendlyError,
       timestamp: DateTime.now(),
     );
 
@@ -1632,6 +1668,10 @@ class ChatService {
     }
     _activeStreams.clear();
 
+    if (!_conversationUpdatesController.isClosed) {
+      _conversationUpdatesController.close();
+    }
+
     // Dispose offline mode services
     _connectivityService.dispose();
     _queueService.dispose();
@@ -1686,7 +1726,7 @@ class ChatService {
       // Add error message
       final errorMessage = Message.error(
         id: const Uuid().v4(),
-        errorMessage: e.toString(),
+        errorMessage: _formatUserFacingError(e.toString()),
         timestamp: DateTime.now(),
       );
       conversation = await addMessage(conversationId, errorMessage);
@@ -1713,6 +1753,86 @@ When you have sufficient information from tool results, provide a complete respo
       return '$basePrompt\n\n$agentInstructions';
     }
     return agentInstructions;
+  }
+
+  // ============================================================================
+  // OFFLINE HELPERS
+  // ============================================================================
+
+  /// Queues an existing user message when connectivity is unavailable.
+  Future<Conversation> _queueExistingMessage(
+    String conversationId,
+    String messageId,
+  ) async {
+    var conversation = getConversation(conversationId);
+    if (conversation == null) {
+      throw Exception('Conversation not found');
+    }
+
+    final alreadyQueued = _queueService
+        .getQueue()
+        .any((item) => item.messageId == messageId);
+
+    if (!alreadyQueued) {
+      await _queueService.enqueue(
+        conversationId: conversationId,
+        messageId: messageId,
+      );
+    }
+
+    final messages = conversation.messages.map((m) {
+      return m.id == messageId
+          ? m.copyWith(status: MessageStatus.queued, queuedAt: DateTime.now())
+          : m;
+    }).toList();
+
+    conversation = conversation.copyWith(
+      messages: messages,
+      updatedAt: DateTime.now(),
+    );
+    await updateConversation(conversation);
+    return conversation;
+  }
+
+  /// Converts raw errors to user-friendly messages.
+  String _formatUserFacingError(String errorMessage) {
+    final status = _connectivityService.currentStatus;
+    final baseUrl = _ollamaManager.connection?.url;
+    final location = baseUrl != null ? ' at $baseUrl' : '';
+
+    if (status == OllamaConnectivityStatus.offline) {
+      return 'You appear to be offline. Check your network and try again.';
+    }
+
+    if (status == OllamaConnectivityStatus.disconnected) {
+      return 'Cannot reach Ollama$location. Make sure it is running and reachable.';
+    }
+
+    final lower = errorMessage.toLowerCase();
+
+    if (lower.contains('no ollama connection configured')) {
+      return 'No Ollama connection configured. Add one in Settings.';
+    }
+
+    if (lower.contains('timeout') ||
+        lower.contains('timed out') ||
+        lower.contains('time out')) {
+      return 'Request timed out. Try again or increase the timeout in Settings.';
+    }
+
+    if (lower.contains('connection refused') ||
+        lower.contains('failed host lookup') ||
+        lower.contains('socketexception') ||
+        lower.contains('network is unreachable') ||
+        lower.contains('no route to host')) {
+      return 'Cannot reach Ollama$location. Make sure it is running and reachable.';
+    }
+
+    if (lower.contains('ollamaexception')) {
+      return errorMessage.replaceFirst(RegExp(r'^OllamaException:\s*'), '');
+    }
+
+    return errorMessage;
   }
 }
 

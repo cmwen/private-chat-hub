@@ -48,6 +48,8 @@ class _ChatScreenState extends State<ChatScreen> {
   int _queuedMessageCount = 0;
   StreamSubscription? _connectivitySubscription;
   StreamSubscription? _queueSubscription;
+  StreamSubscription<Conversation>? _conversationUpdatesSubscription;
+  OllamaConnectivityStatus? _lastConnectivityStatus;
 
   @override
   void initState() {
@@ -63,6 +65,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _loadMessages();
     _setupConnectivityListener();
     _setupQueueListener();
+    _setupConversationUpdatesListener();
   }
 
   @override
@@ -71,6 +74,8 @@ class _ChatScreenState extends State<ChatScreen> {
     if (widget.conversation?.id != oldWidget.conversation?.id) {
       _conversation = widget.conversation;
       _loadMessages();
+      _setupQueueListener();
+      _setupConversationUpdatesListener();
     }
   }
 
@@ -82,6 +87,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _streamSubscription?.cancel();
     _connectivitySubscription?.cancel();
     _queueSubscription?.cancel();
+    _conversationUpdatesSubscription?.cancel();
     super.dispose();
   }
 
@@ -165,6 +171,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // Get initial status
     _connectivityStatus = widget.chatService!.connectivityService.currentStatus;
+    _lastConnectivityStatus ??= _connectivityStatus;
 
     // Listen for changes
     _connectivitySubscription = widget
@@ -173,12 +180,16 @@ class _ChatScreenState extends State<ChatScreen> {
         .statusStream
         .listen((status) {
           if (!mounted) return;
+          final previousStatus = _lastConnectivityStatus;
           setState(() {
             _connectivityStatus = status;
           });
+          _lastConnectivityStatus = status;
 
           // Show snackbar when status changes
-          if (status == OllamaConnectivityStatus.connected) {
+          if (status == OllamaConnectivityStatus.connected &&
+              (previousStatus == OllamaConnectivityStatus.offline ||
+                  previousStatus == OllamaConnectivityStatus.disconnected)) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Connected. Sending queued messages...'),
@@ -194,12 +205,24 @@ class _ChatScreenState extends State<ChatScreen> {
                 backgroundColor: Colors.orange,
               ),
             );
+          } else if (status == OllamaConnectivityStatus.disconnected) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Cannot reach Ollama. Messages will be queued.',
+                ),
+                duration: Duration(seconds: 3),
+                backgroundColor: Colors.orange,
+              ),
+            );
           }
         });
   }
 
   void _setupQueueListener() {
     if (widget.chatService == null || _conversation == null) return;
+
+    _queueSubscription?.cancel();
 
     // Get initial count
     _queuedMessageCount = widget.chatService!.getQueuedMessageCount(
@@ -219,6 +242,27 @@ class _ChatScreenState extends State<ChatScreen> {
         _queuedMessageCount = newCount;
       });
     });
+  }
+
+  void _setupConversationUpdatesListener() {
+    if (widget.chatService == null || _conversation == null) return;
+
+    _conversationUpdatesSubscription?.cancel();
+    _conversationUpdatesSubscription = widget
+        .chatService!
+        .conversationUpdates
+        .listen((updatedConversation) {
+          if (!mounted || _conversation == null) return;
+          if (updatedConversation.id != _conversation!.id) return;
+
+          setState(() {
+            _conversation = updatedConversation;
+            _messages = List.from(updatedConversation.messages);
+            _isLoading = widget.chatService!.isGenerating(updatedConversation.id);
+          });
+          _scrollToBottom();
+          _handleTtsStreaming(updatedConversation);
+        });
   }
 
   void _scrollToBottom() {
