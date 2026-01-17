@@ -67,6 +67,9 @@ dependencies:
   
   # Local notifications for background task completion
   flutter_local_notifications: ^18.0.1
+  
+  # Network connectivity monitoring for offline mode
+  connectivity_plus: ^7.0.0
 
 dev_dependencies:
   flutter_test:
@@ -86,6 +89,7 @@ dev_dependencies:
 # following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
+  connectivity_plus_platform_interface: any
 flutter:
 
   # The following line ensures that the Material Icons font is
