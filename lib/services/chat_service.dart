@@ -746,11 +746,7 @@ class ChatService {
     if (!isOnline) {
       final lastUserMessage = conversation.messages.lastWhere(
         (m) => m.role == MessageRole.user,
-        orElse: () => Message.user(
-          id: '',
-          text: '',
-          timestamp: DateTime.now(),
-        ),
+        orElse: () => Message.user(id: '', text: '', timestamp: DateTime.now()),
       );
 
       if (lastUserMessage.id.isNotEmpty) {
@@ -1769,9 +1765,9 @@ When you have sufficient information from tool results, provide a complete respo
       throw Exception('Conversation not found');
     }
 
-    final alreadyQueued = _queueService
-        .getQueue()
-        .any((item) => item.messageId == messageId);
+    final alreadyQueued = _queueService.getQueue().any(
+      (item) => item.messageId == messageId,
+    );
 
     if (!alreadyQueued) {
       await _queueService.enqueue(

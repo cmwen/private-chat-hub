@@ -208,9 +208,7 @@ class _ChatScreenState extends State<ChatScreen> {
           } else if (status == OllamaConnectivityStatus.disconnected) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text(
-                  'Cannot reach Ollama. Messages will be queued.',
-                ),
+                content: Text('Cannot reach Ollama. Messages will be queued.'),
                 duration: Duration(seconds: 3),
                 backgroundColor: Colors.orange,
               ),
@@ -248,9 +246,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (widget.chatService == null || _conversation == null) return;
 
     _conversationUpdatesSubscription?.cancel();
-    _conversationUpdatesSubscription = widget
-        .chatService!
-        .conversationUpdates
+    _conversationUpdatesSubscription = widget.chatService!.conversationUpdates
         .listen((updatedConversation) {
           if (!mounted || _conversation == null) return;
           if (updatedConversation.id != _conversation!.id) return;
@@ -258,7 +254,9 @@ class _ChatScreenState extends State<ChatScreen> {
           setState(() {
             _conversation = updatedConversation;
             _messages = List.from(updatedConversation.messages);
-            _isLoading = widget.chatService!.isGenerating(updatedConversation.id);
+            _isLoading = widget.chatService!.isGenerating(
+              updatedConversation.id,
+            );
           });
           _scrollToBottom();
           _handleTtsStreaming(updatedConversation);

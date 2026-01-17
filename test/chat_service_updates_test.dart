@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:connectivity_plus_platform_interface/connectivity_plus_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
@@ -10,8 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class FakeConnectivityPlatform extends ConnectivityPlatform {
   FakeConnectivityPlatform({List<ConnectivityResult>? initial})
-      : _current = initial ?? [ConnectivityResult.wifi],
-        _controller = StreamController<List<ConnectivityResult>>.broadcast();
+    : _current = initial ?? [ConnectivityResult.wifi],
+      _controller = StreamController<List<ConnectivityResult>>.broadcast();
 
   final StreamController<List<ConnectivityResult>> _controller;
   List<ConnectivityResult> _current;
@@ -62,9 +61,7 @@ void main() {
       updates.add(updated.title);
     });
 
-    final updatedConversation = conversation.copyWith(
-      title: 'Updated Title',
-    );
+    final updatedConversation = conversation.copyWith(title: 'Updated Title');
     await chatService.updateConversation(updatedConversation);
 
     await Future<void>.delayed(const Duration(milliseconds: 10));
