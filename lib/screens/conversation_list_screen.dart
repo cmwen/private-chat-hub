@@ -51,22 +51,33 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     );
     _selectedModel = widget.connectionService.getSelectedModel();
 
-    // Try to load models from Ollama
-    await _loadModels();
-
+    // Show conversations immediately - don't wait for model loading
     setState(() => _isLoading = false);
+
+    // Load models in background (non-blocking)
+    _loadModels();
   }
 
   Future<void> _loadModels() async {
     final connection = widget.connectionService.getDefaultConnection();
-    if (connection == null) return;
+    if (connection == null) {
+      if (mounted) setState(() => _isLoadingModels = false);
+      return;
+    }
 
-    setState(() => _isLoadingModels = true);
+    if (mounted) setState(() => _isLoadingModels = true);
 
     try {
       widget.ollamaManager.setConnection(connection);
 
-      _models = await widget.ollamaManager.listModels();
+      // Add a reasonable timeout for initial model loading (5 seconds)
+      // This prevents long waits when Ollama is offline
+      _models = await widget.ollamaManager.listModels().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          throw Exception('Connection timeout - Ollama may be offline');
+        },
+      );
 
       // If no model selected, select the first one
       if (_selectedModel == null && _models.isNotEmpty) {
@@ -74,11 +85,13 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
         await widget.connectionService.setSelectedModel(_selectedModel!);
       }
     } catch (e) {
-      // Failed to load models
+      // Failed to load models - this is OK, user can still view conversations
       _models = [];
+      // Only show error message if explicitly requested (on refresh)
+      // Silent failure on initial load for better UX
     }
 
-    setState(() => _isLoadingModels = false);
+    if (mounted) setState(() => _isLoadingModels = false);
   }
 
   Future<void> _createNewConversation() async {
