@@ -71,6 +71,9 @@ dependencies:
   # Network connectivity monitoring for offline mode
   connectivity_plus: ^7.0.0
 
+  # Secure storage for API keys
+  flutter_secure_storage: ^9.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
 
 /// Widget for selecting two models for comparison.
 class DualModelSelector extends StatefulWidget {
-  final List<OllamaModelInfo> models;
+  final List<String> models;
   final String? initialModel1;
   final String? initialModel2;
   final Function(String model1, String model2) onModelsSelected;
@@ -157,38 +156,21 @@ class _DualModelSelectorState extends State<DualModelSelector> {
           value: value,
           hint: Text(hint),
           items: widget.models.map((model) {
-            final isDisabled =
-                disabledValue != null && model.name == disabledValue;
+            final isDisabled = disabledValue != null && model == disabledValue;
             return DropdownMenuItem<String>(
-              value: model.name,
+              value: model,
               enabled: !isDisabled,
               child: Row(
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          model.name,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w500,
-                            color: isDisabled
-                                ? theme.colorScheme.onSurface.withValues(
-                                    alpha: 0.3,
-                                  )
-                                : null,
-                          ),
-                        ),
-                        Text(
-                          '${model.family} • ${model.sizeFormatted}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: isDisabled ? 0.2 : 0.6,
-                            ),
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      model,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: isDisabled
+                            ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                            : null,
+                      ),
                     ),
                   ),
                   if (isDisabled)

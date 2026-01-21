@@ -1,4 +1,5 @@
 import 'package:private_chat_hub/models/conversation.dart';
+import 'package:private_chat_hub/models/ai_provider.dart';
 import 'package:private_chat_hub/models/message.dart';
 import 'package:private_chat_hub/ollama_toolkit/models/ollama_model.dart';
 
@@ -19,6 +20,7 @@ class ComparisonConversation extends Conversation {
     super.parameters, // parameters for model1
     ModelParameters? parameters2,
     super.projectId,
+    super.providerType,
   }) : parameters2 = parameters2 ?? const ModelParameters();
 
   /// Whether this is a comparison conversation.
@@ -89,6 +91,7 @@ class ComparisonConversation extends Conversation {
             )
           : const ModelParameters(),
       projectId: json['projectId'] as String?,
+      providerType: parseAiProviderType(json['providerType'] as String?),
     );
   }
 
@@ -118,6 +121,7 @@ class ComparisonConversation extends Conversation {
     String? projectId,
     bool clearProjectId = false,
     bool? toolCallingEnabled,
+    AiProviderType? providerType,
   }) {
     return ComparisonConversation(
       id: id ?? this.id,
@@ -131,6 +135,7 @@ class ComparisonConversation extends Conversation {
       parameters: parameters ?? this.parameters,
       parameters2: parameters2 ?? this.parameters2,
       projectId: clearProjectId ? null : (projectId ?? this.projectId),
+      providerType: providerType ?? this.providerType,
     );
   }
 

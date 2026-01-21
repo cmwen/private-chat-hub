@@ -1,18 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:private_chat_hub/models/ai_provider.dart';
 import 'package:private_chat_hub/models/conversation.dart';
+import 'package:private_chat_hub/models/provider_models.dart';
 import 'package:private_chat_hub/screens/search_screen.dart';
+import 'package:private_chat_hub/services/ai_connection_service.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
-import 'package:private_chat_hub/services/ollama_connection_manager.dart';
-import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
+import 'package:private_chat_hub/services/provider_client_factory.dart';
+import 'package:private_chat_hub/services/provider_model_storage.dart';
 import 'package:private_chat_hub/widgets/dual_model_selector.dart';
+import 'package:private_chat_hub/widgets/provider_models_modal.dart';
 import 'package:intl/intl.dart';
 
 /// Screen showing the list of conversations.
 class ConversationListScreen extends StatefulWidget {
   final ChatService chatService;
   final ConnectionService connectionService;
-  final OllamaConnectionManager ollamaManager;
+  final AiConnectionService aiConnectionService;
+  final ProviderModelStorage providerModelStorage;
+  final ProviderClientFactory providerClientFactory;
   final Function(Conversation) onConversationSelected;
   final VoidCallback onNewConversation;
 
@@ -20,7 +26,9 @@ class ConversationListScreen extends StatefulWidget {
     super.key,
     required this.chatService,
     required this.connectionService,
-    required this.ollamaManager,
+    required this.aiConnectionService,
+    required this.providerModelStorage,
+    required this.providerClientFactory,
     required this.onConversationSelected,
     required this.onNewConversation,
   });
@@ -31,7 +39,7 @@ class ConversationListScreen extends StatefulWidget {
 
 class _ConversationListScreenState extends State<ConversationListScreen> {
   List<Conversation> _conversations = [];
-  List<OllamaModelInfo> _models = [];
+  List<ProviderModelInfo> _models = [];
   String? _selectedModel;
   bool _isLoading = true;
   bool _isLoadingModels = false;
@@ -49,32 +57,40 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     _conversations = widget.chatService.getConversations(
       excludeProjectConversations: true,
     );
-    _selectedModel = widget.connectionService.getSelectedModel();
+    _selectedModel = widget.providerModelStorage.getSelectedModel(
+      widget.aiConnectionService.getSelectedProvider(),
+    );
 
-    // Try to load models from Ollama
     await _loadModels();
 
     setState(() => _isLoading = false);
   }
 
   Future<void> _loadModels() async {
-    final connection = widget.connectionService.getDefaultConnection();
-    if (connection == null) return;
-
     setState(() => _isLoadingModels = true);
 
     try {
-      widget.ollamaManager.setConnection(connection);
+      final providerType = widget.aiConnectionService.getSelectedProvider();
+      final connection = widget.aiConnectionService.getConnectionForProvider(
+        providerType,
+      );
+      final client = await widget.providerClientFactory.createClient(
+        connection,
+      );
+      if (client == null) {
+        _models = [];
+      } else {
+        _models = await client.listModels();
+      }
 
-      _models = await widget.ollamaManager.listModels();
-
-      // If no model selected, select the first one
       if (_selectedModel == null && _models.isNotEmpty) {
         _selectedModel = _models.first.name;
-        await widget.connectionService.setSelectedModel(_selectedModel!);
+        await widget.providerModelStorage.setSelectedModel(
+          providerType,
+          _selectedModel!,
+        );
       }
-    } catch (e) {
-      // Failed to load models
+    } catch (_) {
       _models = [];
     }
 
@@ -111,6 +127,17 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   }
 
   Future<void> _createComparisonConversation() async {
+    if (widget.aiConnectionService.getSelectedProvider() !=
+        AiProviderType.ollama) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Model comparison is only available for Ollama'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     if (_models.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -125,10 +152,9 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     await showDialog(
       context: context,
       builder: (dialogContext) => DualModelSelector(
-        models: _models,
+        models: _models.map((model) => model.name).toList(),
         initialModel1: _selectedModel,
         onModelsSelected: (model1, model2) async {
-          // Create comparison conversation using the service method
           final conversation = await widget.chatService
               .createComparisonConversation(
                 model1Name: model1,
@@ -188,19 +214,24 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   void _showModelSelector() {
     showModalBottomSheet(
       context: context,
-      builder: (sheetContext) => _ModelSelectorSheet(
+      builder: (sheetContext) => ProviderModelsModal(
+        providerType: widget.aiConnectionService.getSelectedProvider(),
         models: _models,
         selectedModel: _selectedModel,
-        onModelSelected: (model) async {
-          await widget.connectionService.setSelectedModel(model.name);
-          if (!mounted) return;
-          setState(() => _selectedModel = model.name);
-          if (sheetContext.mounted) Navigator.pop(sheetContext);
-        },
         isLoading: _isLoadingModels,
         onRefresh: () async {
           await _loadModels();
           if (mounted) setState(() {});
+        },
+        onSelect: (model) async {
+          final providerType = widget.aiConnectionService.getSelectedProvider();
+          await widget.providerModelStorage.setSelectedModel(
+            providerType,
+            model.name,
+          );
+          if (!mounted) return;
+          setState(() => _selectedModel = model.name);
+          if (sheetContext.mounted) Navigator.pop(sheetContext);
         },
       ),
     );
@@ -485,136 +516,6 @@ class _ConversationTile extends StatelessWidget {
     if (diff.inDays < 7) return '${diff.inDays}d ago';
 
     return DateFormat('MMM d').format(date);
-  }
-}
-
-class _ModelSelectorSheet extends StatelessWidget {
-  final List<OllamaModelInfo> models;
-  final String? selectedModel;
-  final Function(OllamaModelInfo) onModelSelected;
-  final bool isLoading;
-  final VoidCallback onRefresh;
-
-  const _ModelSelectorSheet({
-    required this.models,
-    required this.selectedModel,
-    required this.onModelSelected,
-    required this.isLoading,
-    required this.onRefresh,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.only(top: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                const Text(
-                  'Select Model',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                if (isLoading)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: onRefresh,
-                  ),
-              ],
-            ),
-          ),
-          const Divider(),
-          if (models.isEmpty && !isLoading)
-            const Padding(
-              padding: EdgeInsets.all(32),
-              child: Column(
-                children: [
-                  Icon(Icons.warning_amber, size: 48, color: Colors.orange),
-                  SizedBox(height: 16),
-                  Text('No models found', style: TextStyle(fontSize: 16)),
-                  SizedBox(height: 8),
-                  Text(
-                    'Make sure Ollama is running and has models downloaded',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
-            )
-          else
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: models.length,
-                itemBuilder: (context, index) {
-                  final model = models[index];
-                  final isSelected = model.name == selectedModel;
-
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: isSelected
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest,
-                      child: Icon(
-                        Icons.psychology,
-                        color: isSelected
-                            ? Colors.white
-                            : Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    title: Text(model.name),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${model.sizeFormatted}${model.parameterCount != null ? ' • ${model.parameterCount}' : ''}',
-                        ),
-                        const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 4,
-                          runSpacing: 2,
-                          children: [
-                            if (model.capabilities?.supportsVision == true)
-                              _CapabilityBadge(
-                                icon: Icons.visibility,
-                                label: 'Vision',
-                                color: Colors.purple,
-                              ),
-                            if (model.capabilities?.supportsTools == true)
-                              _CapabilityBadge(
-                                icon: Icons.build,
-                                label: 'Tools',
-                                color: Colors.blue,
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    isThreeLine: true,
-                    trailing: isSelected
-                        ? const Icon(Icons.check, color: Colors.green)
-                        : null,
-                    onTap: () => onModelSelected(model),
-                  );
-                },
-              ),
-            ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
   }
 }
 

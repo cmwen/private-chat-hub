@@ -1,15 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:private_chat_hub/models/ai_provider.dart';
 import 'package:private_chat_hub/models/comparison_conversation.dart';
 import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
 import 'package:private_chat_hub/models/queue_item.dart';
 import 'package:private_chat_hub/models/tool_models.dart' as app_tools;
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
+import 'package:private_chat_hub/services/ai_connection_service.dart';
 import 'package:private_chat_hub/services/connectivity_service.dart';
 import 'package:private_chat_hub/services/message_queue_service.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
+import 'package:private_chat_hub/services/provider_chat_client.dart';
+import 'package:private_chat_hub/services/provider_client_factory.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:private_chat_hub/services/tool_executor_service.dart';
 import 'package:uuid/uuid.dart';
@@ -19,6 +23,8 @@ import 'package:uuid/uuid.dart';
 /// This is a clean rewrite that properly integrates with the ollama_toolkit.
 class ChatService {
   final OllamaConnectionManager _ollamaManager;
+  final AiConnectionService _connectionService;
+  final ProviderClientFactory _clientFactory;
   final StorageService _storage;
   final ToolExecutorService? _toolExecutor;
   final app_tools.ToolConfig? _toolConfig;
@@ -40,13 +46,19 @@ class ChatService {
 
   ChatService(
     this._ollamaManager,
+    this._connectionService,
+    this._clientFactory,
     this._storage, {
     ToolExecutorService? toolExecutor,
     app_tools.ToolConfig? toolConfig,
   }) : _toolExecutor = toolExecutor,
        _toolConfig = toolConfig {
     // Initialize offline mode services
-    _connectivityService = ConnectivityService(_ollamaManager);
+    _connectivityService = ConnectivityService(
+      _ollamaManager,
+      _connectionService,
+      _clientFactory,
+    );
     _queueService = MessageQueueService(_storage);
 
     // Listen for connectivity changes and process queue when online
@@ -141,6 +153,7 @@ class ChatService {
       updatedAt: DateTime.now(),
       systemPrompt: systemPrompt,
       projectId: projectId,
+      providerType: activeProviderType,
     );
 
     final conversations = getConversations();
@@ -166,6 +179,7 @@ class ChatService {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
       systemPrompt: systemPrompt,
+      providerType: activeProviderType,
     );
 
     final conversations = getConversations();
@@ -330,6 +344,9 @@ class ChatService {
   /// Gets the connectivity service.
   ConnectivityService get connectivityService => _connectivityService;
 
+  AiProviderType get activeProviderType =>
+      _connectionService.getSelectedProvider();
+
   /// Gets the message queue service.
   MessageQueueService get queueService => _queueService;
 
@@ -369,6 +386,7 @@ class ChatService {
       await _queueService.enqueue(
         conversationId: conversationId,
         messageId: userMessage.id,
+        providerType: activeProviderType,
       );
       _log('Message queued successfully: ${userMessage.id}');
     } catch (e) {
@@ -458,6 +476,7 @@ class ChatService {
       await _queueService.enqueue(
         conversationId: targetConversation.id,
         messageId: messageId,
+        providerType: activeProviderType,
       );
 
       // Update message status to queued
@@ -567,9 +586,9 @@ class ChatService {
       throw Exception('Conversation not found');
     }
 
-    final client = _ollamaManager.client;
-    if (client == null) {
-      throw Exception('No Ollama connection configured');
+    final providerClient = await _getProviderClient();
+    if (providerClient == null) {
+      throw Exception('No AI provider connection configured');
     }
 
     // Update message status to sending
@@ -584,16 +603,16 @@ class ChatService {
       final messageIndex = conversation.messages.indexWhere(
         (m) => m.id == userMessage.id,
       );
-      final ollamaMessages = _buildOllamaMessageHistory(
+      final historyMessages = _buildMessageHistory(
         conversation.copyWith(
           messages: conversation.messages.sublist(0, messageIndex + 1),
         ),
       );
 
       // Send message (without tool calling for queued messages)
-      final response = await client.chat(
-        conversation.modelName,
-        ollamaMessages,
+      final response = await providerClient.chat(
+        model: conversation.modelName,
+        messages: historyMessages,
         options: conversation.parameters.toOllamaOptions(),
       );
 
@@ -607,7 +626,7 @@ class ChatService {
       // Add assistant response
       final assistantMessage = Message.assistant(
         id: const Uuid().v4(),
-        text: response.message.content,
+        text: response.content,
         timestamp: DateTime.now(),
       );
       await addMessage(conversationId, assistantMessage);
@@ -763,14 +782,14 @@ class ChatService {
     String assistantMessageId,
     StreamController<Conversation> streamController,
   ) async {
-    final client = _ollamaManager.client;
-    if (client == null) {
+    final providerClient = await _getProviderClient();
+    if (providerClient == null) {
       _handleError(
         conversationId,
         conversation,
         assistantMessageId,
         streamController,
-        'No Ollama connection configured',
+        'No AI provider connection configured',
       );
       return;
     }
@@ -797,7 +816,7 @@ class ChatService {
           conversation,
           assistantMessageId,
           streamController,
-          client,
+          providerClient,
         );
       } else {
         _log('Using simple chat approach without tools');
@@ -807,7 +826,7 @@ class ChatService {
           conversation,
           assistantMessageId,
           streamController,
-          client,
+          providerClient,
         );
       }
     } catch (e) {
@@ -828,10 +847,10 @@ class ChatService {
     Conversation conversation,
     String assistantMessageId,
     StreamController<Conversation> streamController,
-    OllamaClient client,
+    ProviderChatClient providerClient,
   ) async {
-    // Build message history for Ollama
-    final ollamaMessages = _buildOllamaMessageHistory(
+    // Build message history
+    final historyMessages = _buildMessageHistory(
       conversation,
       excludeMessageId: assistantMessageId,
     );
@@ -840,19 +859,18 @@ class ChatService {
     final streamingEnabled = await _configService.getStreamEnabled();
 
     if (streamingEnabled) {
-      // Stream the response
       final buffer = StringBuffer();
-      final subscription = client
+      final subscription = providerClient
           .chatStream(
-            conversation.modelName,
-            ollamaMessages,
+            model: conversation.modelName,
+            messages: historyMessages,
             options: conversation.parameters.toOllamaOptions(),
           )
           .listen(
             (response) async {
               if (streamController.isClosed) return;
 
-              final content = response.message.content;
+              final content = response.contentDelta;
               if (content.isNotEmpty) {
                 buffer.write(content);
               }
@@ -894,7 +912,6 @@ class ChatService {
 
               _activeSubscriptions.remove(conversationId);
 
-              // Show notification when response completes
               await _showResponseCompleteNotification(
                 conversation,
                 buffer.toString(),
@@ -904,11 +921,10 @@ class ChatService {
 
       _activeSubscriptions[conversationId] = subscription;
     } else {
-      // Non-streaming mode: get complete response at once
       try {
-        final response = await client.chat(
-          conversation.modelName,
-          ollamaMessages,
+        final response = await providerClient.chat(
+          model: conversation.modelName,
+          messages: historyMessages,
           options: conversation.parameters.toOllamaOptions(),
         );
 
@@ -917,7 +933,7 @@ class ChatService {
         conversation = await _updateAssistantMessage(
           conversation,
           assistantMessageId,
-          response.message.content,
+          response.content,
           isStreaming: false,
         );
 
@@ -928,11 +944,7 @@ class ChatService {
 
         _activeSubscriptions.remove(conversationId);
 
-        // Show notification when response completes
-        await _showResponseCompleteNotification(
-          conversation,
-          response.message.content,
-        );
+        await _showResponseCompleteNotification(conversation, response.content);
       } catch (error) {
         _handleError(
           conversationId,
@@ -945,117 +957,116 @@ class ChatService {
     }
   }
 
-  /// Generates response using agent with tool calling support.
+  /// Generates response using tool calling support.
   Future<void> _generateWithTools(
     String conversationId,
     Conversation conversation,
     String assistantMessageId,
     StreamController<Conversation> streamController,
-    OllamaClient client,
+    ProviderChatClient providerClient,
   ) async {
-    _log('Starting agent-based generation for _generateWithTools');
+    _log('Starting tool-based generation for provider');
 
-    // Check streaming preference - apply to tool calling as well
     final streamingEnabled = await _configService.getStreamEnabled();
     _log('Streaming enabled for tool calling: $streamingEnabled');
 
-    // Create an agent for this conversation
-    final systemPromptWithInstructions = _buildAgentSystemPrompt(
-      conversation.systemPrompt,
-    );
-    final maxIterations = _toolConfig?.maxToolCalls ?? 15;
-    final agent = OllamaAgent(
-      client: client,
-      model: conversation.modelName,
-      systemPrompt: systemPromptWithInstructions,
-      maxIterations: maxIterations,
-    );
-
-    // Get available tools
     final executor = _toolExecutor!;
-    final tools = executor.getAvailableTools().map((tool) {
-      return _OllamaToolWrapper(tool, executor);
-    }).toList();
+    final tools = executor.getAvailableTools();
+    final toolDefinitions = tools.map((tool) => tool.toOllamaFormat()).toList();
 
     _log('Available tools: ${tools.map((t) => t.name).toList()}');
 
-    // Get the last user message as input
-    final userMessages = conversation.messages
-        .where((m) => m.role == MessageRole.user)
-        .toList();
-    if (userMessages.isEmpty) {
-      throw Exception('No user message found');
-    }
-    final lastUserMessage = userMessages.last;
-
-    // Run agent with tools
-    final List<app_tools.ToolCall> toolCalls = [];
-    var responseText = StringBuffer();
+    final toolCalls = <app_tools.ToolCall>[];
+    final assistantBuffer = StringBuffer();
+    final historyMessages = _buildMessageHistory(
+      conversation,
+      excludeMessageId: assistantMessageId,
+    );
 
     try {
-      _log('Running agent.runWithTools for model: ${conversation.modelName}');
+      if (streamingEnabled) {
+        final subscription = providerClient
+            .chatStream(
+              model: conversation.modelName,
+              messages: historyMessages,
+              options: conversation.parameters.toOllamaOptions(),
+              tools: toolDefinitions,
+            )
+            .listen(
+              (chunk) async {
+                if (streamController.isClosed) return;
+                if (chunk.contentDelta.isNotEmpty) {
+                  assistantBuffer.write(chunk.contentDelta);
+                }
+                if (providerClient.providerType == AiProviderType.liteLlm &&
+                    chunk.toolCalls != null) {
+                  toolCalls.addAll(_parseLiteLlmToolCalls(chunk.toolCalls));
+                }
+                conversation = await _updateAssistantMessage(
+                  conversation,
+                  assistantMessageId,
+                  assistantBuffer.toString(),
+                  isStreaming: true,
+                );
+                if (!streamController.isClosed) {
+                  streamController.add(conversation);
+                }
+              },
+              onError: (error) {
+                _handleError(
+                  conversationId,
+                  conversation,
+                  assistantMessageId,
+                  streamController,
+                  error.toString(),
+                );
+              },
+              onDone: () async {
+                if (streamController.isClosed) return;
+                conversation = await _updateAssistantMessage(
+                  conversation,
+                  assistantMessageId,
+                  assistantBuffer.toString(),
+                  isStreaming: false,
+                );
+                if (!streamController.isClosed) {
+                  streamController.add(conversation);
+                  streamController.close();
+                }
+                _activeSubscriptions.remove(conversationId);
+                await _showResponseCompleteNotification(
+                  conversation,
+                  assistantBuffer.toString(),
+                );
+              },
+            );
 
-      // Show initial status
-      conversation = await _updateStatusMessage(
-        conversation,
-        assistantMessageId,
-        '🔄 Starting tool execution...',
-      );
-      if (!streamController.isClosed) {
-        streamController.add(conversation);
-      }
-
-      final result = await agent.runWithTools(lastUserMessage.text, tools);
-
-      _log('Agent completed with ${result.steps.length} steps');
-
-      // Check if agent failed (e.g., max iterations reached)
-      if (!result.success && result.error != null) {
-        _log('Agent failed: ${result.error}');
-        // Throw error to trigger error message display
-        throw Exception(result.error);
-      }
-
-      // Collect tool calls from agent steps and update status
-      for (final step in result.steps) {
-        _log('Step: type=${step.type}, tool=${step.toolName}');
-
-        // Update status for tool calls
-        if (step.type == 'tool_call' && step.toolName != null) {
-          final toolDisplayName = _getToolDisplayName(step.toolName!);
-          conversation = await _updateStatusMessage(
-            conversation,
-            assistantMessageId,
-            '⚙️ Executing $toolDisplayName...',
-          );
-          if (!streamController.isClosed) {
-            streamController.add(conversation);
-          }
-
-          final toolCall = app_tools.ToolCall(
-            id: const Uuid().v4(),
-            toolName: step.toolName!,
-            arguments: step.toolArgs ?? {},
-            status: app_tools.ToolCallStatus.success,
-            createdAt: step.timestamp,
-          );
-          toolCalls.add(toolCall);
-          _log('Added tool call: ${step.toolName}');
+        _activeSubscriptions[conversationId] = subscription;
+      } else {
+        final response = await providerClient.chat(
+          model: conversation.modelName,
+          messages: historyMessages,
+          options: conversation.parameters.toOllamaOptions(),
+          tools: toolDefinitions,
+        );
+        conversation = await _updateAssistantMessage(
+          conversation,
+          assistantMessageId,
+          response.content,
+          isStreaming: false,
+        );
+        if (!streamController.isClosed) {
+          streamController.add(conversation);
+          streamController.close();
+        }
+        _activeSubscriptions.remove(conversationId);
+        await _showResponseCompleteNotification(conversation, response.content);
+        if (providerClient.providerType == AiProviderType.liteLlm) {
+          toolCalls.addAll(_parseLiteLlmToolCalls(response.toolCalls));
         }
       }
-
-      // Clear status message before final response
-      conversation = await _updateStatusMessage(
-        conversation,
-        assistantMessageId,
-        null,
-      );
-
-      responseText.write(result.response);
-      _log('Final response length: ${result.response.length}');
     } catch (e) {
-      _log('Error during agent execution: $e');
-      // Re-throw to use the error handling mechanism
+      _log('Error during tool execution: $e');
       _handleError(
         conversationId,
         conversation,
@@ -1066,30 +1077,40 @@ class ChatService {
       return;
     }
 
-    // Update message with final response and tool calls
-    // Note: Agent execution completes before we can stream, so isStreaming is always false
-    // But we respect the streaming preference for consistency
-    conversation = await _updateAssistantMessage(
-      conversation,
-      assistantMessageId,
-      responseText.toString(),
-      isStreaming:
-          false, // Agent runs to completion, can't stream intermediate states
-      toolCalls: toolCalls,
-    );
-
-    if (!streamController.isClosed) {
-      streamController.add(conversation);
-      streamController.close();
+    if (toolCalls.isNotEmpty) {
+      conversation = await _updateAssistantMessage(
+        conversation,
+        assistantMessageId,
+        assistantBuffer.toString(),
+        isStreaming: false,
+        toolCalls: toolCalls,
+      );
     }
+  }
 
-    _activeSubscriptions.remove(conversationId);
+  List<app_tools.ToolCall> _parseLiteLlmToolCalls(
+    List<Map<String, dynamic>>? toolCalls,
+  ) {
+    if (toolCalls == null || toolCalls.isEmpty) return [];
 
-    // Show notification when response completes
-    await _showResponseCompleteNotification(
-      conversation,
-      responseText.toString(),
-    );
+    return toolCalls.map((toolCall) {
+      final function = toolCall['function'] as Map<String, dynamic>?;
+      final name = function?['name'] as String? ?? 'tool';
+      final argumentsJson = function?['arguments'] as String? ?? '{}';
+      Map<String, dynamic> arguments;
+      try {
+        arguments = jsonDecode(argumentsJson) as Map<String, dynamic>;
+      } catch (_) {
+        arguments = {};
+      }
+      return app_tools.ToolCall(
+        id: toolCall['id'] as String? ?? const Uuid().v4(),
+        toolName: name,
+        arguments: arguments,
+        status: app_tools.ToolCallStatus.success,
+        createdAt: DateTime.now(),
+      );
+    }).toList();
   }
 
   // ============================================================================
@@ -1186,6 +1207,15 @@ class ChatService {
     String model2MessageId,
     StreamController<ComparisonConversation> streamController,
   ) async {
+    if (activeProviderType != AiProviderType.ollama) {
+      streamController.addError(
+        'Model comparison is only supported for Ollama',
+      );
+      _cleanupStream(conversationId);
+      await streamController.close();
+      return;
+    }
+
     final client = _ollamaManager.client;
     if (client == null) {
       streamController.addError('No Ollama connection configured');
@@ -1413,6 +1443,49 @@ class ChatService {
     return messages;
   }
 
+  List<Map<String, dynamic>> _buildToolDefinitions() {
+    final tools = _toolExecutor?.getAvailableTools() ?? [];
+    return tools.map((tool) => tool.toOllamaFormat()).toList();
+  }
+
+  /// Builds provider-agnostic message history.
+  List<Message> _buildMessageHistory(
+    Conversation conversation, {
+    String? excludeMessageId,
+    String? excludeMessageId2,
+    bool includeModel1Only = false,
+  }) {
+    final messages = <Message>[];
+
+    if (conversation.systemPrompt != null) {
+      messages.add(
+        Message.system(
+          id: const Uuid().v4(),
+          text: conversation.systemPrompt!,
+          timestamp: DateTime.now(),
+        ),
+      );
+    }
+
+    for (final msg in conversation.messages) {
+      if (msg.id == excludeMessageId ||
+          msg.id == excludeMessageId2 ||
+          msg.isError) {
+        continue;
+      }
+
+      if (includeModel1Only &&
+          msg.modelSource != ModelSource.user &&
+          msg.modelSource != ModelSource.model1) {
+        continue;
+      }
+
+      messages.add(msg);
+    }
+
+    return messages;
+  }
+
   /// Converts app Message to OllamaMessage.
   OllamaMessage _convertMessageToOllama(Message message) {
     switch (message.role) {
@@ -1544,6 +1617,11 @@ class ChatService {
     }
   }
 
+  Future<ProviderChatClient?> _getProviderClient() async {
+    final connection = _connectionService.getActiveConnection();
+    return _clientFactory.createClient(connection);
+  }
+
   /// Show a notification when a response completes.
   Future<void> _showResponseCompleteNotification(
     Conversation conversation,
@@ -1641,7 +1719,7 @@ class ChatService {
   // SYNCHRONOUS CHAT (NON-STREAMING)
   // ============================================================================
 
-  /// Sends a message and gets a non-streaming response from Ollama.
+  /// Sends a message and gets a non-streaming response from the provider.
   Future<Conversation> sendMessageSync(
     String conversationId,
     String text,
@@ -1651,9 +1729,9 @@ class ChatService {
       throw Exception('Conversation not found');
     }
 
-    final client = _ollamaManager.client;
-    if (client == null) {
-      throw Exception('No Ollama connection configured');
+    final providerClient = await _getProviderClient();
+    if (providerClient == null) {
+      throw Exception('No AI provider connection configured');
     }
 
     // Add user message
@@ -1665,25 +1743,21 @@ class ChatService {
     var conversation = await addMessage(conversationId, userMessage);
 
     try {
-      // Build message history
-      final ollamaMessages = _buildOllamaMessageHistory(conversation);
+      final historyMessages = _buildMessageHistory(conversation);
 
-      // Get response
-      final response = await client.chat(
-        conversation.modelName,
-        ollamaMessages,
+      final response = await providerClient.chat(
+        model: conversation.modelName,
+        messages: historyMessages,
         options: conversation.parameters.toOllamaOptions(),
       );
 
-      // Add assistant message
       final assistantMessage = Message.assistant(
         id: const Uuid().v4(),
-        text: response.message.content,
+        text: response.content,
         timestamp: DateTime.now(),
       );
       conversation = await addMessage(conversationId, assistantMessage);
     } catch (e) {
-      // Add error message
       final errorMessage = Message.error(
         id: const Uuid().v4(),
         errorMessage: e.toString(),

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:private_chat_hub/models/ai_provider.dart';
 import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
 
@@ -35,6 +36,7 @@ void main() {
         createdAt: DateTime(2025, 1, 1),
         updatedAt: DateTime(2025, 1, 1, 10, 5),
         systemPrompt: 'You are a helpful assistant.',
+        providerType: AiProviderType.liteLlm,
       );
 
       final json = original.toJson();
@@ -45,6 +47,19 @@ void main() {
       expect(restored.modelName, original.modelName);
       expect(restored.messages.length, 1);
       expect(restored.systemPrompt, original.systemPrompt);
+      expect(restored.providerType, AiProviderType.liteLlm);
+    });
+
+    test('should default to Ollama provider', () {
+      final conversation = Conversation(
+        id: 'test-id',
+        title: 'Test Conversation',
+        modelName: 'llama3.2:latest',
+        createdAt: DateTime(2025, 1, 1),
+        updatedAt: DateTime(2025, 1, 1),
+      );
+
+      expect(conversation.providerType, AiProviderType.ollama);
     });
 
     test('should add message to conversation', () {

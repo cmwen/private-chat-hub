@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:private_chat_hub/models/ai_provider.dart';
 import 'package:private_chat_hub/models/queue_item.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:uuid/uuid.dart';
@@ -66,6 +67,7 @@ class MessageQueueService {
   Future<QueueItem> enqueue({
     required String conversationId,
     required String messageId,
+    required AiProviderType providerType,
   }) async {
     if (isQueueFull()) {
       throw QueueFullException(
@@ -78,6 +80,7 @@ class MessageQueueService {
       id: const Uuid().v4(),
       conversationId: conversationId,
       messageId: messageId,
+      providerType: providerType,
       queuedAt: DateTime.now(),
     );
 

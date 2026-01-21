@@ -1,26 +1,29 @@
 import 'package:flutter/material.dart';
-import 'package:private_chat_hub/models/project.dart';
-import 'package:private_chat_hub/screens/project_detail_screen.dart';
-import 'package:private_chat_hub/services/chat_service.dart';
-import 'package:private_chat_hub/services/connection_service.dart';
-import 'package:private_chat_hub/services/ollama_connection_manager.dart';
-import 'package:private_chat_hub/services/project_service.dart';
 import 'package:private_chat_hub/models/conversation.dart';
+import 'package:private_chat_hub/screens/project_detail_screen.dart';
+import 'package:private_chat_hub/services/ai_connection_service.dart';
+import 'package:private_chat_hub/services/chat_service.dart';
+import 'package:private_chat_hub/services/provider_client_factory.dart';
+import 'package:private_chat_hub/services/provider_model_storage.dart';
+import 'package:private_chat_hub/services/project_service.dart';
+import 'package:private_chat_hub/models/project.dart';
 
 /// Screen for managing projects.
 class ProjectsScreen extends StatefulWidget {
   final ProjectService projectService;
   final ChatService chatService;
-  final ConnectionService connectionService;
-  final OllamaConnectionManager ollamaManager;
+  final AiConnectionService aiConnectionService;
+  final ProviderModelStorage providerModelStorage;
+  final ProviderClientFactory providerClientFactory;
   final Function(Conversation) onConversationSelected;
 
   const ProjectsScreen({
     super.key,
     required this.projectService,
     required this.chatService,
-    required this.connectionService,
-    required this.ollamaManager,
+    required this.aiConnectionService,
+    required this.providerModelStorage,
+    required this.providerClientFactory,
     required this.onConversationSelected,
   });
 
@@ -110,8 +113,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           project: project,
           projectService: widget.projectService,
           chatService: widget.chatService,
-          connectionService: widget.connectionService,
-          ollamaManager: widget.ollamaManager,
+          aiConnectionService: widget.aiConnectionService,
+          providerModelStorage: widget.providerModelStorage,
+          providerClientFactory: widget.providerClientFactory,
           onConversationSelected: widget.onConversationSelected,
           onProjectUpdated: _loadProjects,
         ),

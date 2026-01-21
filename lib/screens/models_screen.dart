@@ -1,18 +1,26 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:private_chat_hub/models/ai_provider.dart';
+import 'package:private_chat_hub/models/provider_models.dart';
+import 'package:private_chat_hub/services/ai_connection_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
-import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
+import 'package:private_chat_hub/services/provider_client_factory.dart';
+import 'package:private_chat_hub/services/provider_model_storage.dart';
 
-/// Screen for managing Ollama models.
+/// Screen for managing models.
 class ModelsScreen extends StatefulWidget {
-  final OllamaConnectionManager ollamaManager;
   final ConnectionService connectionService;
+  final AiConnectionService aiConnectionService;
+  final ProviderModelStorage providerModelStorage;
+  final ProviderClientFactory providerClientFactory;
 
   const ModelsScreen({
     super.key,
-    required this.ollamaManager,
     required this.connectionService,
+    required this.aiConnectionService,
+    required this.providerModelStorage,
+    required this.providerClientFactory,
   });
 
   @override
@@ -20,7 +28,7 @@ class ModelsScreen extends StatefulWidget {
 }
 
 class _ModelsScreenState extends State<ModelsScreen> {
-  List<OllamaModelInfo> _models = [];
+  List<ProviderModelInfo> _models = [];
   bool _isLoading = true;
   String? _error;
   String? _selectedModel;
@@ -30,7 +38,9 @@ class _ModelsScreenState extends State<ModelsScreen> {
   void initState() {
     super.initState();
     _loadModels();
-    _selectedModel = widget.connectionService.getSelectedModel();
+    _selectedModel = widget.providerModelStorage.getSelectedModel(
+      widget.aiConnectionService.getSelectedProvider(),
+    );
   }
 
   Future<void> _loadModels() async {
@@ -40,19 +50,23 @@ class _ModelsScreenState extends State<ModelsScreen> {
     });
 
     try {
-      final connection = widget.connectionService.getDefaultConnection();
-      if (connection == null) {
+      final providerType = widget.aiConnectionService.getSelectedProvider();
+      final connection = widget.aiConnectionService.getConnectionForProvider(
+        providerType,
+      );
+      final client = await widget.providerClientFactory.createClient(
+        connection,
+      );
+      if (client == null) {
         setState(() {
           _error =
-              'No Ollama connection configured. Go to Settings to add one.';
+              'No ${providerType.label} connection configured. Go to Settings to add one.';
           _isLoading = false;
         });
         return;
       }
 
-      widget.ollamaManager.setConnection(connection);
-
-      final models = await widget.ollamaManager.listModels();
+      final models = await client.listModels();
       setState(() {
         _models = models;
         _isLoading = false;
@@ -65,15 +79,30 @@ class _ModelsScreenState extends State<ModelsScreen> {
     }
   }
 
-  Future<void> _deleteModel(OllamaModelInfo model) async {
+  Future<void> _deleteModel(ProviderModelInfo model) async {
+    if (widget.aiConnectionService.getSelectedProvider() !=
+        AiProviderType.ollama) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Delete Model'),
+          content: const Text('Deleting models is only supported for Ollama.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Model'),
-        content: Text(
-          'Are you sure you want to delete "${model.name}"?\n\n'
-          'This will free up ${model.sizeFormatted} of space.',
-        ),
+        content: Text('Are you sure you want to delete "${model.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -89,29 +118,26 @@ class _ModelsScreenState extends State<ModelsScreen> {
     );
 
     if (confirmed == true) {
-      try {
-        await widget.ollamaManager.deleteModel(model.name);
-        await _loadModels();
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('${model.name} deleted')));
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to delete: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      final defaultConnection = widget.connectionService.getDefaultConnection();
+      if (defaultConnection == null) return;
+      final ollamaManager = OllamaConnectionManager();
+      ollamaManager.setConnection(defaultConnection);
+      await ollamaManager.deleteModel(model.name);
+      await _loadModels();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('${model.name} deleted')));
       }
     }
   }
 
-  Future<void> _selectModel(OllamaModelInfo model) async {
-    await widget.connectionService.setSelectedModel(model.name);
+  Future<void> _selectModel(ProviderModelInfo model) async {
+    final providerType = widget.aiConnectionService.getSelectedProvider();
+    await widget.providerModelStorage.setSelectedModel(
+      providerType,
+      model.name,
+    );
     setState(() => _selectedModel = model.name);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -128,6 +154,18 @@ class _ModelsScreenState extends State<ModelsScreen> {
   }
 
   Future<void> _pullModel(String modelName) async {
+    final providerType = widget.aiConnectionService.getSelectedProvider();
+    if (providerType != AiProviderType.ollama) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pulling models is only supported for Ollama.'),
+          ),
+        );
+      }
+      return;
+    }
+
     Navigator.pop(context);
 
     setState(() {
@@ -138,7 +176,12 @@ class _ModelsScreenState extends State<ModelsScreen> {
     });
 
     try {
-      await widget.ollamaManager.pullModel(
+      final defaultConnection = widget.connectionService.getDefaultConnection();
+      if (defaultConnection == null) return;
+      final ollamaManager = OllamaConnectionManager();
+      ollamaManager.setConnection(defaultConnection);
+
+      await ollamaManager.pullModel(
         modelName,
         onProgress: (progress) {
           setState(() {
@@ -150,7 +193,6 @@ class _ModelsScreenState extends State<ModelsScreen> {
         },
       );
 
-      // Download complete
       setState(() {
         _downloadProgress.remove(modelName);
       });
@@ -175,7 +217,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
     }
   }
 
-  void _showModelDetails(OllamaModelInfo model) async {
+  void _showModelDetails(ProviderModelInfo model) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -184,9 +226,8 @@ class _ModelsScreenState extends State<ModelsScreen> {
         minChildSize: 0.4,
         maxChildSize: 0.9,
         expand: false,
-        builder: (context, scrollController) => _ModelDetailsSheet(
+        builder: (context, scrollController) => _ProviderModelDetailsSheet(
           model: model,
-          ollamaManager: widget.ollamaManager,
           scrollController: scrollController,
         ),
       ),
@@ -208,12 +249,16 @@ class _ModelsScreenState extends State<ModelsScreen> {
         ],
       ),
       body: _buildBody(),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'models_fab',
-        onPressed: _showPullModelDialog,
-        icon: const Icon(Icons.download),
-        label: const Text('Pull Model'),
-      ),
+      floatingActionButton:
+          widget.aiConnectionService.getSelectedProvider() ==
+              AiProviderType.ollama
+          ? FloatingActionButton.extended(
+              heroTag: 'models_fab',
+              onPressed: _showPullModelDialog,
+              icon: const Icon(Icons.download),
+              label: const Text('Pull Model'),
+            )
+          : null,
     );
   }
 
@@ -260,6 +305,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
     }
 
     if (_models.isEmpty) {
+      final providerType = widget.aiConnectionService.getSelectedProvider();
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -273,23 +319,26 @@ class _ModelsScreenState extends State<ModelsScreen> {
               ),
               const SizedBox(height: 24),
               const Text(
-                'No models installed',
+                'No models available',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Text(
-                'Pull a model to get started chatting with AI',
+                providerType == AiProviderType.ollama
+                    ? 'Pull a model to get started chatting with AI'
+                    : 'No models returned from ${providerType.label}.',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _showPullModelDialog,
-                icon: const Icon(Icons.download),
-                label: const Text('Pull Model'),
-              ),
+              if (providerType == AiProviderType.ollama)
+                ElevatedButton.icon(
+                  onPressed: _showPullModelDialog,
+                  icon: const Icon(Icons.download),
+                  label: const Text('Pull Model'),
+                ),
             ],
           ),
         ),
@@ -347,10 +396,14 @@ class _ModelsScreenState extends State<ModelsScreen> {
               itemBuilder: (context, index) {
                 final model = _models[index];
                 final isSelected = model.name == _selectedModel;
+                final canDelete =
+                    widget.aiConnectionService.getSelectedProvider() ==
+                    AiProviderType.ollama;
 
                 return _ModelCard(
                   model: model,
                   isSelected: isSelected,
+                  canDelete: canDelete,
                   onTap: () => _showModelDetails(model),
                   onSelect: () => _selectModel(model),
                   onDelete: () => _deleteModel(model),
@@ -372,8 +425,9 @@ class _DownloadProgress {
 }
 
 class _ModelCard extends StatelessWidget {
-  final OllamaModelInfo model;
+  final ProviderModelInfo model;
   final bool isSelected;
+  final bool canDelete;
   final VoidCallback onTap;
   final VoidCallback onSelect;
   final VoidCallback onDelete;
@@ -381,6 +435,7 @@ class _ModelCard extends StatelessWidget {
   const _ModelCard({
     required this.model,
     required this.isSelected,
+    required this.canDelete,
     required this.onTap,
     required this.onSelect,
     required this.onDelete,
@@ -451,10 +506,12 @@ class _ModelCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        _InfoChip(
-                          icon: Icons.storage,
-                          label: model.sizeFormatted,
-                        ),
+                        if (model.sizeFormatted != null)
+                          _InfoChip(
+                            icon: Icons.storage,
+                            label: model.sizeFormatted!,
+                          ),
+
                         if (model.parameterCount != null) ...[
                           const SizedBox(width: 8),
                           _InfoChip(
@@ -493,7 +550,9 @@ class _ModelCard extends StatelessWidget {
                       onSelect();
                       break;
                     case 'delete':
-                      onDelete();
+                      if (canDelete) {
+                        onDelete();
+                      }
                       break;
                   }
                 },
@@ -507,17 +566,18 @@ class _ModelCard extends StatelessWidget {
                         contentPadding: EdgeInsets.zero,
                       ),
                     ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: ListTile(
-                      leading: Icon(Icons.delete, color: Colors.red),
-                      title: Text(
-                        'Delete',
-                        style: TextStyle(color: Colors.red),
+                  if (canDelete)
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: ListTile(
+                        leading: Icon(Icons.delete, color: Colors.red),
+                        title: Text(
+                          'Delete',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                        contentPadding: EdgeInsets.zero,
                       ),
-                      contentPadding: EdgeInsets.zero,
                     ),
-                  ),
                 ],
               ),
             ],
@@ -752,51 +812,21 @@ class _PullModelDialogState extends State<_PullModelDialog> {
   }
 }
 
-class _ModelDetailsSheet extends StatefulWidget {
-  final OllamaModelInfo model;
-  final OllamaConnectionManager ollamaManager;
+class _ProviderModelDetailsSheet extends StatelessWidget {
+  final ProviderModelInfo model;
   final ScrollController scrollController;
 
-  const _ModelDetailsSheet({
+  const _ProviderModelDetailsSheet({
     required this.model,
-    required this.ollamaManager,
     required this.scrollController,
   });
-
-  @override
-  State<_ModelDetailsSheet> createState() => _ModelDetailsSheetState();
-}
-
-class _ModelDetailsSheetState extends State<_ModelDetailsSheet> {
-  Map<String, dynamic>? _details;
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadDetails();
-  }
-
-  Future<void> _loadDetails() async {
-    try {
-      final details = await widget.ollamaManager.showModel(widget.model.name);
-      setState(() {
-        _details = details.details ?? {};
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(24),
       child: ListView(
-        controller: widget.scrollController,
+        controller: scrollController,
         children: [
           Row(
             children: [
@@ -815,112 +845,72 @@ class _ModelDetailsSheetState extends State<_ModelDetailsSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.model.name,
+                      model.name,
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Text(
-                      widget.model.sizeFormatted,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    if (model.sizeFormatted != null)
+                      Text(
+                        model.sizeFormatted!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 24),
-          if (_isLoading)
-            const Center(child: CircularProgressIndicator())
-          else if (_details != null) ...[
-            // Capabilities badges
-            _DetailSection(
-              title: 'Capabilities',
-              children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (widget.model.capabilities?.supportsVision == true)
-                      _CapabilityChip(
-                        icon: Icons.visibility,
-                        label: 'Vision',
-                        color: Colors.purple,
-                      ),
-                    if (widget.model.capabilities?.supportsTools == true)
-                      _CapabilityChip(
-                        icon: Icons.build,
-                        label: 'Tools',
-                        color: Colors.blue,
-                      ),
+          _DetailSection(
+            title: 'Capabilities',
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (model.capabilities?.supportsVision == true)
+                    _CapabilityChip(
+                      icon: Icons.visibility,
+                      label: 'Vision',
+                      color: Colors.purple,
+                    ),
+                  if (model.capabilities?.supportsTools == true)
+                    _CapabilityChip(
+                      icon: Icons.build,
+                      label: 'Tools',
+                      color: Colors.blue,
+                    ),
+                  if (model.capabilities?.contextLength != null)
                     _CapabilityChip(
                       icon: Icons.storage,
                       label:
-                          '${((widget.model.capabilities?.contextLength ?? 4096) / 1024).toStringAsFixed(0)}K context',
+                          '${((model.capabilities?.contextLength ?? 4096) / 1024).toStringAsFixed(0)}K context',
                       color: Colors.orange,
                     ),
-                  ],
-                ),
-                if (widget.model.capabilities?.description?.isNotEmpty ==
-                    true) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.model.capabilities!.description!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: 14,
-                    ),
-                  ),
                 ],
+              ),
+              if (model.capabilities?.description?.isNotEmpty == true) ...[
+                const SizedBox(height: 8),
+                Text(
+                  model.capabilities!.description!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 14,
+                  ),
+                ),
               ],
-            ),
+            ],
+          ),
+          if (model.parameterCount != null) ...[
             const SizedBox(height: 16),
             _DetailSection(
               title: 'Model Information',
-              children: [
-                if (_details!['modelfile'] != null)
-                  _DetailRow('Family', widget.model.family),
-                if (widget.model.parameterCount != null)
-                  _DetailRow('Parameters', widget.model.parameterCount!),
-                if (_details!['details']?['quantization_level'] != null)
-                  _DetailRow(
-                    'Quantization',
-                    _details!['details']['quantization_level'] as String,
-                  ),
-                if (_details!['details']?['format'] != null)
-                  _DetailRow(
-                    'Format',
-                    _details!['details']['format'] as String,
-                  ),
-              ],
+              children: [_DetailRow('Parameters', model.parameterCount!)],
             ),
-            const SizedBox(height: 16),
-            if (_details!['template'] != null)
-              _DetailSection(
-                title: 'Prompt Template',
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainer,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _details!['template'] as String,
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-          ] else
-            const Text('Failed to load model details'),
+          ],
         ],
       ),
     );

@@ -1,4 +1,5 @@
 import 'package:private_chat_hub/models/message.dart';
+import 'package:private_chat_hub/models/ai_provider.dart';
 import 'package:private_chat_hub/ollama_toolkit/models/ollama_model.dart';
 
 /// Model parameters for controlling AI behavior.
@@ -97,6 +98,7 @@ class Conversation {
   final ModelParameters parameters;
   final String? projectId;
   final bool toolCallingEnabled;
+  final AiProviderType providerType;
 
   const Conversation({
     required this.id,
@@ -109,6 +111,7 @@ class Conversation {
     this.parameters = const ModelParameters(),
     this.projectId,
     this.toolCallingEnabled = true,
+    this.providerType = AiProviderType.ollama,
   });
 
   /// Whether this conversation belongs to a project.
@@ -144,6 +147,7 @@ class Conversation {
           : const ModelParameters(),
       projectId: json['projectId'] as String?,
       toolCallingEnabled: json['toolCallingEnabled'] as bool? ?? true,
+      providerType: parseAiProviderType(json['providerType'] as String?),
     );
   }
 
@@ -160,6 +164,7 @@ class Conversation {
       'parameters': parameters.toJson(),
       'projectId': projectId,
       'toolCallingEnabled': toolCallingEnabled,
+      'providerType': providerType.name,
     };
   }
 
@@ -190,6 +195,7 @@ class Conversation {
     String? projectId,
     bool clearProjectId = false,
     bool? toolCallingEnabled,
+    AiProviderType? providerType,
   }) {
     return Conversation(
       id: id ?? this.id,
@@ -202,6 +208,7 @@ class Conversation {
       parameters: parameters ?? this.parameters,
       projectId: clearProjectId ? null : (projectId ?? this.projectId),
       toolCallingEnabled: toolCallingEnabled ?? this.toolCallingEnabled,
+      providerType: providerType ?? this.providerType,
     );
   }
 

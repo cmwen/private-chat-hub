@@ -1,63 +1,54 @@
 import 'dart:convert';
-import 'dart:convert';
 
-import 'package:private_chat_hub/models/connection.dart';
+import 'package:private_chat_hub/models/lite_llm_connection.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:uuid/uuid.dart';
 
-/// Service for managing Ollama connection profiles.
-class ConnectionService {
+class LiteLlmConfigService {
+  static const String _connectionsKey = 'lite_llm_connections';
+  static const String _defaultConnectionKey = 'lite_llm_default_connection_id';
+
   final StorageService _storage;
-  static const String _connectionsKey = 'ollama_connections';
-  static const String _defaultConnectionKey = 'default_connection_id';
 
-  ConnectionService(this._storage);
+  LiteLlmConfigService(this._storage);
 
-  /// Gets all saved connections.
-  List<Connection> getConnections() {
+  List<LiteLlmConnection> getConnections() {
     final jsonString = _storage.getString(_connectionsKey);
     if (jsonString == null) return [];
 
     try {
       final List<dynamic> jsonList = jsonDecode(jsonString);
       return jsonList
-          .map((json) => Connection.fromJson(json as Map<String, dynamic>))
+          .map(
+            (json) => LiteLlmConnection.fromJson(json as Map<String, dynamic>),
+          )
           .toList();
-    } catch (e) {
+    } catch (_) {
       return [];
     }
   }
 
-  /// Saves connections to storage.
-  Future<void> _saveConnections(List<Connection> connections) async {
+  Future<void> _saveConnections(List<LiteLlmConnection> connections) async {
     final jsonString = jsonEncode(connections.map((c) => c.toJson()).toList());
     await _storage.setString(_connectionsKey, jsonString);
   }
 
-  /// Adds a new connection profile.
-  Future<Connection> addConnection({
+  Future<LiteLlmConnection> addConnection({
     required String name,
-    required String host,
-    int port = 11434,
-    bool useHttps = false,
+    required String baseUrl,
     bool setAsDefault = false,
   }) async {
     final connections = getConnections();
-
-    // If this is the first connection or setAsDefault, make it default
     final isDefault = connections.isEmpty || setAsDefault;
 
-    final connection = Connection(
+    final connection = LiteLlmConnection(
       id: const Uuid().v4(),
       name: name,
-      host: host,
-      port: port,
-      useHttps: useHttps,
+      baseUrl: baseUrl,
       isDefault: isDefault,
       createdAt: DateTime.now(),
     );
 
-    // If setting as default, clear other defaults
     final updatedConnections = connections.map((c) {
       return isDefault && c.isDefault ? c.copyWith(isDefault: false) : c;
     }).toList();
@@ -72,8 +63,7 @@ class ConnectionService {
     return connection;
   }
 
-  /// Updates an existing connection.
-  Future<void> updateConnection(Connection connection) async {
+  Future<void> updateConnection(LiteLlmConnection connection) async {
     final connections = getConnections();
     final index = connections.indexWhere((c) => c.id == connection.id);
 
@@ -83,7 +73,6 @@ class ConnectionService {
     }
   }
 
-  /// Deletes a connection by ID.
   Future<void> deleteConnection(String id) async {
     var connections = getConnections();
     final deletedConnection = connections.firstWhere(
@@ -93,7 +82,6 @@ class ConnectionService {
 
     connections = connections.where((c) => c.id != id).toList();
 
-    // If we deleted the default, make the first remaining one default
     if (deletedConnection.isDefault && connections.isNotEmpty) {
       connections[0] = connections[0].copyWith(isDefault: true);
       await _storage.setString(_defaultConnectionKey, connections[0].id);
@@ -102,7 +90,6 @@ class ConnectionService {
     await _saveConnections(connections);
   }
 
-  /// Sets a connection as the default.
   Future<void> setDefaultConnection(String id) async {
     final connections = getConnections();
     final updatedConnections = connections.map((c) {
@@ -113,21 +100,17 @@ class ConnectionService {
     await _storage.setString(_defaultConnectionKey, id);
   }
 
-  /// Gets the default connection, or null if none set.
-  Connection? getDefaultConnection() {
+  LiteLlmConnection? getDefaultConnection() {
     final connections = getConnections();
     if (connections.isEmpty) return null;
 
-    // Try to find the default
     try {
       return connections.firstWhere((c) => c.isDefault);
     } catch (_) {
-      // Fall back to first connection
       return connections.first;
     }
   }
 
-  /// Updates the last connected timestamp for a connection.
   Future<void> updateLastConnected(String id) async {
     final connections = getConnections();
     final index = connections.indexWhere((c) => c.id == id);

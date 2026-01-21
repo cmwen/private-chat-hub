@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:private_chat_hub/services/ai_connection_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
+import 'package:private_chat_hub/services/provider_client_factory.dart';
 
-/// Status of the Ollama connection.
+/// Status of the provider connection.
+
 enum OllamaConnectivityStatus {
   connected, // Online and Ollama server is reachable
   disconnected, // Network available but Ollama server unreachable
@@ -10,13 +13,16 @@ enum OllamaConnectivityStatus {
   checking, // Testing connection
 }
 
-/// Service for monitoring network connectivity and Ollama server reachability.
+/// Service for monitoring network connectivity and provider reachability.
 ///
-/// This service combines network connectivity monitoring with actual Ollama
+/// This service combines network connectivity monitoring with provider
 /// server health checks to provide accurate connection status.
+
 class ConnectivityService {
   final Connectivity _connectivity = Connectivity();
   final OllamaConnectionManager _ollamaManager;
+  final AiConnectionService _connectionService;
+  final ProviderClientFactory _clientFactory;
 
   // Stream controllers
   final _statusController =
@@ -33,7 +39,11 @@ class ConnectivityService {
   static const Duration _debounceDelay = Duration(seconds: 3);
   static const Duration _periodicCheckInterval = Duration(seconds: 30);
 
-  ConnectivityService(this._ollamaManager) {
+  ConnectivityService(
+    this._ollamaManager,
+    this._connectionService,
+    this._clientFactory,
+  ) {
     _initialize();
   }
 
@@ -115,12 +125,15 @@ class ConnectivityService {
     }
   }
 
-  /// Tests if the Ollama server is reachable.
+  /// Tests if the active provider is reachable.
   Future<bool> _testOllamaConnection() async {
     try {
-      return await _ollamaManager.testConnection();
+      final connection = _connectionService.getActiveConnection();
+      final client = await _clientFactory.createClient(connection);
+      if (client == null) return false;
+      return await client.testConnection();
     } catch (e) {
-      debugPrint('[ConnectivityService] Ollama test failed: $e');
+      debugPrint('[ConnectivityService] Connection test failed: $e');
       return false;
     }
   }

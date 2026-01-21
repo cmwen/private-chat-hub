@@ -1,11 +1,17 @@
 // ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:private_chat_hub/models/ai_provider.dart';
 import 'package:private_chat_hub/models/connection.dart';
+import 'package:private_chat_hub/models/lite_llm_connection.dart';
 import 'package:private_chat_hub/models/tool_models.dart';
 import 'package:private_chat_hub/ollama_toolkit/services/ollama_config_service.dart';
+import 'package:private_chat_hub/services/ai_connection_service.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
+import 'package:private_chat_hub/services/lite_llm_client.dart';
+import 'package:private_chat_hub/services/lite_llm_config_service.dart';
+import 'package:private_chat_hub/services/lite_llm_secure_storage.dart';
 import 'package:private_chat_hub/services/network_discovery_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/tool_config_service.dart';
@@ -15,6 +21,9 @@ import 'package:private_chat_hub/widgets/tool_settings_widget.dart';
 class SettingsScreen extends StatefulWidget {
   final ConnectionService connectionService;
   final OllamaConnectionManager ollamaManager;
+  final AiConnectionService aiConnectionService;
+  final LiteLlmConfigService liteLlmConfigService;
+  final LiteLlmSecureStorage liteLlmSecureStorage;
   final ChatService? chatService;
   final ToolConfigService? toolConfigService;
   final Function(ThemeMode)? onThemeModeChanged;
@@ -24,6 +33,9 @@ class SettingsScreen extends StatefulWidget {
     super.key,
     required this.connectionService,
     required this.ollamaManager,
+    required this.aiConnectionService,
+    required this.liteLlmConfigService,
+    required this.liteLlmSecureStorage,
     this.chatService,
     this.toolConfigService,
     this.onThemeModeChanged,
@@ -36,6 +48,8 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   List<Connection> _connections = [];
+  List<LiteLlmConnection> _liteLlmConnections = [];
+  AiProviderType _selectedProvider = AiProviderType.ollama;
   bool _isLoading = false;
   ToolConfig _toolConfig = const ToolConfig();
   String _appVersion = 'Loading...';
@@ -47,6 +61,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _loadConnections();
+    _loadLiteLlmConnections();
+    _loadSelectedProvider();
     _loadToolConfig();
     _loadAppVersion();
     _loadStreamingPreference();
@@ -93,6 +109,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _loadConnections() {
     setState(() {
       _connections = widget.connectionService.getConnections();
+    });
+  }
+
+  void _loadLiteLlmConnections() {
+    setState(() {
+      _liteLlmConnections = widget.liteLlmConfigService.getConnections();
+    });
+  }
+
+  void _loadSelectedProvider() {
+    setState(() {
+      _selectedProvider = widget.aiConnectionService.getSelectedProvider();
     });
   }
 
@@ -198,6 +226,111 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _showAddLiteLlmDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => _AddLiteLlmDialog(
+        onAdd: (name, baseUrl, apiKey) async {
+          await widget.liteLlmConfigService.addConnection(
+            name: name,
+            baseUrl: baseUrl,
+          );
+          await widget.liteLlmSecureStorage.setApiKey(apiKey);
+          _loadLiteLlmConnections();
+        },
+        onTest: (baseUrl, apiKey) async {
+          return _checkLiteLlmConnection(baseUrl, apiKey);
+        },
+      ),
+    );
+  }
+
+  Future<bool> _checkLiteLlmConnection(String baseUrl, String? apiKey) async {
+    final client = LiteLlmClient(
+      baseUrl: baseUrl,
+      timeout: Duration(seconds: _timeout),
+      apiKey: apiKey,
+    );
+    return client.testConnection();
+  }
+
+  Future<void> _setLiteLlmAsDefault(LiteLlmConnection connection) async {
+    await widget.liteLlmConfigService.setDefaultConnection(connection.id);
+    _loadLiteLlmConnections();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${connection.name} set as default')),
+      );
+    }
+  }
+
+  Future<void> _deleteLiteLlmConnection(LiteLlmConnection connection) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete LiteLLM Connection'),
+        content: Text('Delete "${connection.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await widget.liteLlmConfigService.deleteConnection(connection.id);
+      _loadLiteLlmConnections();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('LiteLLM connection deleted')),
+        );
+      }
+    }
+  }
+
+  Future<void> _testLiteLlmConnection(
+    LiteLlmConnection connection, {
+    String? apiKeyOverride,
+  }) async {
+    setState(() => _isLoading = true);
+
+    final apiKey =
+        apiKeyOverride ?? await widget.liteLlmSecureStorage.getApiKey();
+    final client = LiteLlmClient(
+      baseUrl: connection.baseUrl,
+      timeout: Duration(seconds: _timeout),
+      apiKey: apiKey,
+    );
+    final success = await client.testConnection();
+
+    setState(() => _isLoading = false);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success
+                ? 'LiteLLM connection successful!'
+                : 'LiteLLM connection failed. Check base URL.',
+          ),
+          backgroundColor: success ? Colors.green : Colors.red,
+        ),
+      );
+
+      if (success) {
+        await widget.liteLlmConfigService.updateLastConnected(connection.id);
+        _loadLiteLlmConnections();
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -209,6 +342,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'AI Provider',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<AiProviderType>(
+                        value: _selectedProvider,
+                        decoration: const InputDecoration(
+                          labelText: 'Default Provider',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: AiProviderType.values
+                            .map(
+                              (provider) => DropdownMenuItem(
+                                value: provider,
+                                child: Text(provider.label),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) async {
+                          if (value == null) return;
+                          await widget.aiConnectionService.setSelectedProvider(
+                            value,
+                          );
+                          setState(() {
+                            _selectedProvider = value;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
                 const Padding(
                   padding: EdgeInsets.all(16),
                   child: Text(
@@ -269,6 +443,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onPressed: _showAddConnectionDialog,
                       icon: const Icon(Icons.add),
                       label: const Text('Add Connection'),
+                    ),
+                  ),
+                const SizedBox(height: 32),
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'LiteLLM Connections',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                if (_liteLlmConnections.isEmpty)
+                  Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.cloud_queue,
+                            size: 48,
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'No LiteLLM connections configured',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Add your LiteLLM gateway URL to get started',
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: _showAddLiteLlmDialog,
+                            icon: const Icon(Icons.add),
+                            label: const Text('Add LiteLLM'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  ..._liteLlmConnections.map(
+                    (connection) => _LiteLlmConnectionCard(
+                      connection: connection,
+                      onTest: () => _testLiteLlmConnection(connection),
+                      onDelete: () => _deleteLiteLlmConnection(connection),
+                      onSetDefault: () => _setLiteLlmAsDefault(connection),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                if (_liteLlmConnections.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: OutlinedButton.icon(
+                      onPressed: _showAddLiteLlmDialog,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add LiteLLM'),
                     ),
                   ),
                 const SizedBox(height: 32),
@@ -665,7 +903,306 @@ class _ConnectionCard extends StatelessWidget {
   }
 }
 
+class _LiteLlmConnectionCard extends StatelessWidget {
+  final LiteLlmConnection connection;
+  final VoidCallback onTest;
+  final VoidCallback onDelete;
+  final VoidCallback onSetDefault;
+
+  const _LiteLlmConnectionCard({
+    required this.connection,
+    required this.onTest,
+    required this.onDelete,
+    required this.onSetDefault,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        children: [
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: connection.isDefault
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.surfaceContainer,
+              child: Icon(
+                Icons.cloud_queue,
+                color: connection.isDefault
+                    ? Colors.white
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            title: Row(
+              children: [
+                Text(connection.name),
+                if (connection.isDefault) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Default',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            subtitle: Text(connection.baseUrl),
+            trailing: PopupMenuButton<String>(
+              onSelected: (value) {
+                switch (value) {
+                  case 'test':
+                    onTest();
+                    break;
+                  case 'default':
+                    onSetDefault();
+                    break;
+                  case 'delete':
+                    onDelete();
+                    break;
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'test',
+                  child: ListTile(
+                    leading: Icon(Icons.wifi_tethering),
+                    title: Text('Test Connection'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                if (!connection.isDefault)
+                  const PopupMenuItem(
+                    value: 'default',
+                    child: ListTile(
+                      leading: Icon(Icons.star),
+                      title: Text('Set as Default'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: ListTile(
+                    leading: Icon(Icons.delete, color: Colors.red),
+                    title: Text('Delete', style: TextStyle(color: Colors.red)),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (connection.lastConnectedAt != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 72, right: 16, bottom: 12),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    size: 14,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Last connected: ${_formatDate(connection.lastConnectedAt!)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+
+    return '${date.day}/${date.month}/${date.year}';
+  }
+}
+
 /// Dialog for adding a new Ollama connection.
+class _AddLiteLlmDialog extends StatefulWidget {
+  final Future<void> Function(String name, String baseUrl, String? apiKey)
+  onAdd;
+  final Future<bool> Function(String baseUrl, String? apiKey) onTest;
+
+  const _AddLiteLlmDialog({required this.onAdd, required this.onTest});
+
+  @override
+  State<_AddLiteLlmDialog> createState() => _AddLiteLlmDialogState();
+}
+
+class _AddLiteLlmDialogState extends State<_AddLiteLlmDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController(text: 'LiteLLM Gateway');
+  final _baseUrlController = TextEditingController();
+  final _apiKeyController = TextEditingController();
+  bool _isTesting = false;
+  bool? _testResult;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _baseUrlController.dispose();
+    _apiKeyController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _testConnection() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isTesting = true;
+      _testResult = null;
+    });
+
+    final success = await widget.onTest(
+      _baseUrlController.text.trim(),
+      _apiKeyController.text.trim(),
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _isTesting = false;
+      _testResult = success;
+    });
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    await widget.onAdd(
+      _nameController.text.trim(),
+      _baseUrlController.text.trim(),
+      _apiKeyController.text.trim(),
+    );
+
+    if (mounted) {
+      Navigator.pop(context);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add LiteLLM Connection'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Connection Name',
+                  hintText: 'e.g., Local Gateway',
+                  prefixIcon: Icon(Icons.label_outline),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter a name';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _baseUrlController,
+                decoration: const InputDecoration(
+                  labelText: 'Base URL',
+                  hintText: 'http://localhost:4000',
+                  prefixIcon: Icon(Icons.link),
+                ),
+                keyboardType: TextInputType.url,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter a base URL';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _apiKeyController,
+                decoration: const InputDecoration(
+                  labelText: 'API Key (Optional)',
+                  hintText: 'Leave blank if not required',
+                  prefixIcon: Icon(Icons.lock_outline),
+                ),
+                obscureText: true,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _isTesting ? null : _testConnection,
+                      icon: _isTesting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.wifi_tethering),
+                      label: const Text('Test'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (_testResult != null)
+                    Icon(
+                      _testResult! ? Icons.check_circle : Icons.error,
+                      color: _testResult! ? Colors.green : Colors.red,
+                    ),
+                ],
+              ),
+              if (_testResult == false)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Connection failed. Check base URL or API key.',
+                    style: TextStyle(color: Colors.red, fontSize: 12),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(onPressed: _save, child: const Text('Save')),
+      ],
+    );
+  }
+}
+
 class AddConnectionDialog extends StatefulWidget {
   final Future<void> Function(String name, String host, int port, bool useHttps)
   onAdd;

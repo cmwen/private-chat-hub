@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:private_chat_hub/models/conversation.dart';
+import 'package:private_chat_hub/models/provider_models.dart';
 import 'package:private_chat_hub/models/project.dart';
+import 'package:private_chat_hub/services/ai_connection_service.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
-import 'package:private_chat_hub/services/connection_service.dart';
-import 'package:private_chat_hub/services/ollama_connection_manager.dart';
-import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
+import 'package:private_chat_hub/services/provider_client_factory.dart';
+import 'package:private_chat_hub/services/provider_model_storage.dart';
 import 'package:private_chat_hub/services/project_service.dart';
 
 /// Screen showing project details and its conversations.
@@ -13,8 +14,9 @@ class ProjectDetailScreen extends StatefulWidget {
   final Project project;
   final ProjectService projectService;
   final ChatService chatService;
-  final ConnectionService connectionService;
-  final OllamaConnectionManager ollamaManager;
+  final AiConnectionService aiConnectionService;
+  final ProviderModelStorage providerModelStorage;
+  final ProviderClientFactory providerClientFactory;
   final Function(Conversation) onConversationSelected;
   final VoidCallback onProjectUpdated;
 
@@ -23,8 +25,9 @@ class ProjectDetailScreen extends StatefulWidget {
     required this.project,
     required this.projectService,
     required this.chatService,
-    required this.connectionService,
-    required this.ollamaManager,
+    required this.aiConnectionService,
+    required this.providerModelStorage,
+    required this.providerClientFactory,
     required this.onConversationSelected,
     required this.onProjectUpdated,
   });
@@ -36,7 +39,7 @@ class ProjectDetailScreen extends StatefulWidget {
 class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   late Project _project;
   List<Conversation> _conversations = [];
-  List<OllamaModelInfo> _models = [];
+  List<ProviderModelInfo> _models = [];
   String? _selectedModel;
   bool _isLoading = true;
 
@@ -51,14 +54,18 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     setState(() => _isLoading = true);
 
     _conversations = widget.chatService.getProjectConversations(_project.id);
-    _selectedModel = widget.connectionService.getSelectedModel();
+    _selectedModel = widget.providerModelStorage.getSelectedModel(
+      widget.aiConnectionService.getSelectedProvider(),
+    );
 
-    // Load models
-    final connection = widget.connectionService.getDefaultConnection();
-    if (connection != null) {
+    final providerType = widget.aiConnectionService.getSelectedProvider();
+    final connection = widget.aiConnectionService.getConnectionForProvider(
+      providerType,
+    );
+    final client = await widget.providerClientFactory.createClient(connection);
+    if (client != null) {
       try {
-        widget.ollamaManager.setConnection(connection);
-        _models = await widget.ollamaManager.listModels();
+        _models = await client.listModels();
       } catch (_) {
         _models = [];
       }
@@ -80,6 +87,10 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
     // If no model selected but models are available, use the first one
     final modelToUse = _selectedModel ?? _models.first.name;
+    await widget.providerModelStorage.setSelectedModel(
+      widget.aiConnectionService.getSelectedProvider(),
+      modelToUse,
+    );
 
     final result = await showDialog<Map<String, String?>>(
       context: context,

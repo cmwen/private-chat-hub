@@ -10,10 +10,17 @@ import 'package:private_chat_hub/screens/projects_screen.dart';
 import 'package:private_chat_hub/screens/settings_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
+import 'package:private_chat_hub/models/ai_provider.dart';
+import 'package:private_chat_hub/services/ai_connection_service.dart';
 import 'package:private_chat_hub/services/jina_search_service.dart';
+import 'package:private_chat_hub/services/lite_llm_config_service.dart';
+import 'package:private_chat_hub/services/lite_llm_secure_storage.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/project_service.dart';
+import 'package:private_chat_hub/services/provider_client_factory.dart';
+import 'package:private_chat_hub/services/provider_model_storage.dart';
+import 'package:private_chat_hub/services/provider_selection_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:private_chat_hub/services/tool_config_service.dart';
 import 'package:private_chat_hub/services/tool_executor_service.dart';
@@ -141,6 +148,12 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late final OllamaConnectionManager _ollamaManager;
   late final ConnectionService _connectionService;
+  late final LiteLlmConfigService _liteLlmConfigService;
+  late final LiteLlmSecureStorage _liteLlmSecureStorage;
+  late final ProviderSelectionService _providerSelectionService;
+  late final ProviderModelStorage _providerModelStorage;
+  late final AiConnectionService _aiConnectionService;
+  late final ProviderClientFactory _providerClientFactory;
   late final ChatService _chatService;
   late final ProjectService _projectService;
 
@@ -152,6 +165,19 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _ollamaManager = OllamaConnectionManager();
     _connectionService = ConnectionService(widget.storageService);
+    _liteLlmConfigService = LiteLlmConfigService(widget.storageService);
+    _liteLlmSecureStorage = LiteLlmSecureStorage();
+    _providerSelectionService = ProviderSelectionService(widget.storageService);
+    _providerModelStorage = ProviderModelStorage(widget.storageService);
+    _aiConnectionService = AiConnectionService(
+      providerConfig: _providerSelectionService,
+      ollamaService: _connectionService,
+      liteLlmService: _liteLlmConfigService,
+    );
+    _providerClientFactory = ProviderClientFactory(
+      _ollamaManager,
+      _liteLlmSecureStorage,
+    );
 
     // Initialize tool executor with proper config from settings
     final toolConfig = widget.toolConfigService.getConfig();
@@ -176,6 +202,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _chatService = ChatService(
       _ollamaManager,
+      _aiConnectionService,
+      _providerClientFactory,
       widget.storageService,
       toolExecutor: toolExecutor,
       toolConfig: toolConfig,
@@ -284,25 +312,33 @@ class _HomeScreenState extends State<HomeScreen> {
           ConversationListScreen(
             chatService: _chatService,
             connectionService: _connectionService,
-            ollamaManager: _ollamaManager,
+            aiConnectionService: _aiConnectionService,
+            providerModelStorage: _providerModelStorage,
+            providerClientFactory: _providerClientFactory,
             onConversationSelected: _onConversationSelected,
             onNewConversation: () {},
           ),
           ProjectsScreen(
             projectService: _projectService,
             chatService: _chatService,
-            connectionService: _connectionService,
-            ollamaManager: _ollamaManager,
+            aiConnectionService: _aiConnectionService,
+            providerModelStorage: _providerModelStorage,
+            providerClientFactory: _providerClientFactory,
             onConversationSelected: _onConversationSelected,
           ),
           ModelsScreen(
-            ollamaManager: _ollamaManager,
             connectionService: _connectionService,
+            aiConnectionService: _aiConnectionService,
+            providerModelStorage: _providerModelStorage,
+            providerClientFactory: _providerClientFactory,
           ),
           SettingsScreen(
             connectionService: _connectionService,
             ollamaManager: _ollamaManager,
             chatService: _chatService,
+            aiConnectionService: _aiConnectionService,
+            liteLlmConfigService: _liteLlmConfigService,
+            liteLlmSecureStorage: _liteLlmSecureStorage,
             toolConfigService: widget.toolConfigService,
             onThemeModeChanged: widget.onThemeModeChanged,
             currentThemeMode: widget.currentThemeMode,
