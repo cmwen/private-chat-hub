@@ -19,34 +19,38 @@ void main() {
     service = OnDeviceLLMService(storageService);
 
     // Set up method channel mocking for path_provider
+    // ignore: deprecated_member_use_from_same_package
     const MethodChannel(
-      'plugins.flutter.io/path_provider',
-    ).setMockMethodCallHandler((MethodCall methodCall) async {
-      if (methodCall.method == 'getApplicationDocumentsDirectory') {
-        return '/tmp/test_docs';
-      }
-      return null;
-    });
+          'plugins.flutter.io/path_provider',
+        ) // ignore: deprecated_member_use
+        .setMockMethodCallHandler((MethodCall methodCall) async {
+          if (methodCall.method == 'getApplicationDocumentsDirectory') {
+            return '/tmp/test_docs';
+          }
+          return null;
+        });
 
     // Set up method channel mocking for LiteRT
+    // ignore: deprecated_member_use_from_same_package
     const MethodChannel(
-      'com.cmwen.private_chat_hub/litert',
-    ).setMockMethodCallHandler((MethodCall methodCall) async {
-      if (methodCall.method == 'isAvailable') {
-        return true;
-      } else if (methodCall.method == 'loadModel') {
-        return {'success': true};
-      } else if (methodCall.method == 'unloadModel') {
-        return {'success': true};
-      } else if (methodCall.method == 'generateText') {
-        return 'Hello! This is a simulated response.';
-      } else if (methodCall.method == 'getDeviceCapabilities') {
-        return {'cpu': true, 'gpu': true, 'npu': false};
-      } else if (methodCall.method == 'getMemoryInfo') {
-        return {'totalMemory': 8589934592, 'freeMemory': 4294967296};
-      }
-      return null;
-    });
+          'com.cmwen.private_chat_hub/litert',
+        ) // ignore: deprecated_member_use
+        .setMockMethodCallHandler((MethodCall methodCall) async {
+          if (methodCall.method == 'isAvailable') {
+            return true;
+          } else if (methodCall.method == 'loadModel') {
+            return {'success': true};
+          } else if (methodCall.method == 'unloadModel') {
+            return {'success': true};
+          } else if (methodCall.method == 'generateText') {
+            return 'Hello! This is a simulated response.';
+          } else if (methodCall.method == 'getDeviceCapabilities') {
+            return {'cpu': true, 'gpu': true, 'npu': false};
+          } else if (methodCall.method == 'getMemoryInfo') {
+            return {'totalMemory': 8589934592, 'freeMemory': 4294967296};
+          }
+          return null;
+        });
   });
 
   tearDown(() {
