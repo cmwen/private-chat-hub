@@ -1,0 +1,523 @@
+package com.cmwen.private_chat_hub
+
+import android.app.ActivityManager
+import android.content.Context
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import androidx.annotation.NonNull
+import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.plugin.common.EventChannel
+import io.flutter.plugin.common.MethodCall
+import io.flutter.plugin.common.MethodChannel
+import kotlinx.coroutines.*
+import java.io.File
+
+/**
+ * LiteRT-LM Plugin for Flutter
+ *
+ * This plugin provides on-device LLM inference capabilities using Google's LiteRT-LM.
+ * It handles model loading, text generation, and resource management.
+ *
+ * Note: The actual LiteRT-LM dependencies will need to be added when available via Maven.
+ * For now, this is a scaffold that can be extended once the libraries are integrated.
+ */
+class LiteRTPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
+
+    private lateinit var methodChannel: MethodChannel
+    private lateinit var eventChannel: EventChannel
+    private lateinit var context: Context
+
+    private var eventSink: EventChannel.EventSink? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    // Coroutine scope for async operations
+    private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
+    // Engine state
+    private var isEngineLoaded = false
+    private var currentModelId: String? = null
+    private var currentModelPath: String? = null
+    private var currentBackend: String = "cpu"
+
+    // Generation state
+    private var isGenerating = false
+    private var generationJob: Job? = null
+
+    // Performance metrics
+    private var lastLoadTimeMs: Long = 0
+    private var lastPrefillTokensPerSec: Double = 0.0
+    private var lastDecodeTokensPerSec: Double = 0.0
+
+    companion object {
+        private const val TAG = "LiteRTPlugin"
+        private const val METHOD_CHANNEL = "com.cmwen.private_chat_hub/litert"
+        private const val EVENT_CHANNEL = "com.cmwen.private_chat_hub/litert_stream"
+
+        // Supported backends
+        const val BACKEND_CPU = "cpu"
+        const val BACKEND_GPU = "gpu"
+        const val BACKEND_NPU = "npu"
+    }
+
+    override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+        context = flutterPluginBinding.applicationContext
+
+        methodChannel = MethodChannel(flutterPluginBinding.binaryMessenger, METHOD_CHANNEL)
+        methodChannel.setMethodCallHandler(this)
+
+        eventChannel = EventChannel(flutterPluginBinding.binaryMessenger, EVENT_CHANNEL)
+        eventChannel.setStreamHandler(this)
+
+        log("Plugin attached to Flutter engine")
+    }
+
+    override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
+        methodChannel.setMethodCallHandler(null)
+        eventChannel.setStreamHandler(null)
+        coroutineScope.cancel()
+
+        // Clean up resources
+        unloadModelInternal()
+
+        log("Plugin detached from Flutter engine")
+    }
+
+    override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: MethodChannel.Result) {
+        when (call.method) {
+            "isAvailable" -> {
+                result.success(checkAvailability())
+            }
+
+            "loadModel" -> {
+                val modelPath = call.argument<String>("modelPath")
+                val backend = call.argument<String>("backend") ?: BACKEND_GPU
+
+                if (modelPath == null) {
+                    result.error("INVALID_ARGUMENT", "modelPath is required", null)
+                    return
+                }
+
+                loadModel(modelPath, backend, result)
+            }
+
+            "unloadModel" -> {
+                unloadModel(result)
+            }
+
+            "generateText" -> {
+                val prompt = call.argument<String>("prompt")
+                val temperature = call.argument<Double>("temperature") ?: 0.7
+                val maxTokens = call.argument<Int>("maxTokens")
+
+                if (prompt == null) {
+                    result.error("INVALID_ARGUMENT", "prompt is required", null)
+                    return
+                }
+
+                generateText(prompt, temperature, maxTokens, result)
+            }
+
+            "startGeneration" -> {
+                val prompt = call.argument<String>("prompt")
+                val temperature = call.argument<Double>("temperature") ?: 0.7
+                val maxTokens = call.argument<Int>("maxTokens")
+
+                if (prompt == null) {
+                    result.error("INVALID_ARGUMENT", "prompt is required", null)
+                    return
+                }
+
+                startStreamingGeneration(prompt, temperature, maxTokens)
+                result.success(null)
+            }
+
+            "cancelGeneration" -> {
+                cancelGeneration()
+                result.success(null)
+            }
+
+            "isModelLoaded" -> {
+                result.success(isEngineLoaded)
+            }
+
+            "getCurrentModelId" -> {
+                result.success(currentModelId)
+            }
+
+            "getDeviceCapabilities" -> {
+                result.success(getDeviceCapabilities())
+            }
+
+            "getMemoryInfo" -> {
+                result.success(getMemoryInfo())
+            }
+
+            "getBenchmark" -> {
+                result.success(getBenchmarkResults())
+            }
+
+            else -> {
+                result.notImplemented()
+            }
+        }
+    }
+
+    // ========================================================================
+    // EventChannel.StreamHandler implementation
+    // ========================================================================
+
+    override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+        eventSink = events
+        log("Event stream listener attached")
+    }
+
+    override fun onCancel(arguments: Any?) {
+        eventSink = null
+        cancelGeneration()
+        log("Event stream listener cancelled")
+    }
+
+    // ========================================================================
+    // Core functionality
+    // ========================================================================
+
+    private fun checkAvailability(): Boolean {
+        // Check if LiteRT-LM is available on this device
+        // For now, return true for Android 7.0+ (API 24+)
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
+    }
+
+    private fun loadModel(modelPath: String, backend: String, result: MethodChannel.Result) {
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                log("Loading model from: $modelPath with backend: $backend")
+
+                val startTime = System.currentTimeMillis()
+
+                // Verify model file exists
+                val modelFile = File(modelPath)
+                if (!modelFile.exists()) {
+                    withContext(Dispatchers.Main) {
+                        result.error("FILE_NOT_FOUND", "Model file not found: $modelPath", null)
+                    }
+                    return@launch
+                }
+
+                // Check available memory
+                val memInfo = getMemoryInfo()
+                val availableMemory = memInfo["availableMemory"] ?: 0L
+                val modelSize = modelFile.length()
+
+                if (availableMemory < modelSize * 2) {
+                    log("Warning: Low memory. Available: $availableMemory, Model size: $modelSize")
+                }
+
+                // Unload any existing model
+                unloadModelInternal()
+
+                // TODO: Actual LiteRT-LM integration
+                // When LiteRT-LM Kotlin API is available, uncomment and use:
+                /*
+                val backendEnum = when (backend.lowercase()) {
+                    BACKEND_GPU -> Backend.GPU
+                    BACKEND_NPU -> Backend.NPU
+                    else -> Backend.CPU
+                }
+                
+                val modelAssets = ModelAssets.create(modelPath)
+                val engineSettings = EngineSettings.createDefault(modelAssets, backendEnum)
+                engine = Engine.createEngine(engineSettings)
+                conversation = engine?.createConversation()
+                */
+
+                // For now, simulate successful loading
+                // This allows UI development to proceed while waiting for LiteRT-LM libraries
+                delay(500) // Simulate loading time
+
+                lastLoadTimeMs = System.currentTimeMillis() - startTime
+                isEngineLoaded = true
+                currentModelPath = modelPath
+                currentModelId = modelFile.nameWithoutExtension
+                currentBackend = backend
+
+                log("Model loaded successfully in ${lastLoadTimeMs}ms")
+
+                withContext(Dispatchers.Main) {
+                    result.success(true)
+                }
+
+            } catch (e: Exception) {
+                log("Error loading model: ${e.message}")
+                withContext(Dispatchers.Main) {
+                    result.error("LOAD_ERROR", "Failed to load model: ${e.message}", null)
+                }
+            }
+        }
+    }
+
+    private fun unloadModel(result: MethodChannel.Result) {
+        try {
+            unloadModelInternal()
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("UNLOAD_ERROR", "Failed to unload model: ${e.message}", null)
+        }
+    }
+
+    private fun unloadModelInternal() {
+        // Cancel any ongoing generation
+        cancelGeneration()
+
+        // TODO: Actual LiteRT-LM cleanup
+        /*
+        conversation?.close()
+        conversation = null
+        engine?.close()
+        engine = null
+        */
+
+        isEngineLoaded = false
+        currentModelId = null
+        currentModelPath = null
+
+        // Request garbage collection to free memory
+        System.gc()
+
+        log("Model unloaded")
+    }
+
+    private fun generateText(
+        prompt: String,
+        temperature: Double,
+        maxTokens: Int?,
+        result: MethodChannel.Result
+    ) {
+        if (!isEngineLoaded) {
+            result.error("MODEL_NOT_LOADED", "No model is currently loaded", null)
+            return
+        }
+
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                isGenerating = true
+                log("Generating text for prompt: ${prompt.take(50)}...")
+
+                // TODO: Actual LiteRT-LM generation
+                /*
+                val response = conversation?.sendMessage(
+                    JsonMessage(
+                        mapOf(
+                            "role" to "user",
+                            "content" to prompt
+                        )
+                    )
+                )
+                val responseText = response?.content ?: ""
+                */
+
+                // For now, return a placeholder response
+                // This allows UI testing while waiting for LiteRT-LM integration
+                delay(1000) // Simulate generation time
+
+                val responseText = buildString {
+                    append("This is a simulated response from LiteRT-LM.\n\n")
+                    append("Your prompt was: \"${prompt.take(100)}${if (prompt.length > 100) "..." else ""}\"\n\n")
+                    append("To enable actual on-device inference:\n")
+                    append("1. Add LiteRT-LM dependencies to build.gradle.kts\n")
+                    append("2. Download a .litertlm model file\n")
+                    append("3. Uncomment the actual LiteRT-LM code in LiteRTPlugin.kt\n\n")
+                    append("Backend: $currentBackend\n")
+                    append("Model: $currentModelId")
+                }
+
+                withContext(Dispatchers.Main) {
+                    result.success(responseText)
+                }
+
+            } catch (e: Exception) {
+                log("Error generating text: ${e.message}")
+                withContext(Dispatchers.Main) {
+                    result.error("GENERATION_ERROR", "Failed to generate text: ${e.message}", null)
+                }
+            } finally {
+                isGenerating = false
+            }
+        }
+    }
+
+    private fun startStreamingGeneration(
+        prompt: String,
+        temperature: Double,
+        maxTokens: Int?
+    ) {
+        if (!isEngineLoaded) {
+            sendEventError("MODEL_NOT_LOADED", "No model is currently loaded")
+            return
+        }
+
+        if (isGenerating) {
+            sendEventError("GENERATION_IN_PROGRESS", "A generation is already in progress")
+            return
+        }
+
+        generationJob = coroutineScope.launch(Dispatchers.IO) {
+            try {
+                isGenerating = true
+                log("Starting streaming generation for prompt: ${prompt.take(50)}...")
+
+                // TODO: Actual LiteRT-LM streaming
+                /*
+                conversation?.sendMessageAsync(
+                    JsonMessage(
+                        mapOf(
+                            "role" to "user",
+                            "content" to prompt
+                        )
+                    )
+                ) { token ->
+                    sendEvent(token)
+                }
+                */
+
+                // Simulate streaming generation
+                val words = listOf(
+                    "This", " is", " a", " simulated", " streaming", " response",
+                    " from", " LiteRT-LM.", "\n\n",
+                    "Each", " word", " is", " streamed", " as", " a", " separate", " token.",
+                    "\n\n",
+                    "Backend:", " $currentBackend", "\n",
+                    "Model:", " $currentModelId"
+                )
+
+                for (word in words) {
+                    if (!isGenerating) break
+                    delay(100) // Simulate token generation time
+                    sendEvent(word)
+                }
+
+                // Signal completion
+                sendEvent("[DONE]")
+
+            } catch (e: CancellationException) {
+                log("Generation cancelled")
+                sendEvent("[DONE]")
+            } catch (e: Exception) {
+                log("Error in streaming generation: ${e.message}")
+                sendEventError("GENERATION_ERROR", e.message ?: "Unknown error")
+            } finally {
+                isGenerating = false
+            }
+        }
+    }
+
+    private fun cancelGeneration() {
+        if (isGenerating) {
+            generationJob?.cancel()
+            isGenerating = false
+            log("Generation cancelled by user")
+        }
+    }
+
+    // ========================================================================
+    // Device information
+    // ========================================================================
+
+    private fun getDeviceCapabilities(): Map<String, Boolean> {
+        return mapOf(
+            "cpu" to true,
+            "gpu" to hasGpuSupport(),
+            "npu" to hasNpuSupport()
+        )
+    }
+
+    private fun hasGpuSupport(): Boolean {
+        // Check for GPU support
+        // Most modern Android devices support GPU acceleration
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+    }
+
+    private fun hasNpuSupport(): Boolean {
+        // NPU support is device-specific
+        // Check for known NPU-capable chipsets
+        val manufacturer = Build.MANUFACTURER.lowercase()
+        val model = Build.MODEL.lowercase()
+        val hardware = Build.HARDWARE.lowercase()
+
+        // Qualcomm NPU (Hexagon DSP)
+        if (hardware.contains("qcom") || hardware.contains("snapdragon")) {
+            return true
+        }
+
+        // MediaTek APU
+        if (hardware.contains("mt") || manufacturer.contains("mediatek")) {
+            return true
+        }
+
+        // Samsung Exynos NPU
+        if (hardware.contains("exynos") || (manufacturer == "samsung" && model.contains("sm-"))) {
+            return true
+        }
+
+        // Google Tensor
+        if (hardware.contains("tensor") || model.contains("pixel")) {
+            return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        }
+
+        return false
+    }
+
+    private fun getMemoryInfo(): Map<String, Long> {
+        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val memInfo = ActivityManager.MemoryInfo()
+        activityManager.getMemoryInfo(memInfo)
+
+        return mapOf(
+            "totalMemory" to memInfo.totalMem,
+            "availableMemory" to memInfo.availMem,
+            "threshold" to memInfo.threshold,
+            "lowMemory" to if (memInfo.lowMemory) 1L else 0L,
+            "modelMemory" to getEstimatedModelMemory()
+        )
+    }
+
+    private fun getEstimatedModelMemory(): Long {
+        // Estimate memory used by the loaded model
+        // This is approximate - actual usage depends on the model
+        if (!isEngineLoaded || currentModelPath == null) return 0
+
+        val modelFile = File(currentModelPath!!)
+        if (!modelFile.exists()) return 0
+
+        // Models typically use 1.5-2x their file size in memory
+        return (modelFile.length() * 1.5).toLong()
+    }
+
+    private fun getBenchmarkResults(): Map<String, Double> {
+        return mapOf(
+            "loadTimeMs" to lastLoadTimeMs.toDouble(),
+            "prefillTokensPerSec" to lastPrefillTokensPerSec,
+            "decodeTokensPerSec" to lastDecodeTokensPerSec
+        )
+    }
+
+    // ========================================================================
+    // Event helpers
+    // ========================================================================
+
+    private fun sendEvent(data: String) {
+        mainHandler.post {
+            eventSink?.success(data)
+        }
+    }
+
+    private fun sendEventError(code: String, message: String) {
+        mainHandler.post {
+            eventSink?.success(mapOf("error" to "$code: $message"))
+        }
+    }
+
+    private fun log(message: String) {
+        android.util.Log.d(TAG, message)
+    }
+}
