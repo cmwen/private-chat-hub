@@ -9,12 +9,11 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late OnDeviceLLMService service;
-  late SharedPreferences prefs;
   late StorageService storageService;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    prefs = await SharedPreferences.getInstance();
+    await SharedPreferences.getInstance();
     storageService = StorageService();
     await storageService.init();
     service = OnDeviceLLMService(storageService);
