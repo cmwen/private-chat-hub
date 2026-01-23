@@ -166,12 +166,10 @@ class InferenceModeSelector extends StatelessWidget {
                   ],
                 ),
               ),
-              // ignore: deprecated_member_use
-              Radio<InferenceMode>(
-                value: mode,
-                groupValue: currentMode,
-                onChanged: enabled ? (value) => onModeChanged(value!) : null,
-              ),
+              if (isSelected)
+                Icon(Icons.check_circle, color: colorScheme.primary)
+              else
+                Icon(Icons.circle_outlined, color: colorScheme.outlineVariant),
             ],
           ),
         ),
