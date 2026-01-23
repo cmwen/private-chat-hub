@@ -7,9 +7,12 @@ import 'package:private_chat_hub/models/queue_item.dart';
 import 'package:private_chat_hub/models/tool_models.dart' as app_tools;
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
 import 'package:private_chat_hub/services/connectivity_service.dart';
+import 'package:private_chat_hub/services/inference_config_service.dart';
+import 'package:private_chat_hub/services/llm_service.dart';
 import 'package:private_chat_hub/services/message_queue_service.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
+import 'package:private_chat_hub/services/on_device_llm_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:private_chat_hub/services/tool_executor_service.dart';
 import 'package:uuid/uuid.dart';
@@ -17,6 +20,7 @@ import 'package:uuid/uuid.dart';
 /// Service for managing chat conversations and sending messages to Ollama using the toolkit.
 ///
 /// This is a clean rewrite that properly integrates with the ollama_toolkit.
+/// Now also supports hybrid mode with on-device inference via LiteRT-LM.
 class ChatService {
   final OllamaConnectionManager _ollamaManager;
   final StorageService _storage;
@@ -24,6 +28,10 @@ class ChatService {
   final app_tools.ToolConfig? _toolConfig;
   final OllamaConfigService _configService = OllamaConfigService();
   final NotificationService _notificationService = NotificationService();
+
+  // Hybrid inference mode support
+  InferenceConfigService? _inferenceConfigService;
+  OnDeviceLLMService? _onDeviceLLMService;
 
   // Conversation update stream (for UI sync)
   final StreamController<Conversation> _conversationUpdatesController =
@@ -51,8 +59,12 @@ class ChatService {
     this._storage, {
     ToolExecutorService? toolExecutor,
     app_tools.ToolConfig? toolConfig,
+    InferenceConfigService? inferenceConfigService,
+    OnDeviceLLMService? onDeviceLLMService,
   }) : _toolExecutor = toolExecutor,
-       _toolConfig = toolConfig {
+       _toolConfig = toolConfig,
+       _inferenceConfigService = inferenceConfigService,
+       _onDeviceLLMService = onDeviceLLMService {
     // Initialize offline mode services
     _connectivityService = ConnectivityService(_ollamaManager);
     _queueService = MessageQueueService(_storage);
@@ -65,6 +77,30 @@ class ChatService {
       }
     });
   }
+
+  /// Set the inference configuration service (for hybrid mode)
+  void setInferenceConfigService(InferenceConfigService service) {
+    _inferenceConfigService = service;
+  }
+
+  /// Set the on-device LLM service (for hybrid mode)
+  void setOnDeviceLLMService(OnDeviceLLMService service) {
+    _onDeviceLLMService = service;
+  }
+
+  /// Get current inference mode
+  InferenceMode get currentInferenceMode {
+    return _inferenceConfigService?.inferenceMode ?? InferenceMode.remote;
+  }
+
+  /// Check if on-device inference is available
+  Future<bool> isOnDeviceAvailable() async {
+    if (_onDeviceLLMService == null) return false;
+    return _onDeviceLLMService!.isAvailable();
+  }
+
+  /// Get the on-device LLM service
+  OnDeviceLLMService? get onDeviceLLMService => _onDeviceLLMService;
 
   void _log(String message) {
     _debugLog(message);
@@ -672,12 +708,21 @@ class ChatService {
   ///
   /// Returns a stream of updated conversations as the response streams in.
   /// If offline, queues the message instead.
+  /// Supports hybrid mode: uses on-device inference when mode is set to onDevice.
   Stream<Conversation> sendMessage(String conversationId, String text) async* {
     await cancelMessageGeneration(conversationId);
 
     final initialConversation = getConversation(conversationId);
     if (initialConversation == null) {
       throw Exception('Conversation not found');
+    }
+
+    // Check inference mode - route to on-device if enabled
+    if (currentInferenceMode == InferenceMode.onDevice &&
+        _onDeviceLLMService != null) {
+      _log('Using on-device inference mode');
+      yield* _sendMessageOnDevice(conversationId, text);
+      return;
     }
 
     // Check if not online (offline or Ollama unreachable) - queue the message instead
@@ -724,6 +769,127 @@ class ChatService {
     );
 
     // Yield updates from the stream
+    await for (final updatedConversation in streamController.stream) {
+      yield updatedConversation;
+    }
+  }
+
+  /// Sends a message using on-device inference via LiteRT-LM
+  Stream<Conversation> _sendMessageOnDevice(
+    String conversationId,
+    String text,
+  ) async* {
+    final initialConversation = getConversation(conversationId);
+    if (initialConversation == null) {
+      throw Exception('Conversation not found');
+    }
+
+    // Check if on-device service is available
+    if (_onDeviceLLMService == null) {
+      throw Exception('On-device inference not configured');
+    }
+
+    final isAvailable = await _onDeviceLLMService!.isAvailable();
+    if (!isAvailable) {
+      throw Exception('On-device inference not available on this device');
+    }
+
+    // Add user message
+    final userMessage = Message.user(
+      id: const Uuid().v4(),
+      text: text,
+      timestamp: DateTime.now(),
+    );
+    var conversation = await addMessage(conversationId, userMessage);
+
+    // Create stream controller
+    final streamController = StreamController<Conversation>.broadcast();
+    _activeStreams[conversationId] = streamController;
+
+    streamController.add(conversation);
+    yield conversation;
+
+    // Create placeholder assistant message
+    final assistantMessageId = const Uuid().v4();
+    var assistantMessage = Message.assistant(
+      id: assistantMessageId,
+      text: '',
+      timestamp: DateTime.now(),
+      isStreaming: true,
+    );
+    conversation = await addMessage(conversationId, assistantMessage);
+    streamController.add(conversation);
+    yield conversation;
+
+    // Get the on-device model to use
+    final onDeviceModelId =
+        _inferenceConfigService?.lastOnDeviceModel ?? 'gemma3-1b';
+
+    // Build conversation history (exclude the placeholder assistant message)
+    final conversationHistory = conversation.messages
+        .where((m) => m.id != assistantMessageId && !m.isError)
+        .toList();
+
+    // Start on-device generation
+    try {
+      final buffer = StringBuffer();
+
+      await for (final token in _onDeviceLLMService!.generateResponse(
+        prompt: text,
+        modelId: onDeviceModelId,
+        conversationHistory: conversationHistory,
+        systemPrompt: conversation.systemPrompt,
+        temperature: conversation.parameters.temperature,
+        maxTokens: conversation.parameters.maxTokens,
+      )) {
+        if (streamController.isClosed) break;
+
+        buffer.write(token);
+
+        conversation = await _updateAssistantMessage(
+          conversation,
+          assistantMessageId,
+          buffer.toString(),
+          isStreaming: true,
+        );
+
+        if (!streamController.isClosed) {
+          streamController.add(conversation);
+        }
+      }
+
+      // Finalize the message
+      conversation = await _updateAssistantMessage(
+        conversation,
+        assistantMessageId,
+        buffer.toString(),
+        isStreaming: false,
+      );
+
+      if (!streamController.isClosed) {
+        streamController.add(conversation);
+        streamController.close();
+      }
+
+      // Show notification
+      await _showResponseCompleteNotification(conversation, buffer.toString());
+
+      // Update last used on-device model
+      await _inferenceConfigService?.setLastOnDeviceModel(onDeviceModelId);
+    } catch (e) {
+      _log('On-device generation error: $e');
+      _handleError(
+        conversationId,
+        conversation,
+        assistantMessageId,
+        streamController,
+        'On-device inference error: ${e.toString()}',
+      );
+    }
+
+    _cleanupStream(conversationId);
+
+    // Yield final updates
     await for (final updatedConversation in streamController.stream) {
       yield updatedConversation;
     }
@@ -1671,6 +1837,10 @@ class ChatService {
     // Dispose offline mode services
     _connectivityService.dispose();
     _queueService.dispose();
+
+    // Dispose on-device LLM service if present
+    _onDeviceLLMService?.dispose();
+    _inferenceConfigService?.dispose();
   }
 
   // ============================================================================

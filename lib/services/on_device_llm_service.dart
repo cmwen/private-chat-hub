@@ -1,0 +1,162 @@
+import 'dart:async';
+import 'package:private_chat_hub/models/message.dart';
+import 'package:private_chat_hub/services/litert_platform_channel.dart';
+import 'package:private_chat_hub/services/llm_service.dart';
+import 'package:private_chat_hub/services/model_manager.dart';
+import 'package:private_chat_hub/services/storage_service.dart';
+
+/// On-device LLM service using LiteRT-LM
+///
+/// This service provides on-device inference using Google's LiteRT-LM framework.
+/// It implements the [LLMService] interface for seamless integration with the
+/// existing chat infrastructure.
+class OnDeviceLLMService implements LLMService {
+  final ModelManager _modelManager;
+  final LiteRTPlatformChannel _platformChannel;
+
+  String? _currentModelId;
+
+  OnDeviceLLMService(StorageService storage)
+    : _modelManager = ModelManager(storage),
+      _platformChannel = LiteRTPlatformChannel();
+
+  /// Create with existing ModelManager
+  OnDeviceLLMService.withManager(this._modelManager)
+    : _platformChannel = LiteRTPlatformChannel();
+
+  @override
+  String? get currentModelId => _currentModelId;
+
+  @override
+  bool isModelLoaded(String modelId) => _currentModelId == modelId;
+
+  /// Get the model manager for downloads and lifecycle
+  ModelManager get modelManager => _modelManager;
+
+  @override
+  Future<bool> isAvailable() async {
+    return _platformChannel.isAvailable();
+  }
+
+  @override
+  Future<List<ModelInfo>> getAvailableModels() async {
+    return _modelManager.getAvailableModels();
+  }
+
+  @override
+  Future<void> loadModel(String modelId) async {
+    _log('Loading model: $modelId');
+
+    final success = await _modelManager.loadModel(modelId);
+    if (success) {
+      _currentModelId = modelId;
+    } else {
+      throw Exception('Failed to load model: $modelId');
+    }
+  }
+
+  @override
+  Future<void> unloadModel() async {
+    _log('Unloading model');
+    await _modelManager.unloadModel();
+    _currentModelId = null;
+  }
+
+  @override
+  Stream<String> generateResponse({
+    required String prompt,
+    required String modelId,
+    List<Message>? conversationHistory,
+    String? systemPrompt,
+    double temperature = 0.7,
+    int? maxTokens,
+  }) async* {
+    // Ensure the correct model is loaded
+    if (_currentModelId != modelId) {
+      await loadModel(modelId);
+    }
+
+    // Build the full prompt with conversation history
+    final fullPrompt = _buildPrompt(
+      prompt: prompt,
+      systemPrompt: systemPrompt,
+      conversationHistory: conversationHistory,
+    );
+
+    _log('Generating response for prompt: ${prompt.take(50)}...');
+
+    try {
+      // Use streaming generation for real-time response
+      yield* _platformChannel.generateTextStream(
+        prompt: fullPrompt,
+        temperature: temperature,
+        maxTokens: maxTokens,
+      );
+
+      // Reset the auto-unload timer
+      _modelManager.resetUnloadTimer();
+    } catch (e) {
+      _log('Generation error: $e');
+      rethrow;
+    }
+  }
+
+  /// Build the complete prompt with system prompt and conversation history
+  String _buildPrompt({
+    required String prompt,
+    String? systemPrompt,
+    List<Message>? conversationHistory,
+  }) {
+    final buffer = StringBuffer();
+
+    // Add system prompt if provided
+    if (systemPrompt != null && systemPrompt.isNotEmpty) {
+      buffer.writeln('<system>');
+      buffer.writeln(systemPrompt);
+      buffer.writeln('</system>');
+      buffer.writeln();
+    }
+
+    // Add conversation history
+    if (conversationHistory != null && conversationHistory.isNotEmpty) {
+      for (final message in conversationHistory) {
+        if (message.isMe) {
+          buffer.writeln('<user>');
+          buffer.writeln(message.text);
+          buffer.writeln('</user>');
+        } else {
+          buffer.writeln('<assistant>');
+          buffer.writeln(message.text);
+          buffer.writeln('</assistant>');
+        }
+      }
+    }
+
+    // Add the current prompt
+    buffer.writeln('<user>');
+    buffer.writeln(prompt);
+    buffer.writeln('</user>');
+    buffer.writeln('<assistant>');
+
+    return buffer.toString();
+  }
+
+  @override
+  Future<void> dispose() async {
+    await unloadModel();
+    _modelManager.dispose();
+  }
+
+  void _log(String message) {
+    // ignore: avoid_print
+    print('[OnDeviceLLMService] $message');
+  }
+}
+
+/// Extension on String for easy truncation
+extension StringTruncate on String {
+  String take(int count) {
+    if (length <= count) return this;
+    return '${substring(0, count)}...';
+  }
+}

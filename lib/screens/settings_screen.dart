@@ -4,11 +4,16 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:private_chat_hub/models/connection.dart';
 import 'package:private_chat_hub/models/tool_models.dart';
 import 'package:private_chat_hub/ollama_toolkit/services/ollama_config_service.dart';
+import 'package:private_chat_hub/screens/on_device_models_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
+import 'package:private_chat_hub/services/inference_config_service.dart';
+import 'package:private_chat_hub/services/llm_service.dart';
 import 'package:private_chat_hub/services/network_discovery_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
+import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:private_chat_hub/services/tool_config_service.dart';
+import 'package:private_chat_hub/widgets/inference_settings_widget.dart';
 import 'package:private_chat_hub/widgets/tool_settings_widget.dart';
 
 /// Settings screen for managing Ollama connections.
@@ -17,6 +22,8 @@ class SettingsScreen extends StatefulWidget {
   final OllamaConnectionManager ollamaManager;
   final ChatService? chatService;
   final ToolConfigService? toolConfigService;
+  final InferenceConfigService? inferenceConfigService;
+  final StorageService? storageService;
   final Function(ThemeMode)? onThemeModeChanged;
   final ThemeMode? currentThemeMode;
 
@@ -26,6 +33,8 @@ class SettingsScreen extends StatefulWidget {
     required this.ollamaManager,
     this.chatService,
     this.toolConfigService,
+    this.inferenceConfigService,
+    this.storageService,
     this.onThemeModeChanged,
     this.currentThemeMode,
   });
@@ -43,6 +52,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int _timeout = OllamaConfigService.defaultTimeout;
   final OllamaConfigService _ollamaConfigService = OllamaConfigService();
 
+  // Inference mode state
+  InferenceMode _inferenceMode = InferenceMode.remote;
+
   @override
   void initState() {
     super.initState();
@@ -51,6 +63,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadAppVersion();
     _loadStreamingPreference();
     _loadTimeout();
+    _loadInferenceMode();
+  }
+
+  Future<void> _loadInferenceMode() async {
+    if (widget.inferenceConfigService != null) {
+      setState(() {
+        _inferenceMode = widget.inferenceConfigService!.inferenceMode;
+      });
+    }
+  }
+
+  Future<void> _setInferenceMode(InferenceMode mode) async {
+    if (widget.inferenceConfigService != null) {
+      await widget.inferenceConfigService!.setInferenceMode(mode);
+      setState(() {
+        _inferenceMode = mode;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              mode == InferenceMode.onDevice
+                  ? 'Switched to on-device inference'
+                  : 'Switched to remote (Ollama) inference',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  void _openOnDeviceModelsScreen() {
+    if (widget.storageService == null ||
+        widget.inferenceConfigService == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('On-device models not available')),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OnDeviceModelsScreen(
+          storageService: widget.storageService!,
+          inferenceConfigService: widget.inferenceConfigService!,
+        ),
+      ),
+    );
   }
 
   Future<void> _loadAppVersion() async {
@@ -273,6 +335,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 const SizedBox(height: 32),
                 const Divider(),
+                // Inference Mode Section
+                if (widget.inferenceConfigService != null) ...[
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'Inference Mode',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  InferenceModeSelector(
+                    currentMode: _inferenceMode,
+                    onModeChanged: _setInferenceMode,
+                  ),
+                  const SizedBox(height: 8),
+                  if (_inferenceMode == InferenceMode.onDevice)
+                    ListTile(
+                      leading: const Icon(Icons.download),
+                      title: const Text('Manage On-Device Models'),
+                      subtitle: const Text(
+                        'Download and manage LiteRT-LM models',
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: _openOnDeviceModelsScreen,
+                    ),
+                  const Divider(),
+                ],
                 if (widget.chatService != null) ...[
                   const Padding(
                     padding: EdgeInsets.all(16),
