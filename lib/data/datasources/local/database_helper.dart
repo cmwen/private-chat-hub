@@ -7,7 +7,7 @@ import 'package:private_chat_hub/domain/entities/ollama_model.dart';
 
 class DatabaseHelper {
   static const _databaseName = 'private_chat_hub.db';
-  static const _databaseVersion = 1;
+  static const _databaseVersion = 2;
 
   static Database? _database;
 
@@ -26,11 +26,23 @@ class DatabaseHelper {
       version: _databaseVersion,
       onCreate: _onCreate,
       onConfigure: _onConfigure,
+      onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _onConfigure(Database db) async {
     await db.execute('PRAGMA foreign_keys = ON');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute(
+        'ALTER TABLE conversations ADD COLUMN provider_type TEXT DEFAULT \'ollama\'',
+      );
+      await db.execute(
+        'ALTER TABLE conversations ADD COLUMN provider_config TEXT',
+      );
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -42,7 +54,9 @@ class DatabaseHelper {
         updated_at INTEGER NOT NULL,
         model_name TEXT,
         system_prompt TEXT,
-        is_archived INTEGER DEFAULT 0
+        is_archived INTEGER DEFAULT 0,
+        provider_type TEXT DEFAULT 'ollama',
+        provider_config TEXT
       )
     ''');
 
@@ -129,6 +143,8 @@ class DatabaseHelper {
       'model_name': conversation.modelName,
       'system_prompt': conversation.systemPrompt,
       'is_archived': conversation.isArchived ? 1 : 0,
+      'provider_type': conversation.providerType.name,
+      'provider_config': conversation.providerConfig,
     });
   }
 
@@ -142,6 +158,8 @@ class DatabaseHelper {
         'model_name': conversation.modelName,
         'system_prompt': conversation.systemPrompt,
         'is_archived': conversation.isArchived ? 1 : 0,
+        'provider_type': conversation.providerType.name,
+        'provider_config': conversation.providerConfig,
       },
       where: 'id = ?',
       whereArgs: [conversation.id],
@@ -380,6 +398,20 @@ class DatabaseHelper {
   }
 
   Conversation _conversationFromMap(Map<String, dynamic> map) {
+    final providerTypeStr = map['provider_type'] as String?;
+    ProviderType providerType = ProviderType.ollama;
+
+    if (providerTypeStr != null) {
+      try {
+        providerType = ProviderType.values.firstWhere(
+          (e) => e.name == providerTypeStr,
+          orElse: () => ProviderType.ollama,
+        );
+      } catch (e) {
+        providerType = ProviderType.ollama;
+      }
+    }
+
     return Conversation(
       id: map['id'] as int,
       title: map['title'] as String,
@@ -388,6 +420,8 @@ class DatabaseHelper {
       modelName: map['model_name'] as String?,
       systemPrompt: map['system_prompt'] as String?,
       isArchived: (map['is_archived'] as int) == 1,
+      providerType: providerType,
+      providerConfig: map['provider_config'] as String?,
     );
   }
 

@@ -34,4 +34,14 @@ class StorageKeys {
   static const String themeMode = 'theme_mode';
   static const String lastConnectionHost = 'last_connection_host';
   static const String lastConnectionPort = 'last_connection_port';
+
+  static const String openaiApiKey = 'openai_api_key';
+  static const String openaiBaseUrl = 'openai_base_url';
+  static const String openaiDefaultModel = 'openai_default_model';
+
+  static const String defaultProviderType = 'default_provider_type';
+  static const String liteLLMEndpoint = 'litellm_endpoint';
+  static const String liteLLMApiKey = 'litellm_api_key';
+
+  static const String literTModelPath = 'litert_model_path';
 }

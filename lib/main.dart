@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:private_chat_hub/data/datasources/local/database_helper.dart';
-import 'package:private_chat_hub/data/datasources/remote/ollama_api_client.dart';
+import 'package:private_chat_hub/data/factories/provider_factory.dart';
 import 'package:private_chat_hub/data/repositories/settings_repository.dart';
 import 'package:private_chat_hub/domain/entities/connection.dart';
 import 'package:private_chat_hub/domain/entities/conversation.dart';
 import 'package:private_chat_hub/domain/entities/message.dart';
+import 'package:private_chat_hub/domain/repositories/i_chat_provider.dart';
 import 'package:private_chat_hub/core/utils/logger.dart';
 import 'package:private_chat_hub/core/extensions/datetime_extensions.dart';
 import 'package:private_chat_hub/presentation/screens/connection_profiles_screen.dart';
@@ -99,65 +100,220 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     final titleController = TextEditingController(text: 'New Conversation');
     final systemPromptController = TextEditingController();
 
+    // Provider selection state
+    ProviderType selectedProvider = ProviderType.ollama;
+
+    // Ollama fields
+    final ollamaModelController = TextEditingController();
+
+    // OpenAI fields
+    final openaiApiKeyController = TextEditingController();
+    final openaiBaseUrlController = TextEditingController(
+      text: 'https://api.openai.com/v1',
+    );
+    final openaiModelController = TextEditingController(text: 'gpt-3.5-turbo');
+
+    // LiteRT fields
+    final litertModelPathController = TextEditingController();
+
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('New Conversation'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Title',
-                  border: OutlineInputBorder(),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('New Conversation'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Title',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: systemPromptController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'System Prompt (Optional)',
-                  hintText: 'e.g., You are a helpful assistant...',
-                  border: OutlineInputBorder(),
-                  helperText: 'Customize how the AI should behave',
+                const SizedBox(height: 16),
+                TextField(
+                  controller: systemPromptController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'System Prompt (Optional)',
+                    hintText: 'e.g., You are a helpful assistant...',
+                    border: OutlineInputBorder(),
+                    helperText: 'Customize how the AI should behave',
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<ProviderType>(
+                  value: selectedProvider,
+                  decoration: const InputDecoration(
+                    labelText: 'Provider',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: ProviderType.ollama,
+                      child: Text('Ollama (Local)'),
+                    ),
+                    DropdownMenuItem(
+                      value: ProviderType.openai,
+                      child: Text('OpenAI / LiteLLM'),
+                    ),
+                    DropdownMenuItem(
+                      value: ProviderType.litert,
+                      child: Text('LiteRT (On-Device)'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setDialogState(() {
+                        selectedProvider = value;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                // Provider-specific fields
+                if (selectedProvider == ProviderType.ollama) ...[
+                  TextField(
+                    controller: ollamaModelController,
+                    decoration: const InputDecoration(
+                      labelText: 'Model Name',
+                      hintText: 'llama3.2',
+                      border: OutlineInputBorder(),
+                      helperText: 'Leave empty to use default',
+                    ),
+                  ),
+                ],
+                if (selectedProvider == ProviderType.openai) ...[
+                  TextField(
+                    controller: openaiBaseUrlController,
+                    decoration: const InputDecoration(
+                      labelText: 'Base URL',
+                      hintText: 'https://api.openai.com/v1',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: openaiApiKeyController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'API Key',
+                      hintText: 'sk-...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: openaiModelController,
+                    decoration: const InputDecoration(
+                      labelText: 'Model Name',
+                      hintText: 'gpt-3.5-turbo',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+                if (selectedProvider == ProviderType.litert) ...[
+                  TextField(
+                    controller: litertModelPathController,
+                    decoration: const InputDecoration(
+                      labelText: 'Model Path',
+                      hintText: '/path/to/model.bin',
+                      border: OutlineInputBorder(),
+                      helperText: 'Path to LiteRT model file',
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Create'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Create'),
-          ),
-        ],
       ),
     );
 
     if (confirmed == true && mounted) {
       try {
-        // Get saved default model
+        // Get saved default model for Ollama
         final defaultModel = await widget.settingsRepo.getDefaultModel();
 
         final systemPrompt = systemPromptController.text.trim().isEmpty
             ? null
             : systemPromptController.text.trim();
 
+        // Create provider config based on selected provider
+        String? providerConfig;
+        String modelName = defaultModel ?? 'llama3.2';
+
+        switch (selectedProvider) {
+          case ProviderType.ollama:
+            final host =
+                await widget.settingsRepo.getLastConnectionHost() ??
+                'localhost';
+            final port =
+                await widget.settingsRepo.getLastConnectionPort() ?? 11434;
+            final baseUrl = 'http://$host:$port';
+            providerConfig = ProviderFactory.createOllamaConfig(
+              baseUrl: baseUrl,
+            );
+            if (ollamaModelController.text.trim().isNotEmpty) {
+              modelName = ollamaModelController.text.trim();
+            }
+            break;
+
+          case ProviderType.openai:
+            final apiKey = openaiApiKeyController.text.trim();
+            final baseUrl = openaiBaseUrlController.text.trim();
+            final model = openaiModelController.text.trim();
+
+            if (apiKey.isEmpty) {
+              throw Exception('API Key is required for OpenAI provider');
+            }
+
+            providerConfig = ProviderFactory.createOpenAIConfig(
+              baseUrl: baseUrl,
+              apiKey: apiKey,
+              model: model,
+            );
+            modelName = model;
+            break;
+
+          case ProviderType.litert:
+            final modelPath = litertModelPathController.text.trim();
+
+            if (modelPath.isEmpty) {
+              throw Exception('Model path is required for LiteRT provider');
+            }
+
+            providerConfig = ProviderFactory.createLiteRTConfig(
+              modelPath: modelPath,
+            );
+            modelName = modelPath.split('/').last;
+            break;
+        }
+
         final conversation = Conversation(
           id: 0,
           title: titleController.text,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
-          modelName: defaultModel,
+          modelName: modelName,
           systemPrompt: systemPrompt,
           isArchived: false,
+          providerType: selectedProvider,
+          providerConfig: providerConfig,
         );
 
         final id = await widget.dbHelper.insertConversation(conversation);
@@ -487,7 +643,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _sending = false;
   String _ollamaHost = 'http://localhost:11434';
   String _selectedModel = 'llama3.2';
-  OllamaApiClient? _activeClient;
+  ChatProvider? _activeClient;
 
   @override
   void initState() {
@@ -600,7 +756,19 @@ class _ChatScreenState extends State<ChatScreen> {
       });
       _scrollToBottom();
 
-      _activeClient = OllamaApiClient(baseUrl: _ollamaHost);
+      // Load conversation and create provider using factory
+      final conversation = await widget.dbHelper.getConversation(
+        widget.conversationId,
+      );
+
+      if (conversation == null) {
+        throw Exception('Conversation not found');
+      }
+
+      _activeClient = await ProviderFactory.createFromConversation(
+        conversation,
+        _ollamaHost,
+      );
 
       final apiMessages = _messages
           .where((m) => m.id != assistantMsgId)
@@ -625,7 +793,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       await widget.dbHelper.updateMessage(_messages.last);
 
-      _activeClient?.dispose();
+      await _activeClient?.dispose();
       _activeClient = null;
     } catch (e) {
       AppLogger.error('Failed to send message', e);
@@ -647,7 +815,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } finally {
       setState(() => _sending = false);
-      _activeClient?.dispose();
+      await _activeClient?.dispose();
       _activeClient = null;
     }
   }
@@ -821,93 +989,205 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _showSettings() async {
+    // Load current conversation to get provider type
+    final conversation = await widget.dbHelper.getConversation(
+      widget.conversationId,
+    );
+
+    if (conversation == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to load conversation')),
+        );
+      }
+      return;
+    }
+
+    final currentProvider = conversation.providerType;
     final profiles = await widget.dbHelper.getAllConnectionProfiles();
     ConnectionProfile? selectedProfile;
 
+    // Controllers for Ollama
     final hostController = TextEditingController(text: _ollamaHost);
     final modelController = TextEditingController(text: _selectedModel);
+
+    // Controllers for OpenAI
+    final openaiApiKeyController = TextEditingController();
+    final openaiBaseUrlController = TextEditingController();
+    final openaiModelController = TextEditingController();
+
+    // Controllers for LiteRT
+    final litertModelPathController = TextEditingController();
+
+    // Pre-populate from existing config
+    if (conversation.providerConfig != null) {
+      try {
+        final config =
+            jsonDecode(conversation.providerConfig!) as Map<String, dynamic>;
+
+        switch (currentProvider) {
+          case ProviderType.ollama:
+            if (config.containsKey('baseUrl')) {
+              hostController.text = config['baseUrl'] as String;
+            }
+            break;
+          case ProviderType.openai:
+            openaiBaseUrlController.text = config['baseUrl'] as String? ?? '';
+            openaiApiKeyController.text = config['apiKey'] as String? ?? '';
+            openaiModelController.text = config['model'] as String? ?? '';
+            break;
+          case ProviderType.litert:
+            litertModelPathController.text =
+                config['modelPath'] as String? ?? '';
+            break;
+        }
+      } catch (e) {
+        AppLogger.error('Failed to parse provider config', e);
+      }
+    }
 
     await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Connection Settings'),
+          title: Row(
+            children: [
+              const Text('Connection Settings'),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  currentProvider.name.toUpperCase(),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  ),
+                ),
+              ),
+            ],
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (profiles.isNotEmpty) ...[
-                  DropdownButtonFormField<ConnectionProfile>(
-                    value: selectedProfile,
+                // Provider-specific settings
+                if (currentProvider == ProviderType.ollama) ...[
+                  if (profiles.isNotEmpty) ...[
+                    DropdownButtonFormField<ConnectionProfile>(
+                      value: selectedProfile,
+                      decoration: const InputDecoration(
+                        labelText: 'Connection Profile',
+                        border: OutlineInputBorder(),
+                      ),
+                      hint: const Text('Select a profile'),
+                      items: profiles.map((profile) {
+                        return DropdownMenuItem(
+                          value: profile,
+                          child: Row(
+                            children: [
+                              if (profile.isDefault)
+                                const Icon(Icons.star, size: 16),
+                              if (profile.isDefault) const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  profile.name,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (profile) {
+                        setDialogState(() {
+                          selectedProfile = profile;
+                          if (profile != null) {
+                            hostController.text = profile.baseUrl;
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ConnectionProfilesScreen(
+                              dbHelper: widget.dbHelper,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.edit),
+                      label: const Text('Manage Profiles'),
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                  ],
+                  TextField(
+                    controller: hostController,
                     decoration: const InputDecoration(
-                      labelText: 'Connection Profile',
+                      labelText: 'Ollama Host',
+                      hintText: 'http://localhost:11434',
                       border: OutlineInputBorder(),
                     ),
-                    hint: const Text('Select a profile'),
-                    items: profiles.map((profile) {
-                      return DropdownMenuItem(
-                        value: profile,
-                        child: Row(
-                          children: [
-                            if (profile.isDefault)
-                              const Icon(Icons.star, size: 16),
-                            if (profile.isDefault) const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                profile.name,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (profile) {
-                      setDialogState(() {
-                        selectedProfile = profile;
-                        if (profile != null) {
-                          hostController.text = profile.baseUrl;
-                        }
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ConnectionProfilesScreen(
-                            dbHelper: widget.dbHelper,
-                          ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.edit),
-                    label: const Text('Manage Profiles'),
                   ),
                   const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 16),
+                  TextField(
+                    controller: modelController,
+                    decoration: const InputDecoration(
+                      labelText: 'Model Name',
+                      hintText: 'llama3.2',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
                 ],
-                TextField(
-                  controller: hostController,
-                  decoration: const InputDecoration(
-                    labelText: 'Ollama Host',
-                    hintText: 'http://localhost:11434',
-                    border: OutlineInputBorder(),
+                if (currentProvider == ProviderType.openai) ...[
+                  TextField(
+                    controller: openaiBaseUrlController,
+                    decoration: const InputDecoration(
+                      labelText: 'Base URL',
+                      hintText: 'https://api.openai.com/v1',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: modelController,
-                  decoration: const InputDecoration(
-                    labelText: 'Model Name',
-                    hintText: 'llama3.2',
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: openaiApiKeyController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'API Key',
+                      hintText: 'sk-...',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: openaiModelController,
+                    decoration: const InputDecoration(
+                      labelText: 'Model Name',
+                      hintText: 'gpt-3.5-turbo',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+                if (currentProvider == ProviderType.litert) ...[
+                  TextField(
+                    controller: litertModelPathController,
+                    decoration: const InputDecoration(
+                      labelText: 'Model Path',
+                      hintText: '/path/to/model.bin',
+                      border: OutlineInputBorder(),
+                      helperText: 'Path to LiteRT model file',
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -918,24 +1198,86 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             FilledButton(
               onPressed: () async {
-                final host = hostController.text.trim();
-                final model = modelController.text.trim();
-
-                setState(() {
-                  _ollamaHost = host;
-                  _selectedModel = model;
-                });
-
-                // Save settings
                 try {
-                  // Parse host to extract host and port
-                  final uri = Uri.parse(host);
-                  final hostOnly = uri.host.isNotEmpty ? uri.host : 'localhost';
-                  final port = uri.port != 0 ? uri.port : 11434;
+                  String? newProviderConfig;
+                  String newModelName = _selectedModel;
 
-                  await widget.settingsRepo.setLastConnectionHost(hostOnly);
-                  await widget.settingsRepo.setLastConnectionPort(port);
-                  await widget.settingsRepo.setDefaultModel(model);
+                  // Build provider config based on current provider
+                  switch (currentProvider) {
+                    case ProviderType.ollama:
+                      final host = hostController.text.trim();
+                      final model = modelController.text.trim();
+
+                      if (host.isEmpty) {
+                        throw Exception('Ollama host is required');
+                      }
+
+                      setState(() {
+                        _ollamaHost = host;
+                        _selectedModel = model;
+                      });
+
+                      newProviderConfig = ProviderFactory.createOllamaConfig(
+                        baseUrl: host,
+                      );
+                      newModelName = model;
+
+                      // Also save to global settings
+                      final uri = Uri.parse(host);
+                      final hostOnly = uri.host.isNotEmpty
+                          ? uri.host
+                          : 'localhost';
+                      final port = uri.port != 0 ? uri.port : 11434;
+                      await widget.settingsRepo.setLastConnectionHost(hostOnly);
+                      await widget.settingsRepo.setLastConnectionPort(port);
+                      await widget.settingsRepo.setDefaultModel(model);
+                      break;
+
+                    case ProviderType.openai:
+                      final baseUrl = openaiBaseUrlController.text.trim();
+                      final apiKey = openaiApiKeyController.text.trim();
+                      final model = openaiModelController.text.trim();
+
+                      if (baseUrl.isEmpty) {
+                        throw Exception('Base URL is required');
+                      }
+                      if (apiKey.isEmpty) {
+                        throw Exception('API Key is required');
+                      }
+                      if (model.isEmpty) {
+                        throw Exception('Model name is required');
+                      }
+
+                      newProviderConfig = ProviderFactory.createOpenAIConfig(
+                        baseUrl: baseUrl,
+                        apiKey: apiKey,
+                        model: model,
+                      );
+                      newModelName = model;
+                      break;
+
+                    case ProviderType.litert:
+                      final modelPath = litertModelPathController.text.trim();
+
+                      if (modelPath.isEmpty) {
+                        throw Exception('Model path is required');
+                      }
+
+                      newProviderConfig = ProviderFactory.createLiteRTConfig(
+                        modelPath: modelPath,
+                      );
+                      newModelName = modelPath.split('/').last;
+                      break;
+                  }
+
+                  // Update conversation with new config
+                  final updatedConversation = conversation.copyWith(
+                    providerConfig: newProviderConfig,
+                    modelName: newModelName,
+                    updatedAt: DateTime.now(),
+                  );
+
+                  await widget.dbHelper.updateConversation(updatedConversation);
 
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -944,6 +1286,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         duration: Duration(seconds: 2),
                       ),
                     );
+                    Navigator.pop(context);
                   }
                 } catch (e) {
                   AppLogger.error('Failed to save settings', e);
@@ -958,8 +1301,6 @@ class _ChatScreenState extends State<ChatScreen> {
                     );
                   }
                 }
-
-                if (mounted) Navigator.pop(context);
               },
               child: const Text('Save'),
             ),

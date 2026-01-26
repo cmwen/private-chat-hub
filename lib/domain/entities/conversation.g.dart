@@ -16,6 +16,10 @@ _$ConversationImpl _$$ConversationImplFromJson(Map<String, dynamic> json) =>
       systemPrompt: json['systemPrompt'] as String?,
       isArchived: json['isArchived'] as bool? ?? false,
       messageCount: (json['messageCount'] as num?)?.toInt(),
+      providerType:
+          $enumDecodeNullable(_$ProviderTypeEnumMap, json['providerType']) ??
+          ProviderType.ollama,
+      providerConfig: json['providerConfig'] as String?,
     );
 
 Map<String, dynamic> _$$ConversationImplToJson(_$ConversationImpl instance) =>
@@ -28,4 +32,12 @@ Map<String, dynamic> _$$ConversationImplToJson(_$ConversationImpl instance) =>
       'systemPrompt': instance.systemPrompt,
       'isArchived': instance.isArchived,
       'messageCount': instance.messageCount,
+      'providerType': _$ProviderTypeEnumMap[instance.providerType]!,
+      'providerConfig': instance.providerConfig,
     };
+
+const _$ProviderTypeEnumMap = {
+  ProviderType.ollama: 'ollama',
+  ProviderType.litert: 'litert',
+  ProviderType.openai: 'openai',
+};

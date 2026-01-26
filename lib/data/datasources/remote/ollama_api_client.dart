@@ -5,8 +5,9 @@ import 'package:dio/dio.dart';
 import 'package:private_chat_hub/core/errors/exceptions.dart';
 import 'package:private_chat_hub/core/utils/logger.dart';
 import 'package:private_chat_hub/domain/entities/ollama_model.dart';
+import 'package:private_chat_hub/domain/repositories/i_chat_provider.dart';
 
-class OllamaApiClient {
+class OllamaApiClient implements ChatProvider {
   final Dio _dio;
   final String baseUrl;
   CancelToken? _currentCancelToken;
@@ -275,7 +276,11 @@ class OllamaApiClient {
     }
   }
 
-  void dispose() {
+  @override
+  String get providerName => 'Ollama';
+
+  @override
+  Future<void> dispose() async {
     _currentCancelToken?.cancel();
     _dio.close();
   }

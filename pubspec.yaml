@@ -45,6 +45,11 @@ dependencies:
   # File Handling  
   file_picker: ^8.1.4
   mime: ^2.0.0
+  
+  # AI Model Providers
+  # Note: mediapipe_text is not available on pub.dev yet, using method channels
+  # For OpenAI compatibility (LiteLLM proxy)
+  http: ^1.2.0
 
 dev_dependencies:
   flutter_test:

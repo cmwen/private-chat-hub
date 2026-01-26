@@ -3,6 +3,8 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'conversation.freezed.dart';
 part 'conversation.g.dart';
 
+enum ProviderType { ollama, litert, openai }
+
 @freezed
 class Conversation with _$Conversation {
   const factory Conversation({
@@ -14,6 +16,8 @@ class Conversation with _$Conversation {
     String? systemPrompt,
     @Default(false) bool isArchived,
     int? messageCount,
+    @Default(ProviderType.ollama) ProviderType providerType,
+    String? providerConfig,
   }) = _Conversation;
 
   factory Conversation.fromJson(Map<String, dynamic> json) =>

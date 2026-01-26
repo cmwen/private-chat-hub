@@ -29,6 +29,8 @@ mixin _$Conversation {
   String? get systemPrompt => throw _privateConstructorUsedError;
   bool get isArchived => throw _privateConstructorUsedError;
   int? get messageCount => throw _privateConstructorUsedError;
+  ProviderType get providerType => throw _privateConstructorUsedError;
+  String? get providerConfig => throw _privateConstructorUsedError;
 
   /// Serializes this Conversation to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -56,6 +58,8 @@ abstract class $ConversationCopyWith<$Res> {
     String? systemPrompt,
     bool isArchived,
     int? messageCount,
+    ProviderType providerType,
+    String? providerConfig,
   });
 }
 
@@ -82,6 +86,8 @@ class _$ConversationCopyWithImpl<$Res, $Val extends Conversation>
     Object? systemPrompt = freezed,
     Object? isArchived = null,
     Object? messageCount = freezed,
+    Object? providerType = null,
+    Object? providerConfig = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -117,6 +123,14 @@ class _$ConversationCopyWithImpl<$Res, $Val extends Conversation>
                 ? _value.messageCount
                 : messageCount // ignore: cast_nullable_to_non_nullable
                       as int?,
+            providerType: null == providerType
+                ? _value.providerType
+                : providerType // ignore: cast_nullable_to_non_nullable
+                      as ProviderType,
+            providerConfig: freezed == providerConfig
+                ? _value.providerConfig
+                : providerConfig // ignore: cast_nullable_to_non_nullable
+                      as String?,
           )
           as $Val,
     );
@@ -141,6 +155,8 @@ abstract class _$$ConversationImplCopyWith<$Res>
     String? systemPrompt,
     bool isArchived,
     int? messageCount,
+    ProviderType providerType,
+    String? providerConfig,
   });
 }
 
@@ -166,6 +182,8 @@ class __$$ConversationImplCopyWithImpl<$Res>
     Object? systemPrompt = freezed,
     Object? isArchived = null,
     Object? messageCount = freezed,
+    Object? providerType = null,
+    Object? providerConfig = freezed,
   }) {
     return _then(
       _$ConversationImpl(
@@ -201,6 +219,14 @@ class __$$ConversationImplCopyWithImpl<$Res>
             ? _value.messageCount
             : messageCount // ignore: cast_nullable_to_non_nullable
                   as int?,
+        providerType: null == providerType
+            ? _value.providerType
+            : providerType // ignore: cast_nullable_to_non_nullable
+                  as ProviderType,
+        providerConfig: freezed == providerConfig
+            ? _value.providerConfig
+            : providerConfig // ignore: cast_nullable_to_non_nullable
+                  as String?,
       ),
     );
   }
@@ -218,6 +244,8 @@ class _$ConversationImpl implements _Conversation {
     this.systemPrompt,
     this.isArchived = false,
     this.messageCount,
+    this.providerType = ProviderType.ollama,
+    this.providerConfig,
   });
 
   factory _$ConversationImpl.fromJson(Map<String, dynamic> json) =>
@@ -240,10 +268,15 @@ class _$ConversationImpl implements _Conversation {
   final bool isArchived;
   @override
   final int? messageCount;
+  @override
+  @JsonKey()
+  final ProviderType providerType;
+  @override
+  final String? providerConfig;
 
   @override
   String toString() {
-    return 'Conversation(id: $id, title: $title, createdAt: $createdAt, updatedAt: $updatedAt, modelName: $modelName, systemPrompt: $systemPrompt, isArchived: $isArchived, messageCount: $messageCount)';
+    return 'Conversation(id: $id, title: $title, createdAt: $createdAt, updatedAt: $updatedAt, modelName: $modelName, systemPrompt: $systemPrompt, isArchived: $isArchived, messageCount: $messageCount, providerType: $providerType, providerConfig: $providerConfig)';
   }
 
   @override
@@ -264,7 +297,11 @@ class _$ConversationImpl implements _Conversation {
             (identical(other.isArchived, isArchived) ||
                 other.isArchived == isArchived) &&
             (identical(other.messageCount, messageCount) ||
-                other.messageCount == messageCount));
+                other.messageCount == messageCount) &&
+            (identical(other.providerType, providerType) ||
+                other.providerType == providerType) &&
+            (identical(other.providerConfig, providerConfig) ||
+                other.providerConfig == providerConfig));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -279,6 +316,8 @@ class _$ConversationImpl implements _Conversation {
     systemPrompt,
     isArchived,
     messageCount,
+    providerType,
+    providerConfig,
   );
 
   /// Create a copy of Conversation
@@ -305,6 +344,8 @@ abstract class _Conversation implements Conversation {
     final String? systemPrompt,
     final bool isArchived,
     final int? messageCount,
+    final ProviderType providerType,
+    final String? providerConfig,
   }) = _$ConversationImpl;
 
   factory _Conversation.fromJson(Map<String, dynamic> json) =
@@ -326,6 +367,10 @@ abstract class _Conversation implements Conversation {
   bool get isArchived;
   @override
   int? get messageCount;
+  @override
+  ProviderType get providerType;
+  @override
+  String? get providerConfig;
 
   /// Create a copy of Conversation
   /// with the given fields replaced by the non-null parameter values.

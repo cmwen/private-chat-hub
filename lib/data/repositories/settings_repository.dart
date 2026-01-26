@@ -63,6 +63,76 @@ class SettingsRepository implements ISettingsRepository {
   }
 
   @override
+  Future<String?> getOpenAIApiKey() async {
+    return _prefs.getString(StorageKeys.openaiApiKey);
+  }
+
+  @override
+  Future<void> setOpenAIApiKey(String apiKey) async {
+    await _prefs.setString(StorageKeys.openaiApiKey, apiKey);
+  }
+
+  @override
+  Future<String?> getOpenAIBaseUrl() async {
+    return _prefs.getString(StorageKeys.openaiBaseUrl);
+  }
+
+  @override
+  Future<void> setOpenAIBaseUrl(String baseUrl) async {
+    await _prefs.setString(StorageKeys.openaiBaseUrl, baseUrl);
+  }
+
+  @override
+  Future<String?> getOpenAIDefaultModel() async {
+    return _prefs.getString(StorageKeys.openaiDefaultModel);
+  }
+
+  @override
+  Future<void> setOpenAIDefaultModel(String model) async {
+    await _prefs.setString(StorageKeys.openaiDefaultModel, model);
+  }
+
+  @override
+  Future<String?> getDefaultProviderType() async {
+    return _prefs.getString(StorageKeys.defaultProviderType);
+  }
+
+  @override
+  Future<void> setDefaultProviderType(String providerType) async {
+    await _prefs.setString(StorageKeys.defaultProviderType, providerType);
+  }
+
+  @override
+  Future<String?> getLiteLLMEndpoint() async {
+    return _prefs.getString(StorageKeys.liteLLMEndpoint);
+  }
+
+  @override
+  Future<void> setLiteLLMEndpoint(String endpoint) async {
+    await _prefs.setString(StorageKeys.liteLLMEndpoint, endpoint);
+  }
+
+  @override
+  Future<String?> getLiteLLMApiKey() async {
+    return _prefs.getString(StorageKeys.liteLLMApiKey);
+  }
+
+  @override
+  Future<void> setLiteLLMApiKey(String apiKey) async {
+    await _prefs.setString(StorageKeys.liteLLMApiKey, apiKey);
+  }
+
+  @override
+  Future<String?> getLiteRTModelPath() async {
+    return _prefs.getString(StorageKeys.literTModelPath);
+  }
+
+  @override
+  Future<void> setLiteRTModelPath(String path) async {
+    await _prefs.setString(StorageKeys.literTModelPath, path);
+  }
+
+  @override
   Future<void> clearAll() async {
     await _prefs.clear();
   }
