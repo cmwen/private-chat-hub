@@ -1,827 +1,873 @@
-# Product Requirements: Private Chat Hub
+# Product Requirements: Private Chat Hub v1.5 - Cloud API Integration
 
 **Document Version:** 1.0  
-**Created:** December 31, 2025  
-**Status:** Draft - MVP Scope  
-**Target Release:** Q1 2026
+**Created:** January 26, 2026  
+**Status:** Active Planning  
+**Target Release:** Q2 2026 (6-8 weeks)  
+**Related:** [PRODUCT_VISION.md](PRODUCT_VISION.md)
 
 ---
 
-## Document Overview
+## 📋 Document Overview
 
-This document defines the **functional** and **non-functional requirements** for Private Chat Hub MVP (Phase 1). Requirements are organized by priority using MoSCoW method:
+This document defines **functional** and **non-functional requirements** for Private Chat Hub v1.5, which transforms the app from an Ollama-focused client into a **universal AI chat hub** supporting:
 
-- **Must Have**: Critical for MVP launch
-- **Should Have**: Important but not blocking
-- **Could Have**: Nice to have if time permits
-- **Won't Have**: Explicitly out of scope for MVP
+1. **Local Models** (LiteRT/Gemini Nano) - Already implemented ✅
+2. **Self-Hosted Models** (Ollama) - Already implemented ✅
+3. **Cloud APIs** (OpenAI, Anthropic, Google AI) - **NEW in v1.5** 🆕
+
+---
+
+## 🎯 v1.5 Strategic Goals
+
+### Business Goals
+- **Expand Market**: Reach users who want cloud AI convenience with local AI privacy
+- **Differentiate**: Become the only mobile app supporting local + cloud + self-hosted
+- **User Flexibility**: Let users choose their privacy/performance/cost balance
+- **Revenue Potential**: Enable future monetization through cost optimization features
+
+### Technical Goals
+- **Provider Abstraction**: Clean interface supporting any LLM provider
+- **Unified UX**: Seamless experience regardless of model source
+- **Smart Routing**: Automatic fallback chains and provider health monitoring
+- **Cost Awareness**: Track token usage and costs across providers
 
 ---
 
 ## 1. Functional Requirements
 
-### 1.1 Connection & Configuration
+### 1.1 Provider Abstraction Layer
 
-#### FR-1.1.1: Ollama Connection Setup (Must Have)
-**Description:** Users must be able to configure connection to their Ollama instance.
+#### FR-1.1.1: Abstract LLM Provider Interface (Must Have)
+**Description:** Create provider-agnostic interface for all LLM backends.
+
+**Interface Definition:**
+```dart
+abstract class LLMProvider {
+  // Provider metadata
+  String get providerId;        // "openai", "anthropic", "google", "ollama", "local"
+  String get providerName;      // "OpenAI", "Anthropic", etc.
+  ProviderType get type;        // CLOUD_API, SELF_HOSTED, LOCAL
+  bool get requiresApiKey;      // true for cloud APIs
+  bool get requiresConnection;  // false for local, true for others
+  
+  // Capabilities
+  Future<ProviderCapabilities> getCapabilities();
+  
+  // Model management
+  Future<List<ModelInfo>> listModels();
+  Future<ModelInfo> getModelInfo(String modelId);
+  
+  // Chat operations
+  Stream<ChatResponse> sendMessage({
+    required String modelId,
+    required List<Message> messages,
+    Map<String, dynamic>? parameters,
+  });
+  
+  // Health and status
+  Future<ProviderHealth> checkHealth();
+  
+  // Cost tracking (cloud APIs only)
+  Future<TokenUsage>? estimateCost(String modelId, List<Message> messages);
+}
+```
 
 **Requirements:**
-- Input fields: Host URL/IP, Port
-- Connection validation and testing
-- Save multiple connection profiles
-- Default connection on app startup
-- Connection status indicator (connected/disconnected)
-- Support for both HTTP and HTTPS
+- Interface supports all existing providers (Ollama, LiteRT)
+- Interface supports new cloud providers (OpenAI, Anthropic, Google)
+- Streaming responses work consistently across all providers
+- Error handling standardized across providers
+- Provider can report capabilities (vision, tools, max context)
 
 **Acceptance Criteria:**
-- User can connect to Ollama at `http://192.168.1.100:11434`
-- App validates connection before saving
-- Error messages clearly explain connection failures
-- Connection persists across app restarts
-- User can test connection without saving
-
-**Dependencies:** None
+- [ ] All 5 providers implement the interface
+- [ ] Unit tests for each provider pass
+- [ ] Streaming works for all providers
+- [ ] Error handling tested for all error types
+- [ ] Provider capabilities accurately reported
 
 **Priority:** P0 (Must Have)
 
 ---
 
-#### FR-1.1.2: Connection Auto-Discovery (Should Have)
-**Description:** App should attempt to auto-discover Ollama instances on local network.
+#### FR-1.1.2: Provider Registry & Selection (Must Have)
+**Description:** System to register, discover, and select providers.
 
 **Requirements:**
-- Scan common ports (11434) on local network
-- Present discovered instances to user
-- Optional feature (can skip manually)
-- Timeout after 5 seconds
+- Central registry of all available providers
+- User can enable/disable providers
+- User can set provider priority/preference
+- System tracks provider health status
+- UI shows available providers with status badges
+- Providers sorted by: enabled → healthy → user preference
+
+**Provider Status:**
+```dart
+enum ProviderStatus {
+  READY,          // Configured and healthy
+  UNCONFIGURED,   // Needs API key or setup
+  OFFLINE,        // Network/connection issue
+  ERROR,          // Provider-specific error
+  DISABLED,       // User disabled
+}
+```
 
 **Acceptance Criteria:**
-- Discovers Ollama at common local IPs
-- User can select from discovered list
-- Manual entry still available
-- Does not block app if slow/fails
-
-**Dependencies:** FR-1.1.1
-
-**Priority:** P2 (Should Have)
-
----
-
-### 1.2 Chat Interface
-
-#### FR-1.2.1: Basic Text Chat (Must Have)
-**Description:** Users must be able to send text messages and receive responses.
-
-**Requirements:**
-- Text input field with submit button
-- Display user messages and AI responses
-- Clear visual distinction between user/AI
-- Auto-scroll to latest message
-- Show typing/loading indicator during response
-- Handle multi-line messages
-- Markdown rendering for AI responses (code blocks, lists, etc.)
-
-**Acceptance Criteria:**
-- User can type and send messages
-- AI responses appear with proper formatting
-- Code blocks are syntax-highlighted
-- Links are clickable
-- Loading state is clear
-- Chat history scrolls smoothly
-
-**Dependencies:** FR-1.1.1
+- [ ] Provider registry implemented
+- [ ] User can enable/disable providers in settings
+- [ ] Provider status updates in real-time
+- [ ] Provider sorting works correctly
+- [ ] UI reflects provider status accurately
 
 **Priority:** P0 (Must Have)
 
 ---
 
-#### FR-1.2.2: Message Actions (Should Have)
-**Description:** Users should be able to interact with messages.
+### 1.2 Cloud API Integration
+
+#### FR-1.2.1: OpenAI API Integration (Must Have)
+**Description:** Full integration with OpenAI API for GPT models.
+
+**Supported Models:**
+- GPT-4o (128K context, vision, tools)
+- GPT-4o-mini (128K context, vision, tools)
+- GPT-4-turbo (128K context, vision, tools)
+- GPT-3.5-turbo (16K context, tools)
+- o1-preview (reasoning model, 128K context)
+- o1-mini (reasoning model, 128K context)
 
 **Requirements:**
-- Copy message text to clipboard
-- Retry failed messages
-- Delete individual messages
-- Edit and resend user messages
+- Streaming responses via SSE
+- Vision support (image URLs and base64)
+- Function/tool calling support (for v2)
+- Error handling for rate limits, invalid keys, quota exceeded
+- Cost estimation (input tokens × rate + output tokens × rate)
+- Respect model-specific max context lengths
+- Support for temperature, top_p, max_tokens parameters
+
+**API Configuration:**
+- API key stored securely (Flutter secure_storage)
+- Optional organization ID
+- Optional custom API base URL (for proxies)
+- Request timeout: 30s (configurable)
 
 **Acceptance Criteria:**
-- Long-press message shows action menu
-- Copy works for code blocks and formatted text
-- Retry sends same message again
-- Edit preserves context
-
-**Dependencies:** FR-1.2.1
-
-**Priority:** P2 (Should Have)
-
----
-
-#### FR-1.2.3: Conversation Management (Must Have)
-**Description:** Users must be able to create, view, and delete conversations.
-
-**Requirements:**
-- New conversation button
-- List of recent conversations
-- Conversation titles (auto-generated or manual)
-- Delete conversation with confirmation
-- Clear conversation (delete messages, keep conversation)
-- Last message preview in list
-- Timestamp for each conversation
-
-**Acceptance Criteria:**
-- User can start new conversation
-- Conversations persist across app restarts
-- Delete removes all associated messages
-- Auto-generated titles are descriptive
-- List shows most recent conversations first
-
-**Dependencies:** FR-1.2.1
+- [ ] All listed models work correctly
+- [ ] Streaming responses render in real-time
+- [ ] Vision models accept image inputs
+- [ ] Rate limit errors handled gracefully
+- [ ] Cost estimation accurate within 5%
+- [ ] API key validation on save
 
 **Priority:** P0 (Must Have)
 
 ---
 
-### 1.3 Model Management
+#### FR-1.2.2: Anthropic API Integration (Must Have)
+**Description:** Full integration with Anthropic API for Claude models.
 
-#### FR-1.3.1: Model Selection (Must Have)
-**Description:** Users must be able to view and select from available models.
+**Supported Models:**
+- Claude 3.5 Sonnet (200K context, vision, tools)
+- Claude 3 Opus (200K context, vision, tools)
+- Claude 3 Sonnet (200K context, vision, tools)
+- Claude 3 Haiku (200K context, vision, tools)
 
 **Requirements:**
-- List all models available on Ollama instance
-- Display model names clearly
-- Show currently selected model
-- Allow switching models mid-conversation
-- Fetch model list from Ollama API
-- Handle case when no models are downloaded
+- Streaming responses via SSE
+- Vision support (base64 images in messages)
+- Function/tool calling support (for v2)
+- System prompts support
+- Error handling for rate limits, invalid keys
+- Cost estimation (input tokens × rate + output tokens × rate)
+- Support for temperature, top_p, top_k, max_tokens parameters
+
+**API Configuration:**
+- API key stored securely
+- Optional custom API base URL
+- Request timeout: 45s (Claude can be slower)
 
 **Acceptance Criteria:**
-- User sees all downloaded Ollama models
-- Can switch models with 1-2 taps
-- Current model is clearly indicated
-- Switching model continues conversation with new model
-- Empty state shown if no models available
-
-**Dependencies:** FR-1.1.1
+- [ ] All listed models work correctly
+- [ ] Streaming responses render in real-time
+- [ ] Vision models accept image inputs
+- [ ] System prompts applied correctly
+- [ ] Rate limit errors handled gracefully
+- [ ] Cost estimation accurate within 5%
 
 **Priority:** P0 (Must Have)
 
 ---
 
-#### FR-1.3.2: Model Information Display (Must Have)
-**Description:** Users must see basic information about each model.
+#### FR-1.2.3: Google AI API Integration (Must Have)
+**Description:** Integration with Google AI Studio API for Gemini models.
+
+**Supported Models:**
+- Gemini 1.5 Pro (2M context, vision, tools)
+- Gemini 1.5 Flash (1M context, vision, tools)
+- Gemini 1.0 Pro (32K context, tools)
 
 **Requirements:**
-- Model size (parameters: 7B, 13B, etc.)
-- Model family (Llama, Mistral, etc.)
-- Capabilities tags (vision, code, chat)
-- Model size on disk
-- Last modified/downloaded date
+- Streaming responses via SSE
+- Vision support (inline images)
+- Function/tool calling support (for v2)
+- Error handling for rate limits, invalid keys
+- Cost estimation (input tokens × rate + output tokens × rate)
+- Support for temperature, top_p, top_k, max_output_tokens parameters
+- Handle Google's unique message format
+
+**API Configuration:**
+- API key stored securely
+- Optional custom API base URL
+- Request timeout: 30s
 
 **Acceptance Criteria:**
-- Model list shows key information inline
-- User can tap model for detailed view
-- Information is fetched from Ollama API
-- Handles missing metadata gracefully
-
-**Dependencies:** FR-1.3.1
+- [ ] All listed models work correctly
+- [ ] Streaming responses render in real-time
+- [ ] Vision models accept image inputs
+- [ ] Rate limit errors handled gracefully
+- [ ] Cost estimation accurate within 5%
+- [ ] Message format conversion works correctly
 
 **Priority:** P0 (Must Have)
 
 ---
 
-#### FR-1.3.3: Model Download Management (Must Have)
-**Description:** Users must be able to browse and download models.
+### 1.3 Smart Routing & Fallbacks
 
-**Requirements:**
-- Browse available models from Ollama library
-- Search models by name
-- Display model information before download
-- Initiate model download
-- Show download progress (percentage, speed)
-- Pause/resume downloads (if supported by Ollama)
-- Cancel downloads
-- Notification when download completes
+#### FR-1.3.1: Automatic Provider Fallback (Must Have)
+**Description:** When primary provider fails, automatically try fallback providers.
+
+**Fallback Chain:**
+```
+1. User's selected model/provider
+2. If offline/unavailable → Check fallback preference
+3. Cloud API fails → Try Ollama (if available)
+4. Ollama fails → Try Local (if model downloaded)
+5. All fail → Queue message with error notification
+```
+
+**User Configuration:**
+- Enable/disable automatic fallbacks
+- Set fallback priority order
+- Choose: "Always ask" vs "Auto-fallback"
+
+**Fallback Scenarios:**
+- Network offline → Fallback to local
+- Cloud API rate limited → Try different cloud provider or Ollama
+- Ollama offline → Try cloud API or local
+- Model unavailable → Suggest alternative model
+
+**UI Feedback:**
+```
+⚠️ OpenAI is currently unavailable
+
+Would you like to:
+• Try Claude 3.5 Sonnet (similar capability)
+• Use Ollama llama3:latest (self-hosted)
+• Use Gemma 3 1B (on-device)
+• Queue message and retry later
+```
 
 **Acceptance Criteria:**
-- User can browse Ollama model library
-- Download progress is visible and accurate
-- User can cancel ongoing downloads
-- Completed downloads appear in model list
-- Error handling for failed downloads
-
-**Dependencies:** FR-1.3.1
+- [ ] Fallback chain executes correctly
+- [ ] User preferences respected
+- [ ] UI provides clear fallback options
+- [ ] Fallback happens within 2 seconds
+- [ ] User can disable auto-fallback
 
 **Priority:** P0 (Must Have)
 
 ---
 
-#### FR-1.3.4: Resource-Based Model Recommendations (Should Have)
-**Description:** App should recommend suitable models based on Ollama instance specs.
+#### FR-1.3.2: Provider Health Monitoring (Should Have)
+**Description:** Continuously monitor provider health and availability.
 
-**Requirements:**
-- Detect available RAM on Ollama server
-- Detect GPU availability and VRAM
-- Categorize models by resource requirements
-  - Light: < 8GB RAM (7B models)
-  - Medium: 8-16GB RAM (13B models)
-  - Heavy: > 16GB RAM (30B+ models)
-- Show warnings for models that may struggle
-- Recommend optimal models for detected hardware
+**Health Checks:**
+- Periodic health pings (every 60 seconds)
+- Track success/failure rates
+- Measure response latency
+- Detect rate limiting
+- Monitor API quota usage
+
+**Health Status:**
+```dart
+class ProviderHealth {
+  ProviderStatus status;
+  DateTime lastCheck;
+  double successRate;        // Last 100 requests
+  Duration avgLatency;       // p50
+  String? errorMessage;
+  DateTime? nextAvailableAt; // If rate limited
+}
+```
+
+**UI Indicators:**
+- Green dot: Healthy (success rate > 95%)
+- Yellow dot: Degraded (success rate 80-95%)
+- Red dot: Unavailable (success rate < 80%)
+- Gray dot: Disabled or not configured
 
 **Acceptance Criteria:**
-- App detects Ollama instance RAM/GPU
-- Models are tagged with resource requirements
-- User sees "Recommended" badge on suitable models
-- Warnings appear for heavy models on limited hardware
-- Recommendations update if configuration changes
+- [ ] Health checks run on schedule
+- [ ] Status updates reflected in UI
+- [ ] Rate limiting detected accurately
+- [ ] Health data persisted across restarts
+- [ ] Minimal battery impact from health checks
 
-**Dependencies:** FR-1.3.2, FR-1.3.3
-
-**Priority:** P2 (Should Have)
+**Priority:** P1 (Should Have)
 
 ---
 
-### 1.4 Multi-Modal Capabilities
+### 1.4 Cost Tracking & Awareness
 
-#### FR-1.4.1: Image Input (Vision Models) (Must Have)
-**Description:** Users must be able to attach images for vision model analysis.
+#### FR-1.4.1: Token Usage Tracking (Must Have)
+**Description:** Track token usage for all cloud API requests.
+
+**Data to Track:**
+```dart
+class TokenUsage {
+  String providerId;
+  String modelId;
+  int inputTokens;
+  int outputTokens;
+  int totalTokens;
+  double estimatedCost;     // USD
+  DateTime timestamp;
+  String conversationId;
+  String messageId;
+}
+```
 
 **Requirements:**
-- Image picker from gallery
-- Take photo with camera
-- Multiple image attachments per message
-- Image preview before sending
-- Remove attached image before sending
-- Detect if current model supports vision
-- Show warning/error if vision not supported
+- Track per message, per conversation, per model
+- Calculate estimated cost using current pricing
+- Store in local database
+- Display in UI (per message, conversation summary, monthly total)
+- Export token usage data
+
+**Pricing Database:**
+- Embedded pricing data (updated with app updates)
+- Per-provider, per-model pricing
+- Input token rate, output token rate
+- Cache token rate (for future use)
 
 **Acceptance Criteria:**
-- User can attach images from gallery or camera
-- Images appear as thumbnails in message
-- Vision-capable models process images correctly
-- Non-vision models show clear error message
-- Images are resized/compressed appropriately
-
-**Dependencies:** FR-1.2.1, FR-1.3.1
+- [ ] Token usage tracked for all cloud API messages
+- [ ] Cost estimation accurate within 5%
+- [ ] Data persisted in database
+- [ ] UI displays usage clearly
+- [ ] Export functionality works
 
 **Priority:** P0 (Must Have)
 
 ---
 
-#### FR-1.4.2: File Attachments as Context (Must Have)
-**Description:** Users must be able to attach files for context.
+#### FR-1.4.2: Cost Limits & Warnings (Should Have)
+**Description:** Alert users when approaching cost limits.
 
-**Requirements:**
-- File picker for common types (TXT, PDF, MD, code files)
-- Display attached file name and size
-- Extract text content from files
-- Include file content in prompt context
-- Handle large files gracefully (warn if > 5MB)
-- Remove attached file before sending
+**User Configuration:**
+- Set daily/monthly cost limits per provider
+- Warning threshold (e.g., 80% of limit)
+- Hard limit (stop requests)
+- Email/notification on limit reached
+
+**Warning UI:**
+```
+⚠️ OpenAI Usage Alert
+
+You've used $8.50 of your $10 monthly limit.
+
+• Remaining: $1.50
+• Estimated messages left: ~150 (GPT-4o-mini)
+• Reset: February 1, 2026
+
+[Switch to Free Model]  [Adjust Limit]
+```
 
 **Acceptance Criteria:**
-- User can attach .txt, .md, .pdf, .py, .js, .java files
-- File content is included in AI context
-- Large files show warning before sending
-- File name appears in message
-- PDF text extraction works for simple PDFs
+- [ ] Limits configurable per provider
+- [ ] Warnings displayed at threshold
+- [ ] Hard limits enforced
+- [ ] Reset logic works correctly
+- [ ] Suggestions for free alternatives
 
-**Dependencies:** FR-1.2.1
+**Priority:** P1 (Should Have)
+
+---
+
+#### FR-1.4.3: Cost Optimization Suggestions (Could Have)
+**Description:** Suggest cost-effective alternatives for expensive models.
+
+**Suggestions:**
+```
+💡 Cost Tip: GPT-4o costs 20x more than GPT-4o-mini
+
+For this simple question, GPT-4o-mini would give similar results at $0.01 instead of $0.20.
+
+[Use GPT-4o-mini]  [Continue with GPT-4o]  [Don't show again]
+```
+
+**Logic:**
+- Analyze message complexity (word count, context)
+- Compare model capabilities vs requirements
+- Suggest cheaper model if sufficient
+- Learn from user choices (ML model for future releases)
+
+**Acceptance Criteria:**
+- [ ] Suggestions appear for high-cost models
+- [ ] User can dismiss or accept
+- [ ] Suggestions stop if user dismisses repeatedly
+- [ ] Suggestions are accurate and helpful
+
+**Priority:** P2 (Could Have)
+
+---
+
+### 1.5 UI/UX Updates
+
+#### FR-1.5.1: Unified Model Picker (Must Have)
+**Description:** Single model picker showing all models from all providers.
+
+**Layout:**
+```
+┌─────────────────────────────────────────────┐
+│ Select Model                       [Search] │
+├─────────────────────────────────────────────┤
+│ 🌟 Favorites                                │
+│   ☁️ GPT-4o (OpenAI)                       │
+│   📱 Gemma 3 1B (Local)                    │
+├─────────────────────────────────────────────┤
+│ ☁️ Cloud APIs                              │
+│   OpenAI (🟢 Healthy)                      │
+│     • GPT-4o              $0.005/1K   128K │
+│     • GPT-4o-mini         $0.0002/1K  128K │
+│   Anthropic (🟢 Healthy)                   │
+│     • Claude 3.5 Sonnet   $0.003/1K   200K │
+│     • Claude 3 Haiku      $0.0003/1K  200K │
+│   Google AI (🔴 Unconfigured)              │
+│     [Add API Key]                          │
+├─────────────────────────────────────────────┤
+│ 🖥️ Self-Hosted (Ollama)                    │
+│   llama3:latest (🟢 Online)                │
+│   mistral:latest (🟢 Online)               │
+├─────────────────────────────────────────────┤
+│ 📱 Local (On-Device)                       │
+│   Gemma 3 1B (✅ Downloaded)               │
+│   Phi-4 Mini (⬇️ Available)                │
+└─────────────────────────────────────────────┘
+```
+
+**Features:**
+- Grouped by provider type
+- Provider status indicators
+- Cost per 1K tokens (cloud APIs)
+- Context length indicator
+- Capability badges (vision 👁️, tools 🔧)
+- Quick add API key button
+- Search/filter models
+- Favorites section at top
+
+**Acceptance Criteria:**
+- [ ] All models from all providers shown
+- [ ] Grouping and sorting correct
+- [ ] Status indicators accurate
+- [ ] Cost information displayed
+- [ ] Search/filter works
+- [ ] Favorites persist
 
 **Priority:** P0 (Must Have)
 
 ---
 
-#### FR-1.4.3: Image Generation (Could Have)
-**Description:** App could support image generation if model supports it.
+#### FR-1.5.2: Message Cost Display (Should Have)
+**Description:** Show token usage and cost for each cloud API message.
 
-**Requirements:**
-- Detect models with image generation capability
-- UI to request image generation
-- Display generated images in chat
-- Save generated images to gallery
+**Display:**
+```
+┌────────────────────────────────────────────┐
+│ 🤖 GPT-4o                        10:30 AM  │
+│ [AI response content here...]              │
+│                                            │
+│ 📊 125 tokens ($0.0006) • 1.2s            │
+└────────────────────────────────────────────┘
+```
+
+**Details:**
+- Token count (input + output)
+- Estimated cost in USD
+- Response time
+- Tap to expand for breakdown
+- Monthly running total in conversation header
 
 **Acceptance Criteria:**
-- Detect DALL-E style models on Ollama
-- User can request image generation
-- Generated images display in chat
-- Images can be saved to device
+- [ ] Cost displayed for all cloud API messages
+- [ ] Breakdown shows input/output split
+- [ ] Running total accurate
+- [ ] Zero cost for local/Ollama models
+- [ ] UI is not cluttered
 
-**Dependencies:** FR-1.2.1, FR-1.3.1
-
-**Priority:** P3 (Could Have - MVP)
+**Priority:** P1 (Should Have)
 
 ---
 
-### 1.5 Advanced Features
+#### FR-1.5.3: Provider Settings Screen (Must Have)
+**Description:** Dedicated settings screen for managing providers.
 
-#### FR-1.5.1: Function/Tool Calling (Could Have)
-**Description:** App could support function calling for compatible models.
+**Settings Structure:**
+```
+Settings > Providers
 
-**Requirements:**
-- Detect models with function calling support
-- Define available functions/tools
-- Execute function calls locally or on server
-- Display function call results
-- Support for common functions (calculator, web search, etc.)
+☁️ Cloud API Providers
+  • OpenAI
+  • Anthropic  
+  • Google AI
+
+🖥️ Self-Hosted
+  • Ollama
+
+📱 Local Models
+  • LiteRT
+
+Provider Details (OpenAI):
+  ✅ Enabled
+  🔑 API Key: sk-...abc (configured)
+  🌐 Base URL: https://api.openai.com/v1
+  📊 Monthly Usage: $12.50 / $50.00
+  🔄 Health: Healthy (last check: 2 min ago)
+  
+  [Test Connection]
+  [View Usage History]
+  [Configure Models]
+```
+
+**Features:**
+- Enable/disable providers
+- Add/edit API keys (secure input)
+- Set custom base URLs (for proxies)
+- View usage statistics
+- Test connection
+- Configure cost limits
+- Set fallback preferences
 
 **Acceptance Criteria:**
-- Function-capable models are identified
-- User can enable/disable function calling
-- Function execution is safe and sandboxed
-- Results are displayed clearly
+- [ ] All providers listed
+- [ ] API keys stored securely
+- [ ] Connection test works
+- [ ] Usage statistics accurate
+- [ ] UI is intuitive
 
-**Dependencies:** FR-1.2.1, FR-1.3.1
-
-**Priority:** P3 (Could Have - MVP)
-
-**Note:** This is complex and may be deferred to Phase 3.
+**Priority:** P0 (Must Have)
 
 ---
 
 ### 1.6 Data Management
 
-#### FR-1.6.1: Local Data Persistence (Must Have)
-**Description:** All conversations must be saved locally on device.
+#### FR-1.6.1: Provider Configuration Storage (Must Have)
+**Description:** Securely store provider configurations and credentials.
 
-**Requirements:**
-- SQLite database for conversation storage
-- Store messages, timestamps, model used
-- Store user settings and preferences
-- Persist connection configurations
-- No data sent to external servers
-- Efficient query performance for thousands of messages
+**Data to Store:**
+- Provider enabled/disabled state
+- API keys (encrypted, secure storage)
+- Custom base URLs
+- Cost limits and preferences
+- Fallback preferences
+- Model favorites
+
+**Security Requirements:**
+- API keys stored using flutter_secure_storage
+- Never log API keys
+- Clear API keys on app uninstall
+- Encrypt database containing usage data
+- No API keys in crash reports
 
 **Acceptance Criteria:**
-- Conversations persist across app restarts
-- App works completely offline (after initial setup)
-- Database does not grow unbounded
-- Old conversations load quickly
-
-**Dependencies:** None
+- [ ] Configurations persist across restarts
+- [ ] API keys stored securely
+- [ ] No sensitive data in logs
+- [ ] Database encrypted
+- [ ] Uninstall clears all credentials
 
 **Priority:** P0 (Must Have)
 
 ---
 
-#### FR-1.6.2: Conversation Search (Should Have)
-**Description:** Users should be able to search conversation history.
+#### FR-1.6.2: Usage Data Export (Should Have)
+**Description:** Export token usage and cost data.
 
-**Requirements:**
-- Search across all conversations
-- Search message content
-- Filter by date range
-- Filter by model used
-- Highlight search results
-- Fast full-text search (< 500ms)
+**Export Formats:**
+- CSV (for spreadsheet analysis)
+- JSON (for programmatic access)
+- PDF report (monthly summary)
 
-**Acceptance Criteria:**
-- User can search for keywords
-- Results appear quickly
-- Matches are highlighted
-- Can navigate between search results
-- Search handles typos reasonably
-
-**Dependencies:** FR-1.6.1
-
-**Priority:** P2 (Should Have)
-
----
-
-#### FR-1.6.3: Data Export (Must Have)
-**Description:** Users must be able to export conversation data.
-
-**Requirements:**
-- Export single conversation
-- Export all conversations
-- Format options: JSON, Markdown, Plain Text
-- Include metadata (timestamps, model, etc.)
-- Android share integration for export files
+**Export Includes:**
+- Date range
+- Per-provider breakdown
+- Per-model breakdown
+- Total costs
+- Token usage
+- Message counts
 
 **Acceptance Criteria:**
-- User can export any conversation
-- Exported files are well-formatted
-- JSON export is valid and parseable
-- Markdown export is readable
-- Can share via email, Drive, etc.
+- [ ] All formats export correctly
+- [ ] Data is accurate
+- [ ] Export includes filters (date, provider, model)
+- [ ] Large exports don't crash app
+- [ ] Export completes in < 5s for 1000 messages
 
-**Dependencies:** FR-1.6.1
-
-**Priority:** P0 (Must Have)
-
----
-
-#### FR-1.6.4: Android Sharing Integration (Must Have)
-**Description:** Users must be able to share conversations using Android share sheet.
-
-**Requirements:**
-- Share conversation as text
-- Share specific messages
-- Share with images (if present)
-- Integration with Android share sheet
-- Share to email, messaging, Drive, etc.
-
-**Acceptance Criteria:**
-- "Share" button on conversations/messages
-- Android share sheet appears
-- Content formats correctly for different apps
-- Images include when sharing
-
-**Dependencies:** FR-1.6.1
-
-**Priority:** P0 (Must Have)
-
----
-
-#### FR-1.6.5: Projects/Spaces (Won't Have - MVP)
-**Description:** Organization of conversations by project/topic.
-
-**Requirements:**
-- Deferred to Phase 2
-
-**Priority:** P4 (Won't Have - MVP)
-
----
-
-#### FR-1.6.6: Custom Agents (Won't Have - MVP)
-**Description:** Predefined agents with personalities and instructions.
-
-**Requirements:**
-- Deferred to Phase 3
-
-**Priority:** P4 (Won't Have - MVP)
-
----
-
-### 1.7 Settings & Configuration
-
-#### FR-1.7.1: App Settings (Must Have)
-**Description:** Users must be able to configure app behavior.
-
-**Requirements:**
-- Connection settings (host, port, timeout)
-- Default model selection
-- Theme selection (light/dark/system)
-- Message font size
-- Auto-save conversations
-- Clear all data option
-- About page (version, licenses)
-
-**Acceptance Criteria:**
-- Settings are accessible from main menu
-- Changes take effect immediately
-- Settings persist across restarts
-- Clear data requires confirmation
-
-**Dependencies:** None
-
-**Priority:** P0 (Must Have)
-
----
-
-#### FR-1.7.2: Model Parameters Configuration (Should Have)
-**Description:** Users should be able to adjust model parameters.
-
-**Requirements:**
-- Temperature slider (0.0 - 2.0)
-- Top-K slider
-- Top-P slider
-- Max tokens input
-- System prompt customization
-- Reset to defaults button
-- Presets (Creative, Balanced, Precise)
-
-**Acceptance Criteria:**
-- Parameters can be adjusted per conversation
-- Changes affect subsequent messages
-- Presets apply expected values
-- Advanced users can customize freely
-
-**Dependencies:** FR-1.2.1
-
-**Priority:** P2 (Should Have)
-
----
-
-### 1.8 Error Handling & Feedback
-
-#### FR-1.8.1: Error Handling (Must Have)
-**Description:** App must handle errors gracefully.
-
-**Requirements:**
-- Connection errors with retry option
-- Model not found errors
-- Timeout handling
-- Network errors
-- Model response errors
-- Out of memory errors (on Ollama side)
-- Clear, actionable error messages
-
-**Acceptance Criteria:**
-- User sees helpful error messages
-- Errors do not crash the app
-- User can retry failed operations
-- Logs help with debugging
-- Offline mode detected and communicated
-
-**Dependencies:** All features
-
-**Priority:** P0 (Must Have)
-
----
-
-#### FR-1.8.2: Loading States (Must Have)
-**Description:** Users must see clear loading indicators.
-
-**Requirements:**
-- Message sending loading state
-- Model list loading state
-- Model download progress
-- Connection testing indicator
-- Pull-to-refresh for model list
-
-**Acceptance Criteria:**
-- Loading states are clear and not intrusive
-- User can cancel long operations
-- Progress bars show real progress
-- Animations are smooth
-
-**Dependencies:** All features
-
-**Priority:** P0 (Must Have)
+**Priority:** P1 (Should Have)
 
 ---
 
 ## 2. Non-Functional Requirements
 
-### 2.1 Performance
+### NFR-2.1: Performance
 
-#### NFR-2.1.1: Responsiveness (Must Have)
-**Target:** 
-- App startup: < 2 seconds
-- Screen transitions: < 300ms
-- Message send: < 200ms (before AI response)
-- Scroll performance: 60 FPS
-- Search results: < 500ms
-
-**Measurement:** Performance profiling, user testing
-
-**Priority:** P0
-
----
-
-#### NFR-2.1.2: Resource Efficiency (Must Have)
+#### NFR-2.1.1: API Response Time (Must Have)
 **Target:**
-- Memory usage: < 200MB average
-- Battery drain: < 5% per hour active use
-- Storage: < 100MB app size, < 500MB cache
-- Network: Efficient message streaming
+- Cloud API first token: < 2s (p95)
+- Cloud API streaming: smooth, no stutters
+- Model picker load: < 500ms
+- Provider status update: < 1s
 
-**Measurement:** Android Profiler, battery stats
-
-**Priority:** P0
-
----
-
-### 2.2 Security & Privacy
-
-#### NFR-2.2.1: Data Privacy (Must Have)
-**Requirements:**
-- No telemetry or analytics without explicit consent
-- No data sent to external servers
-- All data stored locally encrypted at rest
-- HTTPS for Ollama connections (when available)
-- No logging of sensitive data
-
-**Compliance:** GDPR principles, Android privacy guidelines
-
-**Priority:** P0
+**Acceptance Criteria:**
+- [ ] First token latency meets target 95% of time
+- [ ] No visible lag in streaming
+- [ ] UI remains responsive during API calls
 
 ---
 
-#### NFR-2.2.2: Secure Communication (Should Have)
-**Requirements:**
-- Support HTTPS for Ollama connections
-- Certificate pinning for secure connections
-- Warn user on HTTP connections
-- Optional authentication for Ollama API
-
-**Priority:** P1
-
----
-
-### 2.3 Usability
-
-#### NFR-2.3.1: Accessibility (Should Have)
-**Requirements:**
-- Support TalkBack screen reader
-- Minimum touch target: 48dp
-- Sufficient color contrast (WCAG AA)
-- Scalable text
-- Keyboard navigation support
-
-**Priority:** P2
-
----
-
-#### NFR-2.3.2: Internationalization (Could Have)
-**Requirements:**
-- Support for multiple languages (English first)
-- RTL layout support
-- Localized error messages
-
-**Priority:** P3
-
----
-
-### 2.4 Compatibility
-
-#### NFR-2.4.1: Android Versions (Must Have)
-**Target:** Android 8.0 (API 26) and above
-**Rationale:** Covers 95%+ active devices, modern APIs
-
-**Priority:** P0
-
----
-
-#### NFR-2.4.2: Device Support (Must Have)
+#### NFR-2.1.2: Offline Performance (Must Have)
 **Target:**
-- Phone: Portrait and landscape
-- Tablet: Responsive layouts
-- Screen sizes: 4.5" - 12"
+- Offline mode detection: < 500ms
+- Message queueing: < 100ms
+- Fallback to local: < 1s
 
-**Priority:** P0
+**Acceptance Criteria:**
+- [ ] Offline detection is instant
+- [ ] No blocking on network calls
+- [ ] UI never freezes
 
 ---
 
-#### NFR-2.4.3: Ollama Compatibility (Must Have)
-**Target:** Ollama 0.1.0 and above
+### NFR-2.2: Security
+
+#### NFR-2.2.1: Credential Security (Must Have)
 **Requirements:**
-- Support Ollama REST API
-- Handle API version differences
-- Graceful degradation for missing features
+- API keys encrypted at rest
+- HTTPS only for all cloud APIs
+- Certificate pinning (optional, for paranoid mode)
+- No credentials in memory dumps
+- Secure key input (obscured, paste-only option)
 
-**Priority:** P0
-
----
-
-### 2.5 Reliability
-
-#### NFR-2.5.1: Stability (Must Have)
-**Target:**
-- Crash-free rate: > 99.5%
-- ANR (App Not Responding) rate: < 0.1%
-- Recovery from connection failures
-
-**Priority:** P0
+**Acceptance Criteria:**
+- [ ] Security audit passes
+- [ ] No credentials in plain text anywhere
+- [ ] HTTPS enforced
 
 ---
 
-#### NFR-2.5.2: Data Integrity (Must Have)
+#### NFR-2.2.2: Data Privacy (Must Have)
 **Requirements:**
-- No data loss on app crash
-- Database transaction safety
-- Backup mechanism for critical data
-- Graceful handling of corrupted data
+- No telemetry sent to Private Chat Hub servers
+- Cloud API providers receive only necessary data
+- User conversations never logged by app
+- Local database encrypted (optional setting)
+- Crash reports exclude message content
 
-**Priority:** P0
+**Acceptance Criteria:**
+- [ ] Privacy audit passes
+- [ ] No unexpected network requests
+- [ ] User data stays private
 
 ---
 
-### 2.6 Maintainability
+### NFR-2.3: Reliability
 
-#### NFR-2.6.1: Code Quality (Should Have)
+#### NFR-2.3.1: Error Handling (Must Have)
 **Requirements:**
-- Flutter best practices
-- Unit test coverage > 70%
-- Widget test coverage > 50%
-- Lint-free code (flutter_lints)
-- Documentation for complex logic
+- All API errors handled gracefully
+- User-friendly error messages
+- Automatic retry with exponential backoff
+- Fallback to alternative providers
+- No crashes due to API failures
 
-**Priority:** P2
+**Common Errors:**
+- Invalid API key → Show setup instructions
+- Rate limit → Show retry time, suggest fallback
+- Network timeout → Show retry button, queue option
+- Model unavailable → Suggest alternative
+- Quota exceeded → Show usage, upgrade prompt
+
+**Acceptance Criteria:**
+- [ ] No crashes from API errors
+- [ ] All error messages are helpful
+- [ ] Retry logic works correctly
 
 ---
 
-#### NFR-2.6.2: Logging & Debugging (Should Have)
+#### NFR-2.3.2: Offline Resilience (Must Have)
 **Requirements:**
-- Structured logging
-- Debug mode with verbose logs
-- Export logs for troubleshooting
-- Crash reporting (opt-in only)
+- Full functionality with local models offline
+- Graceful degradation for cloud APIs offline
+- Message queue for cloud/Ollama offline
+- Auto-resend when connection restored
+- No data loss
 
-**Priority:** P2
-
----
-
-## 3. Technical Constraints
-
-### 3.1 Technology Stack
-- **Framework:** Flutter 3.10.1+
-- **Language:** Dart 3.10.1+
-- **Platform:** Android (Java 17, Gradle 8.0+)
-- **Database:** SQLite (sqflite package)
-- **State Management:** Provider or Riverpod (TBD)
-- **HTTP Client:** dio or http package
-
-### 3.2 Dependencies
-- Minimize external dependencies
-- Prefer well-maintained, popular packages
-- No native code unless absolutely necessary
-- Open source and permissive licenses
-
-### 3.3 Build System
-- Optimized Gradle configuration
-- CI/CD with GitHub Actions
-- Automated testing
-- Signed release builds
+**Acceptance Criteria:**
+- [ ] App works offline with local models
+- [ ] Messages queue correctly
+- [ ] Auto-resend works
+- [ ] No messages lost
 
 ---
 
-## 4. MVP Scope Summary
+### NFR-2.4: Usability
 
-### Must Have (P0) - 23 Requirements
-Core features absolutely required for launch:
-- Ollama connection setup
-- Basic text chat with Markdown
-- Conversation management
-- Model selection and information
-- Model download management
-- Image input for vision models
-- File attachments
-- Local data persistence
-- Data export and sharing
-- App settings
-- Error handling and loading states
-- All NFRs marked as P0
+#### NFR-2.4.1: Onboarding (Should Have)
+**Requirements:**
+- First-time setup wizard
+- Explain provider types (local/cloud/self-hosted)
+- Guide through API key setup
+- Suggest starter models
+- Optional: skip cloud APIs entirely
 
-**Estimated Effort:** 10-12 weeks
-
-### Should Have (P1-P2) - 11 Requirements
-Important features that enhance usability:
-- Connection auto-discovery
-- Message actions
-- Conversation search
-- Model recommendations
-- Model parameters configuration
-- Accessibility improvements
-- Code quality standards
-
-**Estimated Effort:** 4-6 weeks
-
-### Could Have (P3) - 3 Requirements
-Nice-to-have features if time permits:
-- Image generation
-- Function/tool calling (partial)
-- Internationalization
-
-**Estimated Effort:** 2-4 weeks
-
-### Won't Have (P4) - 2 Requirements
-Explicitly deferred to future phases:
-- Projects/Spaces (Phase 2)
-- Custom Agents (Phase 3)
-- Audio features (Phase 4)
+**Acceptance Criteria:**
+- [ ] New users understand provider types
+- [ ] API key setup is clear
+- [ ] Can skip cloud setup
 
 ---
 
-## 5. Success Criteria for MVP
+#### NFR-2.4.2: Documentation (Must Have)
+**Requirements:**
+- In-app help for each provider
+- Links to provider documentation
+- Troubleshooting guides
+- Cost estimation explanation
+- Privacy policy updates
 
-The MVP is successful if:
-
-1. **Core Value Delivered:**
-   - Users can connect to Ollama and chat with AI
-   - Vision and file context work reliably
-   - Model management is intuitive
-   
-2. **Quality Standards Met:**
-   - Crash-free rate > 99.5%
-   - Average response time < 5s for typical models
-   - App startup < 2s
-
-3. **User Feedback:**
-   - Beta testers rate 4+ stars
-   - At least 3 personas represented in testing
-   - Feature requests validate roadmap
-
-4. **Technical Health:**
-   - All P0 requirements implemented
-   - Test coverage > 60%
-   - Zero critical bugs
+**Acceptance Criteria:**
+- [ ] Help is comprehensive
+- [ ] Links are up to date
+- [ ] Users can self-serve
 
 ---
 
-## 6. Related Documents
+## 3. MVP Scope for v1.5
 
-- [PRODUCT_VISION.md](PRODUCT_VISION.md) - Product vision and roadmap
-- [USER_PERSONAS.md](USER_PERSONAS.md) - Target user personas
-- [USER_STORIES_MVP.md](USER_STORIES_MVP.md) - Detailed user stories
-- [ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md) - Technical architecture (to be created)
+### Phase 1A: Core Infrastructure (4 weeks)
+
+**Week 1-2: Provider Abstraction**
+- Implement LLMProvider interface
+- Refactor existing Ollama + LiteRT to use interface
+- Create provider registry
+- Implement health monitoring
+
+**Week 3-4: Cloud API Integration**
+- OpenAI API client + streaming
+- Anthropic API client + streaming
+- Google AI API client + streaming
+- Error handling for all providers
+- Token usage tracking
+
+**Deliverable:** Working cloud API integration with streaming
+
+---
+
+### Phase 1B: UX & Polish (2-3 weeks)
+
+**Week 5-6: UI Updates**
+- Unified model picker
+- Provider settings screen
+- Cost display in messages
+- Status indicators
+- API key management UI
+
+**Week 7 (optional): Advanced Features**
+- Smart fallback system
+- Cost limits and warnings
+- Provider health monitoring UI
+- Usage analytics
+
+**Deliverable:** Production-ready v1.5
+
+---
+
+## 4. Out of Scope for v1.5
+
+### Explicitly Not Included
+- ❌ Advanced tool calling (v2)
+- ❌ Model comparison UI (v2)
+- ❌ Additional providers (Mistral, Cohere, etc.) - future
+- ❌ API gateway integration (LiteLLM, OpenRouter) - v3
+- ❌ Voice input/output - v2
+- ❌ Multi-model conversations - v2
+- ❌ Cost optimization AI - future
+- ❌ Team/enterprise features - future
+
+---
+
+## 5. Success Metrics
+
+### User Adoption
+- 60%+ of users configure at least one cloud API
+- 40%+ of users configure multiple providers
+- 80%+ of users enable smart fallbacks
+
+### Technical Performance
+- Cloud API success rate > 95%
+- Average first token latency < 2s
+- Zero credential leaks or security issues
+- Crash-free sessions > 99.5%
+
+### User Satisfaction
+- App Store rating maintained at 4.5+
+- Feature request: "More cloud providers" 
+- Retention improves due to flexibility
+
+---
+
+## 6. Dependencies
+
+### External
+- OpenAI API access and documentation
+- Anthropic API access and documentation
+- Google AI Studio API access
+- Flutter packages: http, flutter_secure_storage
+
+### Internal
+- Existing v1.0 architecture (local + Ollama)
+- Database schema updates for usage tracking
+- Settings UI refactor
+
+---
+
+## 7. Related Documents
+
+- [PRODUCT_VISION.md](PRODUCT_VISION.md) - Strategic vision and positioning
+- [ARCHITECTURE_CLOUD_API_INTEGRATION.md](ARCHITECTURE_CLOUD_API_INTEGRATION.md) - Technical architecture
+- [PRODUCT_ROADMAP_V1.5.md](PRODUCT_ROADMAP_V1.5.md) - Detailed timeline
+- [USER_STORIES_V1.5.md](USER_STORIES_V1.5.md) - User stories with acceptance criteria
+
+---
+
+## 8. Approval & Sign-Off
+
+**Status:** Draft - Awaiting Review
+
+**Reviewers:**
+- Product Owner: ___________
+- Technical Lead: ___________
+- UX Designer: ___________
+
+**Approval Date:** ___________
 
 ---
 
 **Next Steps:**
-1. Review requirements with development team
-2. Create detailed user stories for P0 features
-3. Estimate effort and create sprint plan
-4. Begin architecture design with @architect
-5. Research Flutter packages with @researcher
+1. Review requirements with stakeholders
+2. Create detailed architecture document
+3. Estimate effort for each requirement
+4. Create sprint plan for 6-8 week timeline
+5. Begin implementation with provider abstraction layer

@@ -1,250 +1,444 @@
-# Minimal Android App Template
+# Private Chat Hub
 
-A production-ready Android Flutter template with **AI-powered development workflow**, optimized build system, and comprehensive documentation. Start building your Android app in minutes, not hours.
+**A feature-rich Android chat client for AI models** - Connect to Ollama, manage conversations, search chat history, and more.
 
-## ✨ What Makes This Template Special
+[![Flutter](https://img.shields.io/badge/Flutter-3.10%2B-blue)](https://flutter.dev)
+[![Dart](https://img.shields.io/badge/Dart-3.10%2B-blue)](https://dart.dev)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-- 🤖 **AI-First Development**: 6 custom GitHub Copilot agents (product owner, UX designer, architect, developer, researcher, doc writer)
-- ⚡ **Optimized Build System**: Java 17, parallel builds, multi-level caching - builds 60% faster
-- 🚀 **Production CI/CD**: GitHub Actions workflows with caching, testing, and signed releases
-- 📱 **Android Focused**: Clean, minimal Android-only configuration
-- 🎨 **Material Design 3**: Beautiful, accessible UI out of the box
-- 📚 **Extensive Documentation**: Step-by-step guides for first-time users
-- 🧪 **Testing Framework**: Unit, widget, and integration testing ready
-- 🔧 **VS Code Optimized**: Agents configured with terminal, debugger, and VS Code API access
+---
 
-## 🚀 Quick Start (5 Minutes)
+## ✨ Features
+
+### 🤖 Core Chat Functionality
+- **Real-time Streaming**: See AI responses as they're generated
+- **Multiple Conversations**: Organize chats by topic or project
+- **System Prompts**: Customize AI behavior per conversation
+- **Cancel/Retry**: Stop streaming responses or retry failed messages
+- **Offline-First**: All data stored locally in SQLite with FTS5 search
+
+### 🔌 Ollama Integration
+- **Connection Profiles**: Save multiple Ollama server configurations
+- **Health Checks**: Test connection before chatting
+- **Model Management**: Pull, list, and delete models directly from the app
+- **Real-time Progress**: Track model downloads with progress bars
+
+### 🔍 Advanced Features
+- **Full-Text Search**: Find messages across all conversations (FTS5)
+- **Export Conversations**: Save chats as JSON, Markdown, or Plain Text
+- **Archive/Delete**: Organize conversations with swipe gestures
+- **Settings Persistence**: Configure defaults for model and connection
+
+### 🎨 Modern UI
+- **Material Design 3**: Beautiful, accessible interface
+- **Light/Dark Theme**: Automatically follows system theme
+- **Smooth Animations**: Polished interactions and transitions
+- **Empty States**: Helpful guidance when getting started
+
+---
+
+## 📱 Screenshots
+
+*Coming soon*
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- ✅ Flutter SDK 3.10.1+
-- ✅ Dart 3.10.1+
-- ✅ Java 17+ (for Android)
-- ✅ VS Code + GitHub Copilot (recommended)
+- **Flutter SDK**: 3.10.1+ ([Install Flutter](https://docs.flutter.dev/get-started/install))
+- **Dart SDK**: 3.10.0+
+- **Ollama Server**: Running locally or on your network ([Install Ollama](https://ollama.ai))
+- **Android Device/Emulator**: API level 21+ (Android 5.0+)
 
-Verify: `flutter doctor -v && java -version`
+### Installation
 
-> 📖 **New to development?** See [PREREQUISITES.md](PREREQUISITES.md) for detailed installation instructions.
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/private-chat-hub.git
+   cd private-chat-hub
+   ```
 
-### Option 1: Automated Setup (Recommended)
+2. **Install dependencies**
+   ```bash
+   flutter pub get
+   ```
+
+3. **Generate code** (if needed)
+   ```bash
+   dart run build_runner build --delete-conflicting-outputs
+   ```
+
+4. **Run the app**
+   ```bash
+   flutter run
+   ```
+
+### First-Time Setup
+
+1. **Launch the app** - You'll see the empty conversations screen
+
+2. **Create a connection profile**
+   - Tap the **DNS icon** (network settings) in the top-right
+   - Tap the **+ button** to add a new profile
+   - Enter your Ollama server details:
+     - **Name**: e.g., "Local Ollama"
+     - **Host**: `http://192.168.1.100` (your Ollama server IP)
+     - **Port**: `11434` (default Ollama port)
+   - Tap **Test Connection** to verify
+   - Tap the **star icon** to set as default
+   - Tap **Save**
+
+3. **Pull a model**
+   - Tap the **Layers icon** (models) in the top-right
+   - Tap the **download icon** in the bottom-right
+   - Enter a model name (e.g., `llama3.2`, `mistral`, `phi3`)
+   - Watch the download progress
+   - Wait for completion
+
+4. **Start chatting**
+   - Tap the **+ button** to create a new conversation
+   - Enter a title (e.g., "General Chat")
+   - Optionally add a system prompt (e.g., "You are a helpful assistant")
+   - Tap **Create**
+   - Send your first message!
+
+---
+
+## 📖 User Guide
+
+### Managing Conversations
+
+**Create a new conversation:**
+- Tap the **+ button** on the conversations screen
+- Enter a title and optional system prompt
+- Tap **Create**
+
+**Archive a conversation:**
+- Swipe **left** on a conversation
+- Tap **Undo** in the SnackBar to restore
+
+**Delete a conversation:**
+- Swipe **right** on a conversation
+- Confirm in the dialog
+
+**Edit system prompt:**
+- Open a conversation
+- Tap the **3-dot menu** → **System Prompt**
+- Edit or clear the prompt
+- Tap **Save**
+
+**Export a conversation:**
+- Open a conversation
+- Tap the **3-dot menu** → **Export Conversation**
+- Select format (JSON, Markdown, or Plain Text)
+- Preview and copy the exported content
+
+### Searching Messages
+
+1. On the conversations screen, tap the **search icon** (magnifying glass)
+2. Enter your search query
+3. Press **Enter** or tap the search button
+4. Browse results with context and timestamps
+5. Tap a result to navigate to that conversation
+
+### Managing Models
+
+**List installed models:**
+- Tap the **Layers icon** in the top-right
+- View model size, parameter count, and last modified date
+
+**Pull/download a model:**
+- Tap the **download icon** in the bottom-right
+- Enter the model name (e.g., `llama3.2:latest`)
+- Watch real-time progress
+- Wait for completion
+
+**Delete a model:**
+- Tap the **trash icon** next to a model
+- Confirm in the dialog
+
+**Refresh model list:**
+- Tap the **refresh icon** in the top-right
+
+### Connection Settings
+
+**During a chat:**
+- Tap the **3-dot menu** → **Connection Settings**
+- Select a saved profile from the dropdown
+- Or enter custom host and model
+- Tap **Save**
+
+**Manage profiles:**
+- Tap the **DNS icon** on the conversations screen
+- Create, edit, or delete profiles
+- Test connections with the **test button**
+- Star a profile to set it as default
+
+### App Settings
+
+- Tap the **Settings icon** (gear) on the conversations screen
+- **Default Model**: Set the model used for new conversations
+- **Default Connection**: Set the host and port for Ollama
+- **Clear All Data**: Reset the app (deletes all conversations, messages, and settings)
+
+---
+
+## 🏗️ Architecture
+
+Private Chat Hub follows **Clean Architecture** principles:
+
+```
+lib/
+├── core/               # Constants, errors, utils, extensions
+├── domain/             # Entities (Freezed) and repository interfaces
+├── data/               # Database, API client, repositories
+└── presentation/       # Screens and UI components
+```
+
+### Key Technologies
+
+- **State Management**: StatefulWidget with setState() (Riverpod ready for v2.0)
+- **Database**: SQLite with FTS5 full-text search
+- **HTTP Client**: Dio for Ollama API
+- **Serialization**: Freezed + json_serializable
+- **Local Storage**: SharedPreferences for settings
+
+### Database Schema
+
+- `conversations` - Chat sessions with title, timestamps, model, system prompt
+- `messages` - Individual messages with role, content, timestamps
+- `messages_fts` - FTS5 virtual table for full-text search
+- `connection_profiles` - Saved Ollama server configurations
+- `cached_models` - Model metadata cache
+
+---
+
+## 🛠️ Development
+
+### Project Structure
+
+```
+private-chat-hub/
+├── lib/
+│   ├── core/
+│   │   ├── constants/
+│   │   ├── errors/
+│   │   ├── utils/
+│   │   └── extensions/
+│   ├── domain/
+│   │   ├── entities/
+│   │   └── repositories/
+│   ├── data/
+│   │   ├── datasources/
+│   │   │   ├── local/
+│   │   │   └── remote/
+│   │   └── repositories/
+│   ├── presentation/
+│   │   └── screens/
+│   └── main.dart
+├── test/
+├── android/
+├── docs/                 # Product vision, requirements, architecture
+└── pubspec.yaml
+```
+
+### Commands
 
 ```bash
-# Clone this template
-git clone https://github.com/yourusername/your-repo-name.git
-cd your-repo-name
+# Analyze code
+flutter analyze
 
-# Run the quick start script
-./scripts/setup/quick-start.sh
+# Format code
+dart format lib/ test/
+
+# Run tests
+flutter test
+
+# Build release APK
+flutter build apk --release
+
+# Build app bundle
+flutter build appbundle --release
+
+# Generate code (after entity changes)
+dart run build_runner build --delete-conflicting-outputs
+
+# Watch mode for code generation
+dart run build_runner watch
 ```
 
-The script will guide you through naming your app and make all necessary changes automatically!
+### Running Ollama
 
-### Option 2: Manual Setup
-
+**On your local machine:**
 ```bash
-# Clone this template
-git clone https://github.com/yourusername/your-repo-name.git
-cd your-repo-name
-
-# Get dependencies
-flutter pub get
-
-# Verify everything works
-flutter test && flutter analyze
+ollama serve
 ```
 
-### 2. Customize Your App (CRITICAL!)
-
-⚠️ **IMPORTANT**: You MUST rename the package before running the app. See [PACKAGE_RENAME_GUIDE.md](PACKAGE_RENAME_GUIDE.md)
-
-Then customize using AI:
-```
-@flutter-developer Please rename this app from "min_flutter_template" 
-to "my_awesome_app" with package "com.mycompany.my_awesome_app"
-```
-
-### Option 3: GitHub Codespaces (No Installation!)
-
-1. Click **"Use this template"** → **"Create a new repository"**
-2. In your new repo, click **Code** → **Codespaces** → **"Create codespace on main"**
-3. Everything is pre-configured - start coding immediately!
-
-**See [GETTING_STARTED.md](GETTING_STARTED.md) for complete setup guide.**
-
-### Generate App Icon
-
-```
-@icon-generation.prompt.md Create an app icon for my [describe app] 
-with primary color #3B82F6 in minimal style
-```
-
-### Build and Run
-
+**On a remote server:**
 ```bash
-flutter run -d android     # Android (connected device/emulator)
-flutter build apk          # Release APK
+# Make sure to bind to 0.0.0.0 to accept external connections
+OLLAMA_HOST=0.0.0.0:11434 ollama serve
 ```
 
-**Full customization guide: [APP_CUSTOMIZATION.md](APP_CUSTOMIZATION.md)**
-
-## 🤖 AI-Powered Development
-
-### Meet Your AI Team
-
-This template includes 6 specialized AI agents for VS Code:
-
-| Agent | Purpose | Example Usage |
-|-------|---------|---------------|
-| **@product-owner** | Define features & requirements | `@product-owner Create user stories for a note-taking app` |
-| **@experience-designer** | Design UX & user flows | `@experience-designer Design the login and onboarding flow` |
-| **@architect** | Plan technical architecture | `@architect How should I structure authentication?` |
-| **@researcher** | Find packages & best practices | `@researcher Best packages for local database in Flutter` |
-| **@flutter-developer** | Implement features & fix bugs | `@flutter-developer Implement login screen with validation` |
-| **@doc-writer** | Write documentation | `@doc-writer Document the authentication API` |
-
-### Example Workflow
-
+**Pull a model:**
 ```bash
-# 1. Define your app concept
-@product-owner I want to build a recipe app with categories, 
-search, and favorites. Create user stories and MVP scope.
-
-# 2. Design the experience
-@experience-designer Based on the requirements, design the 
-information architecture and main user flows.
-
-# 3. Research dependencies
-@researcher What packages do I need for local storage, 
-images, and JSON parsing?
-
-# 4. Plan architecture
-@architect Design the app architecture with Riverpod state management 
-and repository pattern for recipes.
-
-# 5. Implement features
-@flutter-developer Implement the recipe list screen with 
-category filtering and search.
-
-# 6. Write documentation
-@doc-writer Document the recipe repository API and usage examples.
+ollama pull llama3.2
+ollama pull mistral
+ollama pull phi3
 ```
 
-**All agents have access to VS Code terminal, debugger, and test runner!**
-
-## ⚡ Build Performance
-
-This template includes **comprehensive build optimizations**:
-
-- **Java 17 baseline** for modern Android development
-- **Parallel builds** with 4 workers (local) / 2 workers (CI)
-- **Multi-level caching**: Gradle, Flutter SDK, pub packages
-- **R8 code shrinking**: 40-60% smaller release APKs
-- **Concurrency control**: Cancels duplicate CI runs
-- **CI-optimized Gradle properties**: Separate config for CI vs local
-
-### Expected Build Times
-
-| Environment | Build Type | Time |
-|------------|-----------|------|
-| Local (cached) | Debug APK | 30-60s |
-| Local | Release APK | 1-2 min |
-| CI (cached) | Full workflow | 3-5 min |
-
-**See [BUILD_OPTIMIZATION.md](BUILD_OPTIMIZATION.md) for details.**
-
-## 🔄 CI/CD Workflows
-
-### Automated Workflows
-
-- **build.yml**: Auto-formats code, runs tests, lints, and builds on every push (30min timeout)
-- **release.yml**: Signed releases on version tags (45min timeout)
-- **pre-release.yml**: Manual beta/alpha releases (workflow_dispatch)
-- **deploy-website.yml**: Deploys GitHub Pages website
-
-> **Note**: The build workflow automatically formats code using `dart format` and applies lint fixes with `dart fix --apply`. Any formatting changes are committed automatically, so you don't need to worry about code style.
-
-### Setup Signed Releases
-
+**List models:**
 ```bash
-# 1. Generate keystore
-keytool -genkey -v -keystore release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias release
-
-# 2. Add GitHub Secrets
-- ANDROID_KEYSTORE_BASE64: `base64 -i release.jks | pbcopy`
-- ANDROID_KEYSTORE_PASSWORD
-- ANDROID_KEY_ALIAS: release
-- ANDROID_KEY_PASSWORD
-
-# 3. Tag and push
-git tag v1.0.0 && git push --tags
+ollama list
 ```
 
-## Project Structure
+---
 
-```
-├── lib/main.dart         # App entry point
-├── test/                 # Tests
-├── android/              # Android configuration
-├── astro/                # GitHub Pages website
-├── docs/                 # AI prompting guides
-└── pubspec.yaml          # Dependencies
-```
+## 🧪 Testing
+
+### Current Status
+
+- ✅ **flutter analyze**: 0 errors, 1 harmless warning
+- ✅ **Compilation**: Clean builds
+- ⚠️ **Widget tests**: Basic test exists (SQLite initialization issue in test environment)
+
+### Future Testing
+
+- [ ] Unit tests for repositories
+- [ ] Unit tests for API client
+- [ ] Unit tests for database helper
+- [ ] Widget tests for screens
+- [ ] Integration tests for complete flows
+
+---
 
 ## 📚 Documentation
 
-### Getting Started
-- **[GETTING_STARTED.md](GETTING_STARTED.md)** - Complete setup guide for first-time users ⭐
-- **[APP_CUSTOMIZATION.md](APP_CUSTOMIZATION.md)** - Comprehensive customization checklist & AI prompts ⭐
-- **[PREREQUISITES.md](PREREQUISITES.md)** - Installation requirements for all platforms
+- **[PRODUCT_VISION.md](docs/PRODUCT_VISION.md)** - Product strategy and roadmap (v1.0, v1.5, v2.0)
+- **[PRODUCT_REQUIREMENTS.md](docs/PRODUCT_REQUIREMENTS.md)** - Detailed feature requirements
+- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - MVP implementation details
+- **[V1_PROGRESS.md](V1_PROGRESS.md)** - Development progress tracking
+- **[RALPH_LOOP_5_COMPLETION.md](RALPH_LOOP_5_COMPLETION.md)** - v1.0 completion report
 
-### Development
-- [AI_PROMPTING_GUIDE.md](AI_PROMPTING_GUIDE.md) - AI agent best practices
-- [AGENTS.md](AGENTS.md) - AI agent configuration reference
-- [BUILD_OPTIMIZATION.md](BUILD_OPTIMIZATION.md) - Build performance details
-- [TESTING.md](TESTING.md) - Testing guide
-- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
+---
 
-### Help
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues and solutions
+## 🗺️ Roadmap
 
-### Prompts
-- `.github/prompts/icon-generation.prompt.md` - Icon generation guide
+### ✅ v1.0 - Ollama Client (Current)
+- [x] Core chat with streaming responses
+- [x] Conversation management (archive, delete)
+- [x] Connection profiles
+- [x] Model management (pull, list, delete)
+- [x] Full-text search (FTS5)
+- [x] System prompts per conversation
+- [x] Export conversations (JSON/Markdown/Text)
+- [x] Settings persistence
 
-## 💡 Pro Tips
+### 🚧 v1.5 - Cloud API Integration (Planned)
+- [ ] OpenAI API integration
+- [ ] Anthropic API integration
+- [ ] Google AI API integration
+- [ ] Provider abstraction layer
+- [ ] Smart routing and fallbacks
+- [ ] Cost tracking per provider
+- [ ] API key management
 
-1. **Start with @product-owner** - Define clear requirements before coding
-2. **Use @experience-designer** - Plan UX before implementing screens
-3. **Let @researcher find packages** - Don't waste time searching pub.dev
-4. **@flutter-developer has terminal access** - Can run tests, format, build
-5. **Save documentation to docs/** - AI agents reference prior decisions
-6. **Use pre-release workflow** - Test builds before production releases
+### 🔮 v2.0 - Advanced Features (Future)
+- [ ] Local models (LiteRT/Gemini Nano)
+- [ ] Multi-model comparison
+- [ ] Tool calling framework
+- [ ] Web search integration
+- [ ] Extended reasoning models
+- [ ] Android native integration (share, TTS)
+- [ ] Projects/spaces organization
+- [ ] Custom agents
 
-## 🎓 Learning Path
+---
 
-### For Beginners
-1. Read [GETTING_STARTED.md](GETTING_STARTED.md)
-2. Follow the customization checklist
-3. Ask `@flutter-developer` questions as you learn
-4. Start with simple features
+## 🐛 Known Issues
 
-### For Intermediate Developers
-1. Review [BUILD_OPTIMIZATION.md](BUILD_OPTIMIZATION.md) 
-2. Set up CI/CD workflows
-3. Use AI agents to accelerate development
-4. Implement advanced features with @architect guidance
+1. **Test Timeout**: Widget tests hang due to SQLite initialization in test environment (not a runtime issue)
+2. **Deprecated APIs**: Some Material 3 colors use deprecated names (cosmetic, no impact)
+3. **BuildContext Warnings**: Async gaps with mounted checks (properly handled)
 
-### For Teams
-1. Review [AGENTS.md](AGENTS.md) for agent roles
-2. Set up shared documentation in docs/
-3. Use @product-owner for requirement alignment
-4. Leverage @doc-writer for team documentation
+---
 
-## Resources
+## 🤝 Contributing
 
-- [Flutter Documentation](https://docs.flutter.dev/)
-- [Dart Language](https://dart.dev/)
-- [Flutter Packages](https://pub.dev/)
+Contributions are welcome! Please follow these guidelines:
 
-## License
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-MIT License - see [LICENSE](LICENSE)
+### Development Guidelines
+
+- Follow Clean Architecture principles
+- Use Freezed for entities
+- Add tests for new features
+- Run `flutter analyze` before committing
+- Update documentation for significant changes
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- **[Ollama](https://ollama.ai)** - Local LLM runtime
+- **[Flutter](https://flutter.dev)** - UI framework
+- **[Material Design 3](https://m3.material.io/)** - Design system
+- **[Freezed](https://pub.dev/packages/freezed)** - Code generation for immutable classes
+
+---
+
+## 💡 Tips & Tricks
+
+### Performance
+
+- **Database**: Conversations and messages are indexed for fast queries
+- **FTS5 Search**: Full-text search uses SQLite's high-performance FTS5 engine
+- **Streaming**: Incremental UI updates minimize memory usage during long responses
+
+### Troubleshooting
+
+**Cannot connect to Ollama:**
+- Ensure Ollama is running: `ollama serve`
+- Check firewall allows connections to port 11434
+- Use correct IP address if Ollama is on another machine
+- Test with: `curl http://YOUR_HOST:11434/api/version`
+
+**Model not found:**
+- Pull the model first: `ollama pull llama3.2`
+- Check available models: `ollama list`
+- Use exact model name in app settings
+
+**Slow responses:**
+- Check network latency to Ollama server
+- Try a smaller model (e.g., `phi3` instead of `llama3.2`)
+- Ensure Ollama server has sufficient resources (CPU/GPU)
+
+**App crashes on startup:**
+- Clear app data and try again
+- Check Android version (requires API 21+)
+- Ensure Flutter SDK is up to date
+
+---
+
+## 📧 Contact
+
+**Project Link**: https://github.com/yourusername/private-chat-hub
+
+**Issues**: https://github.com/yourusername/private-chat-hub/issues
+
+---
+
+**Built with ❤️ using Flutter**
