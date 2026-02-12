@@ -13,13 +13,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// - Backend selection (CPU/GPU/NPU)
 /// - Model switching
 class ModelManager {
-  // ignore: unused_field
-  final StorageService _storage; // Keep for potential future use
   final ModelDownloadService _downloadService;
   final LiteRTPlatformChannel _platformChannel;
-  // ignore: unused_field
-  final String?
-  _huggingFaceToken; // Mutable for token updates, used via download service
 
   // Configuration
   static const Duration _defaultUnloadTimeout = Duration(minutes: 5);
@@ -38,14 +33,15 @@ class ModelManager {
       StreamController<ModelManagerState>.broadcast();
 
   ModelManager(
-    this._storage, {
+    StorageService storage, {
     ModelDownloadService? downloadService,
     String? huggingFaceToken,
-  }) : _huggingFaceToken = huggingFaceToken,
-       _downloadService =
-           downloadService ??
-           ModelDownloadService(_storage, huggingFaceToken: huggingFaceToken),
-       _platformChannel = LiteRTPlatformChannel() {
+  })  : _downloadService = downloadService ??
+            ModelDownloadService(
+              storage,
+              huggingFaceToken: huggingFaceToken,
+            ),
+        _platformChannel = LiteRTPlatformChannel() {
     _loadPreferences();
   }
 
