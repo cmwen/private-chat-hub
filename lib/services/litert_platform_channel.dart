@@ -106,50 +106,81 @@ class LiteRTPlatformChannel {
     double repetitionPenalty = 1.0,
   }) {
     final controller = StreamController<String>();
+    StreamSubscription? subscription;
 
-    // Start generation with all parameters
-    _methodChannel
-        .invokeMethod<void>('startGeneration', {
-          'prompt': prompt,
-          'temperature': temperature,
-          if (maxTokens != null) 'maxTokens': maxTokens,
-          'topK': topK,
-          'topP': topP,
-          'repetitionPenalty': repetitionPenalty,
-        })
-        .catchError((error) {
-          controller.addError(error);
-          controller.close();
-        });
+    Future<void> closeController() async {
+      if (!controller.isClosed) {
+        await controller.close();
+      }
+    }
 
-    // Listen for tokens via event channel
-    final subscription = _eventChannel.receiveBroadcastStream().listen(
-      (event) {
-        if (event is String) {
-          if (event == '[DONE]') {
-            controller.close();
-          } else {
-            controller.add(event);
+    controller.onListen = () {
+      // Listen for events first to avoid missing early tokens.
+      subscription = _eventChannel.receiveBroadcastStream().listen(
+        (event) {
+          if (event is String) {
+            if (event == '[DONE]') {
+              closeController();
+            } else if (event.isNotEmpty) {
+              controller.add(event);
+            }
+            return;
           }
-        } else if (event is Map && event['error'] != null) {
-          controller.addError(Exception(event['error']));
-          controller.close();
-        }
-      },
-      onError: (error) {
-        controller.addError(error);
-        controller.close();
-      },
-      onDone: () {
-        if (!controller.isClosed) {
-          controller.close();
-        }
-      },
-    );
 
-    // Clean up subscription when stream is closed
+          if (event is Map) {
+            final error = event['error'];
+            if (error != null) {
+              controller.addError(Exception(error.toString()));
+              closeController();
+              return;
+            }
+
+            final token =
+                event['token'] ??
+                event['text'] ??
+                event['content'] ??
+                event['delta'];
+            if (token is String && token.isNotEmpty) {
+              controller.add(token);
+            }
+
+            final isDone =
+                event['done'] == true ||
+                event['isDone'] == true ||
+                event['type'] == 'done';
+            if (isDone) {
+              closeController();
+            }
+          }
+        },
+        onError: (error) {
+          controller.addError(error);
+          closeController();
+        },
+        onDone: () {
+          closeController();
+        },
+      );
+
+      // Start generation after event subscription is attached.
+      _methodChannel
+          .invokeMethod<void>('startGeneration', {
+            'prompt': prompt,
+            'temperature': temperature,
+            if (maxTokens != null) 'maxTokens': maxTokens,
+            'topK': topK,
+            'topP': topP,
+            'repetitionPenalty': repetitionPenalty,
+          })
+          .catchError((error) {
+            controller.addError(error);
+            closeController();
+          });
+    };
+
+    // Clean up subscription when stream is closed/cancelled
     controller.onCancel = () {
-      subscription.cancel();
+      subscription?.cancel();
       _methodChannel.invokeMethod<void>('cancelGeneration');
     };
 

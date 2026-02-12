@@ -1995,6 +1995,25 @@ When you have sufficient information from tool results, provide a complete respo
 
   /// Converts raw errors to user-friendly messages.
   String _formatUserFacingError(String errorMessage) {
+    var cleaned = errorMessage.trim();
+    cleaned = cleaned.replaceFirst(RegExp(r'^Exception:\s*'), '');
+    cleaned = cleaned.replaceFirst(RegExp(r'^Error:\s*'), '');
+
+    if (cleaned.startsWith('PlatformException(') && cleaned.endsWith(')')) {
+      final parts = cleaned.substring(
+        'PlatformException('.length,
+        cleaned.length - 1,
+      );
+      final segments = parts.split(',');
+      if (segments.length >= 2) {
+        cleaned = segments[1].trim();
+      }
+    }
+
+    if (cleaned.isEmpty) {
+      return 'Something went wrong while generating a response. Please try again.';
+    }
+
     final status = _connectivityService.currentStatus;
     final baseUrl = _ollamaManager.connection?.url;
     final location = baseUrl != null ? ' at $baseUrl' : '';
@@ -2007,7 +2026,25 @@ When you have sufficient information from tool results, provide a complete respo
       return 'Cannot reach Ollama$location. Make sure it is running and reachable.';
     }
 
-    final lower = errorMessage.toLowerCase();
+    final lower = cleaned.toLowerCase();
+
+    if (lower.contains('on-device') ||
+        lower.contains('litert') ||
+        lower.contains('model_not_loaded')) {
+      return 'On-device model is not ready. Open Settings > On-device Models, load a model, then try again.';
+    }
+
+    if (lower.contains('not available on this device')) {
+      return 'On-device inference is not supported on this device. Use a remote model instead.';
+    }
+
+    if (lower.contains('not downloaded')) {
+      return 'This local model is not downloaded yet. Download it from Settings > On-device Models and retry.';
+    }
+
+    if (lower.contains('generation_in_progress')) {
+      return 'A response is already being generated. Please wait for it to finish.';
+    }
 
     if (lower.contains('no ollama connection configured')) {
       return 'No Ollama connection configured. Add one in Settings.';
@@ -2028,10 +2065,10 @@ When you have sufficient information from tool results, provide a complete respo
     }
 
     if (lower.contains('ollamaexception')) {
-      return errorMessage.replaceFirst(RegExp(r'^OllamaException:\s*'), '');
+      return cleaned.replaceFirst(RegExp(r'^OllamaException:\s*'), '');
     }
 
-    return errorMessage;
+    return cleaned;
   }
 }
 
