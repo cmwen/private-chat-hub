@@ -8,12 +8,14 @@ import 'package:private_chat_hub/screens/on_device_models_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/inference_config_service.dart';
+import 'package:private_chat_hub/services/litert_platform_channel.dart';
 import 'package:private_chat_hub/services/llm_service.dart';
 import 'package:private_chat_hub/services/network_discovery_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:private_chat_hub/services/tool_config_service.dart';
 import 'package:private_chat_hub/widgets/inference_settings_widget.dart';
+import 'package:private_chat_hub/widgets/litert_model_settings_widget.dart';
 import 'package:private_chat_hub/widgets/tool_settings_widget.dart';
 
 /// Settings screen for managing Ollama connections.
@@ -24,6 +26,7 @@ class SettingsScreen extends StatefulWidget {
   final ToolConfigService? toolConfigService;
   final InferenceConfigService? inferenceConfigService;
   final StorageService? storageService;
+  final dynamic onDeviceLLMService; // OnDeviceLLMService
   final Function(ThemeMode)? onThemeModeChanged;
   final ThemeMode? currentThemeMode;
 
@@ -35,6 +38,7 @@ class SettingsScreen extends StatefulWidget {
     this.toolConfigService,
     this.inferenceConfigService,
     this.storageService,
+    this.onDeviceLLMService,
     this.onThemeModeChanged,
     this.currentThemeMode,
   });
@@ -51,9 +55,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _streamingEnabled = true;
   int _timeout = OllamaConfigService.defaultTimeout;
   final OllamaConfigService _ollamaConfigService = OllamaConfigService();
+  final LiteRTPlatformChannel _liteRTPlatformChannel = LiteRTPlatformChannel();
 
   // Inference mode state
   InferenceMode _inferenceMode = InferenceMode.remote;
+  bool _isOnDeviceSupported = true;
+  List<String> _onDeviceUnsupportedReasons = [];
+  List<String> _onDeviceWarnings = [];
 
   @override
   void initState() {
@@ -64,6 +72,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadStreamingPreference();
     _loadTimeout();
     _loadInferenceMode();
+    _loadOnDeviceReadiness();
+  }
+
+  Future<void> _loadOnDeviceReadiness() async {
+    if (widget.inferenceConfigService == null) return;
+
+    try {
+      final readiness = await _liteRTPlatformChannel.getReadinessReport();
+      if (!mounted) return;
+
+      setState(() {
+        _isOnDeviceSupported = readiness['isSupported'] as bool? ?? false;
+        _onDeviceUnsupportedReasons =
+            (readiness['unsupportedReasons'] as List<dynamic>? ?? [])
+                .whereType<String>()
+                .toList();
+        _onDeviceWarnings =
+            (readiness['warnings'] as List<dynamic>? ?? [])
+                .whereType<String>()
+                .toList();
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isOnDeviceSupported = false;
+        _onDeviceUnsupportedReasons = ['Failed to detect device capabilities'];
+        _onDeviceWarnings = [];
+      });
+    }
   }
 
   Future<void> _loadInferenceMode() async {
@@ -75,6 +112,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _setInferenceMode(InferenceMode mode) async {
+    if (mode == InferenceMode.onDevice && !_isOnDeviceSupported) {
+      if (mounted) {
+        final reason = _onDeviceUnsupportedReasons.isNotEmpty
+            ? _onDeviceUnsupportedReasons.first
+            : 'This device does not meet on-device inference requirements';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('On-device mode unavailable: $reason')),
+        );
+      }
+      return;
+    }
+
     if (widget.inferenceConfigService != null) {
       await widget.inferenceConfigService!.setInferenceMode(mode);
       setState(() {
@@ -335,6 +384,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 const SizedBox(height: 32),
                 const Divider(),
+                // On-Device Models Section - Always visible
+                if (widget.inferenceConfigService != null) ...[
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'On-Device Models (LiteRT)',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.download),
+                    title: const Text('Manage On-Device Models'),
+                    subtitle: const Text(
+                      'Download and manage local LiteRT-LM models for offline use',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: _openOnDeviceModelsScreen,
+                  ),
+                  const SizedBox(height: 12),
+                  LiteRTModelSettingsWidget(
+                    configService: widget.inferenceConfigService!,
+                    onDeviceLLMService: widget.onDeviceLLMService,
+                  ),
+                  const Divider(),
+                ],
                 // Inference Mode Section
                 if (widget.inferenceConfigService != null) ...[
                   const Padding(
@@ -351,17 +428,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     currentMode: _inferenceMode,
                     onModeChanged: _setInferenceMode,
                   ),
-                  const SizedBox(height: 8),
-                  if (_inferenceMode == InferenceMode.onDevice)
-                    ListTile(
-                      leading: const Icon(Icons.download),
-                      title: const Text('Manage On-Device Models'),
-                      subtitle: const Text(
-                        'Download and manage LiteRT-LM models',
+                  if (!_isOnDeviceSupported)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Card(
+                        color: Theme.of(context).colorScheme.errorContainer,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.warning_amber_rounded,
+                                color: Theme.of(context).colorScheme.onErrorContainer,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _onDeviceUnsupportedReasons.isNotEmpty
+                                      ? _onDeviceUnsupportedReasons.first
+                                      : 'On-device mode is not supported on this device.',
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onErrorContainer,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: _openOnDeviceModelsScreen,
                     ),
+                  if (_isOnDeviceSupported && _onDeviceWarnings.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Card(
+                        color: Theme.of(context).colorScheme.secondaryContainer,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color:
+                                    Theme.of(context).colorScheme.onSecondaryContainer,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _onDeviceWarnings.first,
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSecondaryContainer,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      _inferenceMode == InferenceMode.onDevice
+                          ? 'Using local on-device models (offline capable)'
+                          : 'Using remote Ollama server (requires connection)',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
                   const Divider(),
                 ],
                 if (widget.chatService != null) ...[

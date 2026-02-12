@@ -15,6 +15,7 @@ import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/on_device_llm_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:private_chat_hub/services/tool_executor_service.dart';
+import 'package:private_chat_hub/services/unified_model_service.dart';
 import 'package:uuid/uuid.dart';
 
 /// Service for managing chat conversations and sending messages to Ollama using the toolkit.
@@ -707,8 +708,10 @@ class ChatService {
   /// Sends a message and gets a streaming response from Ollama.
   ///
   /// Returns a stream of updated conversations as the response streams in.
-  /// If offline, queues the message instead.
-  /// Supports hybrid mode: uses on-device inference when mode is set to onDevice.
+  /// If offline and on-device models available, automatically uses local inference.
+  /// Otherwise queues the message.
+  /// Supports hybrid mode: uses on-device inference when mode is set to onDevice or as fallback.
+  /// Also detects local models by prefix and routes to on-device inference automatically.
   Stream<Conversation> sendMessage(String conversationId, String text) async* {
     await cancelMessageGeneration(conversationId);
 
@@ -717,17 +720,36 @@ class ChatService {
       throw Exception('Conversation not found');
     }
 
-    // Check inference mode - route to on-device if enabled
-    if (currentInferenceMode == InferenceMode.onDevice &&
-        _onDeviceLLMService != null) {
-      _log('Using on-device inference mode');
+    // Check if model is a local model (has local: prefix)
+    final isLocalModel =
+        UnifiedModelService.isLocalModel(initialConversation.modelName);
+
+    // Route to on-device if local model is selected
+    if (isLocalModel && _onDeviceLLMService != null) {
+      _log('Using on-device inference (local model selected)');
       yield* _sendMessageOnDevice(conversationId, text);
       return;
     }
 
-    // Check if not online (offline or Ollama unreachable) - queue the message instead
+    // Check inference mode - route to on-device if explicitly enabled
+    if (currentInferenceMode == InferenceMode.onDevice &&
+        _onDeviceLLMService != null) {
+      _log('Using on-device inference mode (explicitly enabled)');
+      yield* _sendMessageOnDevice(conversationId, text);
+      return;
+    }
+
+    // Check if offline - try on-device fallback before queueing
     if (!isOnline) {
-      _log('Offline/disconnected mode: queueing message');
+      // Check if on-device inference is available as fallback
+      if (_onDeviceLLMService != null && await isOnDeviceAvailable()) {
+        _log('Ollama offline: falling back to on-device inference');
+        yield* _sendMessageOnDevice(conversationId, text);
+        return;
+      }
+      
+      // No on-device fallback available - queue the message
+      _log('Offline mode: queueing message (no on-device models available)');
       final conversation = await queueMessage(conversationId, text);
       yield conversation;
       return;
@@ -822,8 +844,17 @@ class ChatService {
     yield conversation;
 
     // Get the on-device model to use
-    final onDeviceModelId =
-        _inferenceConfigService?.lastOnDeviceModel ?? 'gemma3-1b';
+    // If conversation has local: prefix, extract the actual model ID
+    String onDeviceModelId;
+    if (UnifiedModelService.isLocalModel(initialConversation.modelName)) {
+      onDeviceModelId =
+          UnifiedModelService.getLocalModelId(initialConversation.modelName);
+      _log('Using local model from conversation: $onDeviceModelId');
+    } else {
+      onDeviceModelId =
+          _inferenceConfigService?.lastOnDeviceModel ?? 'gemma3-1b';
+      _log('Using default on-device model: $onDeviceModelId');
+    }
 
     // Build conversation history (exclude the placeholder assistant message)
     final conversationHistory = conversation.messages

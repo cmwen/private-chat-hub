@@ -90,20 +90,32 @@ class LiteRTPlatformChannel {
 
   /// Generate text with streaming (token-by-token)
   ///
-  /// Returns a stream of tokens as they are generated
+  /// Returns a stream of tokens as they are generated.
+  /// Supports configurable model parameters:
+  /// - [temperature]: Controls randomness (0.0-2.0, default 0.7)
+  /// - [topK]: Only consider top K tokens (default 40)
+  /// - [topP]: Nucleus sampling parameter (0.0-1.0, default 0.9)
+  /// - [maxTokens]: Maximum tokens to generate
+  /// - [repetitionPenalty]: Penalize repeated tokens (0.5-2.0, default 1.0)
   Stream<String> generateTextStream({
     required String prompt,
     double temperature = 0.7,
     int? maxTokens,
+    int topK = 40,
+    double topP = 0.9,
+    double repetitionPenalty = 1.0,
   }) {
     final controller = StreamController<String>();
 
-    // Start generation
+    // Start generation with all parameters
     _methodChannel
         .invokeMethod<void>('startGeneration', {
           'prompt': prompt,
           'temperature': temperature,
           if (maxTokens != null) 'maxTokens': maxTokens,
+          'topK': topK,
+          'topP': topP,
+          'repetitionPenalty': repetitionPenalty,
         })
         .catchError((error) {
           controller.addError(error);
@@ -190,6 +202,43 @@ class LiteRTPlatformChannel {
     }
   }
 
+  /// Get on-device inference readiness report with capability details
+  Future<Map<String, dynamic>> getReadinessReport() async {
+    try {
+      final result = await _methodChannel.invokeMethod<Map<dynamic, dynamic>>(
+        'getReadinessReport',
+      );
+
+      if (result == null) {
+        return _defaultReadinessReport();
+      }
+
+      return {
+        'isSupported': result['isSupported'] as bool? ?? false,
+        'androidApi': result['androidApi'] as int? ?? 0,
+        'androidVersion': result['androidVersion'] as String? ?? 'unknown',
+        'deviceModel': result['deviceModel'] as String? ?? 'unknown',
+        'cpu': result['cpu'] as bool? ?? true,
+        'gpu': result['gpu'] as bool? ?? false,
+        'npu': result['npu'] as bool? ?? false,
+        'has64BitAbi': result['has64BitAbi'] as bool? ?? false,
+        'supported64BitAbis':
+            (result['supported64BitAbis'] as List?)?.cast<String>() ??
+            <String>[],
+        'totalMemory': result['totalMemory'] as int? ?? 0,
+        'availableMemory': result['availableMemory'] as int? ?? 0,
+        'unsupportedReasons':
+            (result['unsupportedReasons'] as List?)?.cast<String>() ??
+            <String>[],
+        'warnings': (result['warnings'] as List?)?.cast<String>() ?? <String>[],
+      };
+    } on PlatformException {
+      return _defaultReadinessReport();
+    } on MissingPluginException {
+      return _defaultReadinessReport();
+    }
+  }
+
   /// Get device capabilities (CPU, GPU, NPU support)
   Future<Map<String, bool>> getDeviceCapabilities() async {
     try {
@@ -258,5 +307,23 @@ class LiteRTPlatformChannel {
   void _log(String message) {
     // ignore: avoid_print
     print('[LiteRTPlatformChannel] $message');
+  }
+
+  Map<String, dynamic> _defaultReadinessReport() {
+    return {
+      'isSupported': false,
+      'androidApi': 0,
+      'androidVersion': 'unknown',
+      'deviceModel': 'unknown',
+      'cpu': true,
+      'gpu': false,
+      'npu': false,
+      'has64BitAbi': false,
+      'supported64BitAbis': <String>[],
+      'totalMemory': 0,
+      'availableMemory': 0,
+      'unsupportedReasons': <String>['LiteRT plugin unavailable'],
+      'warnings': <String>[],
+    };
   }
 }

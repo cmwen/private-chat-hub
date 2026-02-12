@@ -523,8 +523,7 @@ class DeviceResourceInfo extends StatelessWidget {
         const SizedBox(height: 4),
         LinearProgressIndicator(
           value: percent.clamp(0, 1),
-          // ignore: deprecated_member_use
-          backgroundColor: color.withOpacity(0.2),
+          backgroundColor: color.withValues(alpha: 0.2),
           valueColor: AlwaysStoppedAnimation(color),
         ),
       ],

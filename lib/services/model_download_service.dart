@@ -13,6 +13,7 @@ import 'package:private_chat_hub/services/storage_service.dart';
 class ModelDownloadService {
   final StorageService _storage;
   final http.Client _client;
+  String? _huggingFaceToken;
 
   // Download progress streams
   final Map<String, StreamController<ModelDownloadProgress>>
@@ -80,8 +81,18 @@ class ModelDownloadService {
     ),
   };
 
-  ModelDownloadService(this._storage, {http.Client? client})
-    : _client = client ?? http.Client();
+  ModelDownloadService(
+    this._storage, {
+    http.Client? client,
+    String? huggingFaceToken,
+  })  : _client = client ?? http.Client(),
+        _huggingFaceToken = huggingFaceToken;
+
+  /// Update the Hugging Face token
+  void updateHuggingFaceToken(String? token) {
+    _huggingFaceToken = token;
+    _log('Hugging Face token updated');
+  }
 
   /// Get the models directory path
   Future<Directory> getModelsDirectory() async {
@@ -128,6 +139,7 @@ class ModelDownloadService {
           isDownloaded: isDownloaded,
           capabilities: entry.value.capabilities,
           downloadUrl: entry.value.downloadUrl,
+          isLocal: true, // On-device models are local
         ),
       );
     }
@@ -202,10 +214,27 @@ class ModelDownloadService {
         request.headers['Range'] = 'bytes=$resumeFrom-';
       }
 
-      // Add authorization header for Hugging Face (optional)
-      // request.headers['Authorization'] = 'Bearer $hfToken';
+      // Add authorization header for Hugging Face if token is provided
+      if (_huggingFaceToken != null && _huggingFaceToken!.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $_huggingFaceToken';
+        _log('Using Hugging Face authentication token');
+      }
 
       final response = await _client.send(request);
+
+      if (response.statusCode == 401) {
+        throw HuggingFaceAuthException(
+          'Authentication required. This model requires a Hugging Face token. '
+          'Get a free token at https://huggingface.co/settings/tokens and add it in Settings.',
+        );
+      }
+
+      if (response.statusCode == 403) {
+        throw HuggingFaceAuthException(
+          'Access denied. You may need to accept the model\'s license agreement at '
+          'https://huggingface.co/${_extractRepoFromUrl(model.downloadUrl)}',
+        );
+      }
 
       if (response.statusCode != 200 && response.statusCode != 206) {
         throw Exception(
@@ -389,6 +418,18 @@ class ModelDownloadService {
     await _storage.remove('litert_model_$modelId');
   }
 
+  String _extractRepoFromUrl(String url) {
+    // Extract repo path from HuggingFace URL
+    // e.g., https://huggingface.co/google/gemma-3n-E2B-it-litert-lm-preview/resolve/main/...
+    // Returns: google/gemma-3n-E2B-it-litert-lm-preview
+    final uri = Uri.parse(url);
+    final pathSegments = uri.pathSegments;
+    if (pathSegments.length >= 3) {
+      return '${pathSegments[0]}/${pathSegments[1]}';
+    }
+    return url;
+  }
+
   void _log(String message) {
     // ignore: avoid_print
     print('[ModelDownloadService] $message');
@@ -482,4 +523,14 @@ class CancelableDownload {
 class DownloadCancelledException implements Exception {
   @override
   String toString() => 'Download was cancelled';
+}
+
+/// Exception thrown when Hugging Face authentication fails
+class HuggingFaceAuthException implements Exception {
+  final String message;
+  
+  HuggingFaceAuthException(this.message);
+  
+  @override
+  String toString() => message;
 }

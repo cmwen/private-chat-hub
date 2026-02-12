@@ -50,7 +50,10 @@ class _OnDeviceModelsScreenState extends State<OnDeviceModelsScreen> {
   @override
   void initState() {
     super.initState();
-    _downloadService = ModelDownloadService(widget.storageService);
+    _downloadService = ModelDownloadService(
+      widget.storageService,
+      huggingFaceToken: widget.inferenceConfigService.huggingFaceToken,
+    );
     _platformChannel = LiteRTPlatformChannel();
     _selectedModelId = widget.inferenceConfigService.lastOnDeviceModel;
     _currentBackend = widget.inferenceConfigService.preferredBackend;
@@ -76,9 +79,9 @@ class _OnDeviceModelsScreenState extends State<OnDeviceModelsScreen> {
       setState(() {
         _models = models;
         _deviceCapabilities = {
-          'cpu': capabilities['cpuSupported'] ?? true,
-          'gpu': capabilities['gpuSupported'] ?? false,
-          'npu': capabilities['npuSupported'] ?? false,
+          'cpu': capabilities['cpu'] ?? true,
+          'gpu': capabilities['gpu'] ?? false,
+          'npu': capabilities['npu'] ?? false,
         };
         _memoryInfo = {
           'totalMemory': memoryInfo['totalMemory'] ?? 0,
@@ -111,7 +114,21 @@ class _OnDeviceModelsScreenState extends State<OnDeviceModelsScreen> {
       },
       onError: (e) {
         _log('Download error: $e');
-        _showSnackBar('Download failed: $e');
+        
+        // Show user-friendly error message
+        String errorMessage = 'Download failed';
+        if (e is HuggingFaceAuthException) {
+          errorMessage = e.message;
+        } else {
+          errorMessage = 'Download failed: $e';
+        }
+        
+        _showErrorDialog('Download Error', errorMessage);
+        
+        // Remove progress on error
+        setState(() {
+          _downloadProgress.remove(modelId);
+        });
       },
       onDone: () {
         setState(() {
@@ -202,6 +219,42 @@ class _OnDeviceModelsScreenState extends State<OnDeviceModelsScreen> {
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+    );
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error),
+            const SizedBox(width: 8),
+            Expanded(child: Text(title)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: SelectableText(
+            message,
+            style: const TextStyle(fontSize: 14),
+          ),
+        ),
+        actions: [
+          if (message.contains('Hugging Face token'))
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.pop(context); // Go back to settings
+              },
+              icon: const Icon(Icons.settings),
+              label: const Text('Open Settings'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
     );
   }
 

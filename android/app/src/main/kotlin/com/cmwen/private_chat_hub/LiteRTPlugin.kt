@@ -53,6 +53,10 @@ class LiteRTPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChanne
         private const val TAG = "LiteRTPlugin"
         private const val METHOD_CHANNEL = "com.cmwen.private_chat_hub/litert"
         private const val EVENT_CHANNEL = "com.cmwen.private_chat_hub/litert_stream"
+        private const val MIN_ANDROID_API = Build.VERSION_CODES.N
+        private const val MIN_TOTAL_MEMORY_BYTES = 3L * 1024 * 1024 * 1024 // 3 GB
+        private const val RECOMMENDED_TOTAL_MEMORY_BYTES = 6L * 1024 * 1024 * 1024 // 6 GB
+        private const val MIN_AVAILABLE_MEMORY_BYTES = 1024L * 1024 * 1024 // 1 GB
 
         // Supported backends
         const val BACKEND_CPU = "cpu"
@@ -149,6 +153,10 @@ class LiteRTPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChanne
                 result.success(getDeviceCapabilities())
             }
 
+            "getReadinessReport" -> {
+                result.success(getReadinessReport())
+            }
+
             "getMemoryInfo" -> {
                 result.success(getMemoryInfo())
             }
@@ -183,9 +191,8 @@ class LiteRTPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChanne
     // ========================================================================
 
     private fun checkAvailability(): Boolean {
-        // Check if LiteRT-LM is available on this device
-        // For now, return true for Android 7.0+ (API 24+)
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
+        val report = getReadinessReport()
+        return report["isSupported"] as? Boolean ?: false
     }
 
     private fun loadModel(modelPath: String, backend: String, result: MethodChannel.Result) {
@@ -429,6 +436,80 @@ class LiteRTPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChanne
             "gpu" to hasGpuSupport(),
             "npu" to hasNpuSupport()
         )
+    }
+
+    private fun getReadinessReport(): Map<String, Any> {
+        val capabilities = getDeviceCapabilities()
+        val memoryInfo = getMemoryInfo()
+
+        val sdkInt = Build.VERSION.SDK_INT
+        val totalMemory = memoryInfo["totalMemory"] ?: 0L
+        val availableMemory = memoryInfo["availableMemory"] ?: 0L
+
+        val supported64BitAbis = Build.SUPPORTED_64_BIT_ABIS?.toList() ?: emptyList()
+        val has64BitAbi = supported64BitAbis.any {
+            it.equals("arm64-v8a", ignoreCase = true) ||
+                it.equals("x86_64", ignoreCase = true)
+        }
+
+        val unsupportedReasons = mutableListOf<String>()
+        val warnings = mutableListOf<String>()
+
+        if (sdkInt < MIN_ANDROID_API) {
+            unsupportedReasons.add(
+                "Android ${Build.VERSION.RELEASE} (API $sdkInt) is below minimum API $MIN_ANDROID_API"
+            )
+        }
+
+        if (!has64BitAbi) {
+            unsupportedReasons.add("64-bit ABI required (arm64-v8a or x86_64)")
+        }
+
+        if (totalMemory in 1 until MIN_TOTAL_MEMORY_BYTES) {
+            unsupportedReasons.add(
+                "Insufficient total RAM (${formatBytes(totalMemory)}). Minimum ${formatBytes(MIN_TOTAL_MEMORY_BYTES)} required"
+            )
+        }
+
+        if (totalMemory >= MIN_TOTAL_MEMORY_BYTES && totalMemory < RECOMMENDED_TOTAL_MEMORY_BYTES) {
+            warnings.add(
+                "RAM is limited (${formatBytes(totalMemory)}). Performance may be reduced; ${formatBytes(RECOMMENDED_TOTAL_MEMORY_BYTES)}+ recommended"
+            )
+        }
+
+        if (availableMemory in 1 until MIN_AVAILABLE_MEMORY_BYTES) {
+            warnings.add(
+                "Low free RAM (${formatBytes(availableMemory)}). Close background apps before running on-device inference"
+            )
+        }
+
+        if (capabilities["gpu"] != true && capabilities["npu"] != true) {
+            warnings.add("No GPU/NPU acceleration detected. CPU inference may be slow")
+        }
+
+        val isSupported = unsupportedReasons.isEmpty()
+
+        return mapOf(
+            "isSupported" to isSupported,
+            "androidApi" to sdkInt,
+            "androidVersion" to Build.VERSION.RELEASE,
+            "deviceModel" to "${Build.MANUFACTURER} ${Build.MODEL}",
+            "cpu" to (capabilities["cpu"] ?: true),
+            "gpu" to (capabilities["gpu"] ?: false),
+            "npu" to (capabilities["npu"] ?: false),
+            "has64BitAbi" to has64BitAbi,
+            "supported64BitAbis" to supported64BitAbis,
+            "totalMemory" to totalMemory,
+            "availableMemory" to availableMemory,
+            "unsupportedReasons" to unsupportedReasons,
+            "warnings" to warnings,
+        )
+    }
+
+    private fun formatBytes(bytes: Long): String {
+        if (bytes <= 0) return "0 B"
+        val gb = bytes.toDouble() / (1024 * 1024 * 1024)
+        return String.format("%.1f GB", gb)
     }
 
     private fun hasGpuSupport(): Boolean {

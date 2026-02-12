@@ -3,8 +3,10 @@ import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/screens/search_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
+import 'package:private_chat_hub/services/llm_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
+import 'package:private_chat_hub/services/unified_model_service.dart';
 import 'package:private_chat_hub/widgets/dual_model_selector.dart';
 import 'package:intl/intl.dart';
 
@@ -31,14 +33,19 @@ class ConversationListScreen extends StatefulWidget {
 
 class _ConversationListScreenState extends State<ConversationListScreen> {
   List<Conversation> _conversations = [];
-  List<OllamaModelInfo> _models = [];
+  List<OllamaModelInfo> _ollamaModels = [];
+  List<ModelInfo> _allModels = []; // Combined list
   String? _selectedModel;
   bool _isLoading = true;
   bool _isLoadingModels = false;
+  late UnifiedModelService _unifiedModelService;
 
   @override
   void initState() {
     super.initState();
+    _unifiedModelService = UnifiedModelService(
+      onDeviceLLMService: widget.chatService.onDeviceLLMService,
+    );
     _loadData();
   }
 
@@ -72,23 +79,36 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
 
       // Add a reasonable timeout for initial model loading (5 seconds)
       // This prevents long waits when Ollama is offline
-      _models = await widget.ollamaManager.listModels().timeout(
+      _ollamaModels = await widget.ollamaManager.listModels().timeout(
         const Duration(seconds: 5),
         onTimeout: () {
           throw Exception('Connection timeout - Ollama may be offline');
         },
       );
 
+      // Get unified model list (Ollama + local models)
+      _allModels =
+          await _unifiedModelService.getUnifiedModelList(_ollamaModels);
+
       // If no model selected, select the first one
-      if (_selectedModel == null && _models.isNotEmpty) {
-        _selectedModel = _models.first.name;
+      if (_selectedModel == null && _allModels.isNotEmpty) {
+        _selectedModel = _allModels.first.id;
         await widget.connectionService.setSelectedModel(_selectedModel!);
       }
     } catch (e) {
-      // Failed to load models - this is OK, user can still view conversations
-      _models = [];
-      // Only show error message if explicitly requested (on refresh)
-      // Silent failure on initial load for better UX
+      // Failed to load Ollama models - still try to get local models
+      _ollamaModels = [];
+      try {
+        _allModels =
+            await _unifiedModelService.getUnifiedModelList(_ollamaModels);
+        // Select first local model if available
+        if (_selectedModel == null && _allModels.isNotEmpty) {
+          _selectedModel = _allModels.first.id;
+          await widget.connectionService.setSelectedModel(_selectedModel!);
+        }
+      } catch (localError) {
+        _allModels = [];
+      }
     }
 
     if (mounted) setState(() => _isLoadingModels = false);
@@ -124,22 +144,25 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   }
 
   Future<void> _createComparisonConversation() async {
-    if (_models.length < 2) {
+    if (_ollamaModels.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('You need at least 2 models to compare'),
+          content: Text('You need at least 2 Ollama models to compare'),
           backgroundColor: Colors.orange,
         ),
       );
       return;
     }
 
-    // Show dual model selector
+    // Show dual model selector (only Ollama models for comparison)
     await showDialog(
       context: context,
       builder: (dialogContext) => DualModelSelector(
-        models: _models,
-        initialModel1: _selectedModel,
+        models: _ollamaModels,
+        initialModel1: _selectedModel != null &&
+                !UnifiedModelService.isLocalModel(_selectedModel!)
+            ? _selectedModel
+            : null,
         onModelsSelected: (model1, model2) async {
           // Create comparison conversation using the service method
           final conversation = await widget.chatService
@@ -202,12 +225,12 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     showModalBottomSheet(
       context: context,
       builder: (sheetContext) => _ModelSelectorSheet(
-        models: _models,
+        models: _allModels,
         selectedModel: _selectedModel,
         onModelSelected: (model) async {
-          await widget.connectionService.setSelectedModel(model.name);
+          await widget.connectionService.setSelectedModel(model.id);
           if (!mounted) return;
-          setState(() => _selectedModel = model.name);
+          setState(() => _selectedModel = model.id);
           if (sheetContext.mounted) Navigator.pop(sheetContext);
         },
         isLoading: _isLoadingModels,
@@ -316,7 +339,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (_models.length >= 2)
+          if (_ollamaModels.length >= 2)
             FloatingActionButton.extended(
               heroTag: 'compare_models_fab',
               onPressed: _createComparisonConversation,
@@ -325,7 +348,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
               backgroundColor: Theme.of(context).colorScheme.tertiary,
               foregroundColor: Theme.of(context).colorScheme.onTertiary,
             ),
-          if (_models.length >= 2) const SizedBox(height: 12),
+          if (_ollamaModels.length >= 2) const SizedBox(height: 12),
           FloatingActionButton.extended(
             heroTag: 'conversation_list_fab',
             onPressed: _createNewConversation,
@@ -364,7 +387,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            if (_models.isEmpty && !_isLoadingModels)
+            if (_allModels.isEmpty && !_isLoadingModels)
               Column(
                 children: [
                   Icon(
@@ -502,9 +525,9 @@ class _ConversationTile extends StatelessWidget {
 }
 
 class _ModelSelectorSheet extends StatelessWidget {
-  final List<OllamaModelInfo> models;
+  final List<ModelInfo> models;
   final String? selectedModel;
-  final Function(OllamaModelInfo) onModelSelected;
+  final Function(ModelInfo) onModelSelected;
   final bool isLoading;
   final VoidCallback onRefresh;
 
@@ -571,7 +594,7 @@ class _ModelSelectorSheet extends StatelessWidget {
                 itemCount: models.length,
                 itemBuilder: (context, index) {
                   final model = models[index];
-                  final isSelected = model.name == selectedModel;
+                  final isSelected = model.id == selectedModel;
 
                   return ListTile(
                     leading: CircleAvatar(
@@ -581,31 +604,68 @@ class _ModelSelectorSheet extends StatelessWidget {
                               context,
                             ).colorScheme.surfaceContainerHighest,
                       child: Icon(
-                        Icons.psychology,
+                        model.isLocal ? Icons.phone_android : Icons.cloud,
                         color: isSelected
                             ? Colors.white
                             : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    title: Text(model.name),
+                    title: Row(
+                      children: [
+                        Expanded(child: Text(model.name)),
+                        if (model.isLocal) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: Colors.green.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.offline_bolt,
+                                  size: 14,
+                                  color: Colors.green,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'LOCAL',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          '${model.sizeFormatted}${model.parameterCount != null ? ' • ${model.parameterCount}' : ''}',
-                        ),
+                        Text(model.sizeString),
                         const SizedBox(height: 4),
                         Wrap(
                           spacing: 4,
                           runSpacing: 2,
                           children: [
-                            if (model.capabilities?.supportsVision == true)
+                            if (model.capabilities.contains('vision'))
                               _CapabilityBadge(
                                 icon: Icons.visibility,
                                 label: 'Vision',
                                 color: Colors.purple,
                               ),
-                            if (model.capabilities?.supportsTools == true)
+                            if (model.capabilities.contains('tools'))
                               _CapabilityBadge(
                                 icon: Icons.build,
                                 label: 'Tools',

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:private_chat_hub/models/message.dart';
+import 'package:private_chat_hub/services/inference_config_service.dart';
 import 'package:private_chat_hub/services/litert_platform_channel.dart';
 import 'package:private_chat_hub/services/llm_service.dart';
 import 'package:private_chat_hub/services/model_manager.dart';
@@ -10,19 +11,31 @@ import 'package:private_chat_hub/services/storage_service.dart';
 /// This service provides on-device inference using Google's LiteRT-LM framework.
 /// It implements the [LLMService] interface for seamless integration with the
 /// existing chat infrastructure.
+///
+/// Supports configurable model parameters including temperature, top-k, top-p,
+/// max tokens, and repetition penalty via [InferenceConfigService].
 class OnDeviceLLMService implements LLMService {
   final ModelManager _modelManager;
   final LiteRTPlatformChannel _platformChannel;
+  final InferenceConfigService? _configService;
 
   String? _currentModelId;
 
-  OnDeviceLLMService(StorageService storage)
-    : _modelManager = ModelManager(storage),
-      _platformChannel = LiteRTPlatformChannel();
+  OnDeviceLLMService(StorageService storage, {InferenceConfigService? configService})
+    : _modelManager = ModelManager(
+        storage,
+        huggingFaceToken: configService?.huggingFaceToken,
+      ),
+      _platformChannel = LiteRTPlatformChannel(),
+      _configService = configService;
 
   /// Create with existing ModelManager
-  OnDeviceLLMService.withManager(this._modelManager)
-    : _platformChannel = LiteRTPlatformChannel();
+  OnDeviceLLMService.withManager(
+    this._modelManager, {
+    InferenceConfigService? configService,
+  })
+    : _platformChannel = LiteRTPlatformChannel(),
+      _configService = configService;
 
   @override
   String? get currentModelId => _currentModelId;
@@ -32,6 +45,12 @@ class OnDeviceLLMService implements LLMService {
 
   /// Get the model manager for downloads and lifecycle
   ModelManager get modelManager => _modelManager;
+
+  /// Update Hugging Face token
+  void updateHuggingFaceToken(String? token) {
+    _modelManager.updateHuggingFaceToken(token);
+    _log('Hugging Face token updated in OnDeviceLLMService');
+  }
 
   @override
   Future<bool> isAvailable() async {
@@ -76,6 +95,13 @@ class OnDeviceLLMService implements LLMService {
       await loadModel(modelId);
     }
 
+    // Use configured parameters if config service is available, otherwise use defaults
+    final effectiveTemperature = _configService?.temperature ?? temperature;
+    final effectiveMaxTokens = _configService?.maxTokens ?? maxTokens ?? 512;
+    final effectiveTopK = _configService?.topK ?? 40;
+    final effectiveTopP = _configService?.topP ?? 0.9;
+    final effectiveRepetitionPenalty = _configService?.repetitionPenalty ?? 1.0;
+
     // Build the full prompt with conversation history
     final fullPrompt = _buildPrompt(
       prompt: prompt,
@@ -83,14 +109,22 @@ class OnDeviceLLMService implements LLMService {
       conversationHistory: conversationHistory,
     );
 
-    _log('Generating response for prompt: ${prompt.take(50)}...');
+    _log('Generating response with parameters: '
+        'temperature=$effectiveTemperature, '
+        'maxTokens=$effectiveMaxTokens, '
+        'topK=$effectiveTopK, '
+        'topP=$effectiveTopP, '
+        'repetitionPenalty=$effectiveRepetitionPenalty');
 
     try {
-      // Use streaming generation for real-time response
+      // Use streaming generation for real-time response with all parameters
       yield* _platformChannel.generateTextStream(
         prompt: fullPrompt,
-        temperature: temperature,
-        maxTokens: maxTokens,
+        temperature: effectiveTemperature,
+        maxTokens: effectiveMaxTokens,
+        topK: effectiveTopK,
+        topP: effectiveTopP,
+        repetitionPenalty: effectiveRepetitionPenalty,
       );
 
       // Reset the auto-unload timer

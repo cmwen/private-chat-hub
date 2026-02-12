@@ -17,6 +17,8 @@ class ModelManager {
   final StorageService _storage; // Keep for potential future use
   final ModelDownloadService _downloadService;
   final LiteRTPlatformChannel _platformChannel;
+  // ignore: unused_field
+  final String? _huggingFaceToken; // Mutable for token updates, used via download service
 
   // Configuration
   static const Duration _defaultUnloadTimeout = Duration(minutes: 5);
@@ -34,9 +36,17 @@ class ModelManager {
   final StreamController<ModelManagerState> _stateController =
       StreamController<ModelManagerState>.broadcast();
 
-  ModelManager(this._storage, {ModelDownloadService? downloadService})
-    : _downloadService = downloadService ?? ModelDownloadService(_storage),
-      _platformChannel = LiteRTPlatformChannel() {
+  ModelManager(
+    this._storage, {
+    ModelDownloadService? downloadService,
+    String? huggingFaceToken,
+  })  : _huggingFaceToken = huggingFaceToken,
+        _downloadService = downloadService ??
+            ModelDownloadService(
+              _storage,
+              huggingFaceToken: huggingFaceToken,
+            ),
+        _platformChannel = LiteRTPlatformChannel() {
     _loadPreferences();
   }
 
@@ -93,6 +103,12 @@ class ModelManager {
     }
 
     _log('Auto-unload set to: $enabled');
+  }
+
+  /// Update Hugging Face token for downloads
+  void updateHuggingFaceToken(String? token) {
+    _downloadService.updateHuggingFaceToken(token);
+    _log('Hugging Face token updated in ModelManager');
   }
 
   /// Get available models with download status

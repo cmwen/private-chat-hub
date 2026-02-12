@@ -19,6 +19,7 @@ class ModelInfo {
   final bool isDownloaded;
   final List<String> capabilities;
   final String? downloadUrl;
+  final bool isLocal;
 
   const ModelInfo({
     required this.id,
@@ -28,6 +29,7 @@ class ModelInfo {
     required this.isDownloaded,
     required this.capabilities,
     this.downloadUrl,
+    this.isLocal = false,
   });
 
   /// Human-readable size string (e.g., "557 MB")
@@ -59,6 +61,7 @@ class ModelInfo {
     bool? isDownloaded,
     List<String>? capabilities,
     String? downloadUrl,
+    bool? isLocal,
   }) {
     return ModelInfo(
       id: id ?? this.id,
@@ -68,6 +71,7 @@ class ModelInfo {
       isDownloaded: isDownloaded ?? this.isDownloaded,
       capabilities: capabilities ?? this.capabilities,
       downloadUrl: downloadUrl ?? this.downloadUrl,
+      isLocal: isLocal ?? this.isLocal,
     );
   }
 
@@ -78,6 +82,7 @@ class ModelInfo {
       'description': description,
       'sizeBytes': sizeBytes,
       'isDownloaded': isDownloaded,
+      'isLocal': isLocal,
       'capabilities': capabilities,
       'downloadUrl': downloadUrl,
     };
