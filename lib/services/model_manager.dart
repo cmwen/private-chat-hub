@@ -36,12 +36,10 @@ class ModelManager {
     StorageService storage, {
     ModelDownloadService? downloadService,
     String? huggingFaceToken,
-  })  : _downloadService = downloadService ??
-            ModelDownloadService(
-              storage,
-              huggingFaceToken: huggingFaceToken,
-            ),
-        _platformChannel = LiteRTPlatformChannel() {
+  }) : _downloadService =
+           downloadService ??
+           ModelDownloadService(storage, huggingFaceToken: huggingFaceToken),
+       _platformChannel = LiteRTPlatformChannel() {
     _loadPreferences();
   }
 
