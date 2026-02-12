@@ -721,8 +721,9 @@ class ChatService {
     }
 
     // Check if model is a local model (has local: prefix)
-    final isLocalModel =
-        UnifiedModelService.isLocalModel(initialConversation.modelName);
+    final isLocalModel = UnifiedModelService.isLocalModel(
+      initialConversation.modelName,
+    );
 
     // Route to on-device if local model is selected
     if (isLocalModel && _onDeviceLLMService != null) {
@@ -747,7 +748,7 @@ class ChatService {
         yield* _sendMessageOnDevice(conversationId, text);
         return;
       }
-      
+
       // No on-device fallback available - queue the message
       _log('Offline mode: queueing message (no on-device models available)');
       final conversation = await queueMessage(conversationId, text);
@@ -847,8 +848,9 @@ class ChatService {
     // If conversation has local: prefix, extract the actual model ID
     String onDeviceModelId;
     if (UnifiedModelService.isLocalModel(initialConversation.modelName)) {
-      onDeviceModelId =
-          UnifiedModelService.getLocalModelId(initialConversation.modelName);
+      onDeviceModelId = UnifiedModelService.getLocalModelId(
+        initialConversation.modelName,
+      );
       _log('Using local model from conversation: $onDeviceModelId');
     } else {
       onDeviceModelId =

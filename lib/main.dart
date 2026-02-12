@@ -200,38 +200,46 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final inferenceConfigService = InferenceConfigService(prefs);
-      
+
       // Always set inference config service so the toggle is visible
       if (!mounted) return;
       setState(() {
         _inferenceConfigService = inferenceConfigService;
       });
-      
+
       // Update chat service with inference config service
       _chatService.setInferenceConfigService(inferenceConfigService);
-      
+
       // Try to initialize on-device service separately
       try {
         final onDeviceLLMService = OnDeviceLLMService(
           widget.storageService,
           configService: inferenceConfigService,
         );
-        
+
         if (!mounted) return;
         setState(() {
           _onDeviceLLMService = onDeviceLLMService;
         });
-        
+
         // Update chat service with on-device service
         _chatService.setOnDeviceLLMService(onDeviceLLMService);
-        
-        print('[HomeScreen._initializeInferenceServices] On-device service initialized successfully');
+
+        print(
+          '[HomeScreen._initializeInferenceServices] On-device service initialized successfully',
+        );
       } catch (e) {
-        print('[HomeScreen._initializeInferenceServices] WARNING: Failed to initialize on-device service: $e');
-        print('[HomeScreen._initializeInferenceServices] The on-device mode toggle will still be available, but on-device inference may not work.');
+        print(
+          '[HomeScreen._initializeInferenceServices] WARNING: Failed to initialize on-device service: $e',
+        );
+        print(
+          '[HomeScreen._initializeInferenceServices] The on-device mode toggle will still be available, but on-device inference may not work.',
+        );
       }
     } catch (e) {
-      print('[HomeScreen._initializeInferenceServices] ERROR: Failed to initialize inference services: $e');
+      print(
+        '[HomeScreen._initializeInferenceServices] ERROR: Failed to initialize inference services: $e',
+      );
       // Still try to continue without these services
     }
   }

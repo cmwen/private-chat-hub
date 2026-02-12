@@ -21,21 +21,22 @@ class OnDeviceLLMService implements LLMService {
 
   String? _currentModelId;
 
-  OnDeviceLLMService(StorageService storage, {InferenceConfigService? configService})
-    : _modelManager = ModelManager(
-        storage,
-        huggingFaceToken: configService?.huggingFaceToken,
-      ),
-      _platformChannel = LiteRTPlatformChannel(),
-      _configService = configService;
+  OnDeviceLLMService(
+    StorageService storage, {
+    InferenceConfigService? configService,
+  }) : _modelManager = ModelManager(
+         storage,
+         huggingFaceToken: configService?.huggingFaceToken,
+       ),
+       _platformChannel = LiteRTPlatformChannel(),
+       _configService = configService;
 
   /// Create with existing ModelManager
   OnDeviceLLMService.withManager(
     this._modelManager, {
     InferenceConfigService? configService,
-  })
-    : _platformChannel = LiteRTPlatformChannel(),
-      _configService = configService;
+  }) : _platformChannel = LiteRTPlatformChannel(),
+       _configService = configService;
 
   @override
   String? get currentModelId => _currentModelId;
@@ -109,12 +110,14 @@ class OnDeviceLLMService implements LLMService {
       conversationHistory: conversationHistory,
     );
 
-    _log('Generating response with parameters: '
-        'temperature=$effectiveTemperature, '
-        'maxTokens=$effectiveMaxTokens, '
-        'topK=$effectiveTopK, '
-        'topP=$effectiveTopP, '
-        'repetitionPenalty=$effectiveRepetitionPenalty');
+    _log(
+      'Generating response with parameters: '
+      'temperature=$effectiveTemperature, '
+      'maxTokens=$effectiveMaxTokens, '
+      'topK=$effectiveTopK, '
+      'topP=$effectiveTopP, '
+      'repetitionPenalty=$effectiveRepetitionPenalty',
+    );
 
     try {
       // Use streaming generation for real-time response with all parameters

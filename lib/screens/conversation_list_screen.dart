@@ -87,8 +87,9 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
       );
 
       // Get unified model list (Ollama + local models)
-      _allModels =
-          await _unifiedModelService.getUnifiedModelList(_ollamaModels);
+      _allModels = await _unifiedModelService.getUnifiedModelList(
+        _ollamaModels,
+      );
 
       // If no model selected, select the first one
       if (_selectedModel == null && _allModels.isNotEmpty) {
@@ -99,8 +100,9 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
       // Failed to load Ollama models - still try to get local models
       _ollamaModels = [];
       try {
-        _allModels =
-            await _unifiedModelService.getUnifiedModelList(_ollamaModels);
+        _allModels = await _unifiedModelService.getUnifiedModelList(
+          _ollamaModels,
+        );
         // Select first local model if available
         if (_selectedModel == null && _allModels.isNotEmpty) {
           _selectedModel = _allModels.first.id;
@@ -159,7 +161,8 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
       context: context,
       builder: (dialogContext) => DualModelSelector(
         models: _ollamaModels,
-        initialModel1: _selectedModel != null &&
+        initialModel1:
+            _selectedModel != null &&
                 !UnifiedModelService.isLocalModel(_selectedModel!)
             ? _selectedModel
             : null,

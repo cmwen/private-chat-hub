@@ -85,8 +85,8 @@ class ModelDownloadService {
     this._storage, {
     http.Client? client,
     String? huggingFaceToken,
-  })  : _client = client ?? http.Client(),
-        _huggingFaceToken = huggingFaceToken;
+  }) : _client = client ?? http.Client(),
+       _huggingFaceToken = huggingFaceToken;
 
   /// Update the Hugging Face token
   void updateHuggingFaceToken(String? token) {
@@ -528,9 +528,9 @@ class DownloadCancelledException implements Exception {
 /// Exception thrown when Hugging Face authentication fails
 class HuggingFaceAuthException implements Exception {
   final String message;
-  
+
   HuggingFaceAuthException(this.message);
-  
+
   @override
   String toString() => message;
 }

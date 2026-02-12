@@ -18,14 +18,14 @@ class InferenceConfigService {
   static const String _autoUnloadTimeoutKey = 'litert_auto_unload_timeout';
   static const String _lastRemoteModelKey = 'last_remote_model';
   static const String _lastOnDeviceModelKey = 'last_on_device_model';
-  
+
   // LiteLM Model Parameters
   static const String _temperatureKey = 'litert_temperature';
   static const String _topKKey = 'litert_top_k';
   static const String _topPKey = 'litert_top_p';
   static const String _maxTokensKey = 'litert_max_tokens';
   static const String _repetitionPenaltyKey = 'litert_repetition_penalty';
-  
+
   // Hugging Face API Token
   static const String _huggingFaceTokenKey = 'huggingface_api_token';
 

@@ -114,7 +114,7 @@ class _OnDeviceModelsScreenState extends State<OnDeviceModelsScreen> {
       },
       onError: (e) {
         _log('Download error: $e');
-        
+
         // Show user-friendly error message
         String errorMessage = 'Download failed';
         if (e is HuggingFaceAuthException) {
@@ -122,9 +122,9 @@ class _OnDeviceModelsScreenState extends State<OnDeviceModelsScreen> {
         } else {
           errorMessage = 'Download failed: $e';
         }
-        
+
         _showErrorDialog('Download Error', errorMessage);
-        
+
         // Remove progress on error
         setState(() {
           _downloadProgress.remove(modelId);
@@ -228,16 +228,16 @@ class _OnDeviceModelsScreenState extends State<OnDeviceModelsScreen> {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error),
+            Icon(
+              Icons.error_outline,
+              color: Theme.of(context).colorScheme.error,
+            ),
             const SizedBox(width: 8),
             Expanded(child: Text(title)),
           ],
         ),
         content: SingleChildScrollView(
-          child: SelectableText(
-            message,
-            style: const TextStyle(fontSize: 14),
-          ),
+          child: SelectableText(message, style: const TextStyle(fontSize: 14)),
         ),
         actions: [
           if (message.contains('Hugging Face token'))

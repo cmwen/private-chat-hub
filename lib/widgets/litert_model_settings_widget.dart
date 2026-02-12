@@ -297,9 +297,7 @@ class _LiteRTModelSettingsWidgetState extends State<LiteRTModelSettingsWidget> {
                           ),
                         ),
                         Icon(
-                          _isExpanded
-                              ? Icons.expand_less
-                              : Icons.expand_more,
+                          _isExpanded ? Icons.expand_less : Icons.expand_more,
                           size: 20,
                         ),
                       ],
@@ -572,7 +570,8 @@ class _LiteRTModelSettingsWidgetState extends State<LiteRTModelSettingsWidget> {
                 max: 2048,
                 divisions: 100,
                 label: '$_maxTokens',
-                onChanged: (value) => setState(() => _maxTokens = value.toInt()),
+                onChanged: (value) =>
+                    setState(() => _maxTokens = value.toInt()),
               ),
             ],
           ),

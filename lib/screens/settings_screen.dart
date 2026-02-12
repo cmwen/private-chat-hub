@@ -88,10 +88,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             (readiness['unsupportedReasons'] as List<dynamic>? ?? [])
                 .whereType<String>()
                 .toList();
-        _onDeviceWarnings =
-            (readiness['warnings'] as List<dynamic>? ?? [])
-                .whereType<String>()
-                .toList();
+        _onDeviceWarnings = (readiness['warnings'] as List<dynamic>? ?? [])
+            .whereType<String>()
+            .toList();
       });
     } catch (_) {
       if (!mounted) return;
@@ -440,7 +439,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             children: [
                               Icon(
                                 Icons.warning_amber_rounded,
-                                color: Theme.of(context).colorScheme.onErrorContainer,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onErrorContainer,
                               ),
                               const SizedBox(width: 10),
                               Expanded(
@@ -449,7 +450,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       ? _onDeviceUnsupportedReasons.first
                                       : 'On-device mode is not supported on this device.',
                                   style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onErrorContainer,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onErrorContainer,
                                   ),
                                 ),
                               ),
@@ -470,8 +473,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             children: [
                               Icon(
                                 Icons.info_outline,
-                                color:
-                                    Theme.of(context).colorScheme.onSecondaryContainer,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSecondaryContainer,
                               ),
                               const SizedBox(width: 10),
                               Expanded(

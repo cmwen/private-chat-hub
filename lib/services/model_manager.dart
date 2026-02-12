@@ -18,7 +18,8 @@ class ModelManager {
   final ModelDownloadService _downloadService;
   final LiteRTPlatformChannel _platformChannel;
   // ignore: unused_field
-  final String? _huggingFaceToken; // Mutable for token updates, used via download service
+  final String?
+  _huggingFaceToken; // Mutable for token updates, used via download service
 
   // Configuration
   static const Duration _defaultUnloadTimeout = Duration(minutes: 5);
@@ -40,13 +41,11 @@ class ModelManager {
     this._storage, {
     ModelDownloadService? downloadService,
     String? huggingFaceToken,
-  })  : _huggingFaceToken = huggingFaceToken,
-        _downloadService = downloadService ??
-            ModelDownloadService(
-              _storage,
-              huggingFaceToken: huggingFaceToken,
-            ),
-        _platformChannel = LiteRTPlatformChannel() {
+  }) : _huggingFaceToken = huggingFaceToken,
+       _downloadService =
+           downloadService ??
+           ModelDownloadService(_storage, huggingFaceToken: huggingFaceToken),
+       _platformChannel = LiteRTPlatformChannel() {
     _loadPreferences();
   }
 

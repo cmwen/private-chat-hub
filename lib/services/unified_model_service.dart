@@ -8,7 +8,7 @@ class UnifiedModelService {
   final OnDeviceLLMService? _onDeviceLLMService;
 
   UnifiedModelService({OnDeviceLLMService? onDeviceLLMService})
-      : _onDeviceLLMService = onDeviceLLMService;
+    : _onDeviceLLMService = onDeviceLLMService;
 
   /// Prefix for local model names to avoid conflicts with Ollama models
   static const String localModelPrefix = 'local:';
@@ -37,8 +37,8 @@ class UnifiedModelService {
     // Add on-device models (local)
     if (_onDeviceLLMService != null) {
       try {
-        final localModels =
-            await _onDeviceLLMService.modelManager.getDownloadedModels();
+        final localModels = await _onDeviceLLMService.modelManager
+            .getDownloadedModels();
 
         for (final localModel in localModels) {
           unifiedList.add(
