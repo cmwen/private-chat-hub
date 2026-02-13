@@ -863,66 +863,81 @@ class ChatService {
         .where((m) => m.id != assistantMessageId && !m.isError)
         .toList();
 
-    // Start on-device generation
-    try {
-      final buffer = StringBuffer();
+    // Start on-device generation in background so stream subscribers
+    // receive token updates in real time.
+    () async {
+      try {
+        final buffer = StringBuffer();
 
-      await for (final token in _onDeviceLLMService!.generateResponse(
-        prompt: text,
-        modelId: onDeviceModelId,
-        conversationHistory: conversationHistory,
-        systemPrompt: conversation.systemPrompt,
-        temperature: conversation.parameters.temperature,
-        maxTokens: conversation.parameters.maxTokens,
-      )) {
-        if (streamController.isClosed) break;
+        await for (final token in _onDeviceLLMService!.generateResponse(
+          prompt: text,
+          modelId: onDeviceModelId,
+          conversationHistory: conversationHistory,
+          systemPrompt: conversation.systemPrompt,
+          temperature: conversation.parameters.temperature,
+          maxTokens: conversation.parameters.maxTokens,
+        )) {
+          if (streamController.isClosed) break;
 
-        buffer.write(token);
+          buffer.write(token);
 
+          conversation = await _updateAssistantMessage(
+            conversation,
+            assistantMessageId,
+            buffer.toString(),
+            isStreaming: true,
+          );
+
+          if (!streamController.isClosed) {
+            streamController.add(conversation);
+          }
+        }
+
+        final finalText = buffer.toString();
+        if (finalText.trim().isEmpty) {
+          _handleError(
+            conversationId,
+            conversation,
+            assistantMessageId,
+            streamController,
+            'On-device model returned an empty response. Try again or switch model/backend.',
+          );
+          return;
+        }
+
+        // Finalize the message
         conversation = await _updateAssistantMessage(
           conversation,
           assistantMessageId,
-          buffer.toString(),
-          isStreaming: true,
+          finalText,
+          isStreaming: false,
         );
 
         if (!streamController.isClosed) {
           streamController.add(conversation);
+          await streamController.close();
         }
+
+        // Show notification
+        await _showResponseCompleteNotification(conversation, finalText);
+
+        // Update last used on-device model
+        await _inferenceConfigService?.setLastOnDeviceModel(onDeviceModelId);
+      } catch (e) {
+        _log('On-device generation error: $e');
+        _handleError(
+          conversationId,
+          conversation,
+          assistantMessageId,
+          streamController,
+          'On-device inference error: ${e.toString()}',
+        );
+      } finally {
+        _cleanupStream(conversationId);
       }
+    }();
 
-      // Finalize the message
-      conversation = await _updateAssistantMessage(
-        conversation,
-        assistantMessageId,
-        buffer.toString(),
-        isStreaming: false,
-      );
-
-      if (!streamController.isClosed) {
-        streamController.add(conversation);
-        streamController.close();
-      }
-
-      // Show notification
-      await _showResponseCompleteNotification(conversation, buffer.toString());
-
-      // Update last used on-device model
-      await _inferenceConfigService?.setLastOnDeviceModel(onDeviceModelId);
-    } catch (e) {
-      _log('On-device generation error: $e');
-      _handleError(
-        conversationId,
-        conversation,
-        assistantMessageId,
-        streamController,
-        'On-device inference error: ${e.toString()}',
-      );
-    }
-
-    _cleanupStream(conversationId);
-
-    // Yield final updates
+    // Yield updates as they arrive
     await for (final updatedConversation in streamController.stream) {
       yield updatedConversation;
     }
