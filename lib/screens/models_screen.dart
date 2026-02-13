@@ -468,10 +468,7 @@ class _LocalModelCard extends StatelessWidget {
         subtitle: Text(model.sizeString),
         trailing: isSelected
             ? const Icon(Icons.check_circle, color: Colors.green)
-            : TextButton(
-                onPressed: onSelect,
-                child: const Text('Set Active'),
-              ),
+            : TextButton(onPressed: onSelect, child: const Text('Set Active')),
         onTap: onSelect,
       ),
     );

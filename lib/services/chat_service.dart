@@ -856,7 +856,9 @@ class ChatService {
         _log('Failed to fetch readiness report: $e');
       }
 
-      throw Exception('On-device inference not available on this device: $reason');
+      throw Exception(
+        'On-device inference not available on this device: $reason',
+      );
     }
 
     // Add user message
@@ -1039,20 +1041,26 @@ class ChatService {
 
     if (isLocalModel) {
       if (_onDeviceLLMService == null) {
-        _log('Local model selected in sendMessageWithContext but on-device service is null');
+        _log(
+          'Local model selected in sendMessageWithContext but on-device service is null',
+        );
         throw Exception(
           'On-device service is still initializing. Please wait a few seconds and try again.',
         );
       }
 
-      _log('Routing sendMessageWithContext to on-device inference (local model selected)');
+      _log(
+        'Routing sendMessageWithContext to on-device inference (local model selected)',
+      );
       yield* _sendMessageOnDevice(conversationId, lastUserText(conversation));
       return;
     }
 
     if (currentInferenceMode == InferenceMode.onDevice &&
         _onDeviceLLMService != null) {
-      _log('Routing sendMessageWithContext to on-device inference (onDevice mode enabled)');
+      _log(
+        'Routing sendMessageWithContext to on-device inference (onDevice mode enabled)',
+      );
       yield* _sendMessageOnDevice(conversationId, lastUserText(conversation));
       return;
     }

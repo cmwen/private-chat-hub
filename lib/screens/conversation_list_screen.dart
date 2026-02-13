@@ -99,9 +99,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
       }
 
       // Get unified model list (Ollama + local models)
-      _allModels = await unifiedModelService.getUnifiedModelList(
-        _ollamaModels,
-      );
+      _allModels = await unifiedModelService.getUnifiedModelList(_ollamaModels);
 
       // If selected model is missing or not set, select first available
       final selectedStillExists =

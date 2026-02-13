@@ -69,9 +69,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
         ollamaModels = await widget.ollamaManager.listModels();
       }
 
-      _models = await unifiedModelService.getUnifiedModelList(
-        ollamaModels,
-      );
+      _models = await unifiedModelService.getUnifiedModelList(ollamaModels);
     } catch (_) {
       try {
         _models = await unifiedModelService.getUnifiedModelList([]);

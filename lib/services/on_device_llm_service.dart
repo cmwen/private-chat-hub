@@ -139,25 +139,29 @@ class OnDeviceLLMService implements LLMService {
       var chunkCount = 0;
       final startedAt = DateTime.now();
 
-      yield* _platformChannel.generateTextStream(
-        prompt: fullPrompt,
-        temperature: effectiveTemperature,
-        maxTokens: effectiveMaxTokens,
-        topK: effectiveTopK,
-        topP: effectiveTopP,
-        repetitionPenalty: effectiveRepetitionPenalty,
-      ).map((chunk) {
-        chunkCount++;
-        if (chunkCount == 1 || chunkCount % 25 == 0) {
-          _log(
-            'Streaming chunk received: chunkCount=$chunkCount, chunkLength=${chunk.length}',
-          );
-        }
-        return chunk;
-      });
+      yield* _platformChannel
+          .generateTextStream(
+            prompt: fullPrompt,
+            temperature: effectiveTemperature,
+            maxTokens: effectiveMaxTokens,
+            topK: effectiveTopK,
+            topP: effectiveTopP,
+            repetitionPenalty: effectiveRepetitionPenalty,
+          )
+          .map((chunk) {
+            chunkCount++;
+            if (chunkCount == 1 || chunkCount % 25 == 0) {
+              _log(
+                'Streaming chunk received: chunkCount=$chunkCount, chunkLength=${chunk.length}',
+              );
+            }
+            return chunk;
+          });
 
       final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
-      _log('generateResponse completed: chunks=$chunkCount, elapsedMs=$elapsedMs');
+      _log(
+        'generateResponse completed: chunks=$chunkCount, elapsedMs=$elapsedMs',
+      );
 
       // Reset the auto-unload timer
       _modelManager.resetUnloadTimer();
