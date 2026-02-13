@@ -107,6 +107,8 @@ class LiteRTPlatformChannel {
   }) {
     final controller = StreamController<String>();
     StreamSubscription? subscription;
+    var eventCount = 0;
+    var tokenCount = 0;
 
     Future<void> closeController() async {
       if (!controller.isClosed) {
@@ -115,13 +117,29 @@ class LiteRTPlatformChannel {
     }
 
     controller.onListen = () {
+      _log(
+        'Starting generateTextStream: promptLength=${prompt.length}, '
+        'temperature=$temperature, maxTokens=$maxTokens, topK=$topK, '
+        'topP=$topP, repetitionPenalty=$repetitionPenalty',
+      );
+
       // Listen for events first to avoid missing early tokens.
       subscription = _eventChannel.receiveBroadcastStream().listen(
         (event) {
+          eventCount++;
           if (event is String) {
             if (event == '[DONE]') {
+              _log(
+                'Stream completed via [DONE]: events=$eventCount, tokens=$tokenCount',
+              );
               closeController();
             } else if (event.isNotEmpty) {
+              tokenCount++;
+              if (tokenCount == 1 || tokenCount % 25 == 0) {
+                _log(
+                  'String token received: tokenCount=$tokenCount, length=${event.length}',
+                );
+              }
               controller.add(event);
             }
             return;
@@ -130,6 +148,7 @@ class LiteRTPlatformChannel {
           if (event is Map) {
             final error = event['error'];
             if (error != null) {
+              _log('Stream error event received: $error');
               controller.addError(Exception(error.toString()));
               closeController();
               return;
@@ -141,6 +160,12 @@ class LiteRTPlatformChannel {
                 event['content'] ??
                 event['delta'];
             if (token is String && token.isNotEmpty) {
+              tokenCount++;
+              if (tokenCount == 1 || tokenCount % 25 == 0) {
+                _log(
+                  'Map token received: tokenCount=$tokenCount, length=${token.length}',
+                );
+              }
               controller.add(token);
             }
 
@@ -149,15 +174,22 @@ class LiteRTPlatformChannel {
                 event['isDone'] == true ||
                 event['type'] == 'done';
             if (isDone) {
+              _log(
+                'Stream completed via done flag: events=$eventCount, tokens=$tokenCount',
+              );
               closeController();
             }
           }
         },
         onError: (error) {
+          _log('Event channel stream error: $error');
           controller.addError(error);
           closeController();
         },
         onDone: () {
+          _log(
+            'Event channel stream closed: events=$eventCount, tokens=$tokenCount',
+          );
           closeController();
         },
       );
@@ -173,6 +205,7 @@ class LiteRTPlatformChannel {
             'repetitionPenalty': repetitionPenalty,
           })
           .catchError((error) {
+            _log('startGeneration invoke failed: $error');
             controller.addError(error);
             closeController();
           });
@@ -180,6 +213,7 @@ class LiteRTPlatformChannel {
 
     // Clean up subscription when stream is closed/cancelled
     controller.onCancel = () {
+      _log('generateTextStream cancelled by caller');
       subscription?.cancel();
       _methodChannel.invokeMethod<void>('cancelGeneration');
     };

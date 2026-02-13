@@ -353,6 +353,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ModelsScreen(
             ollamaManager: _ollamaManager,
             connectionService: _connectionService,
+            onDeviceLLMService: _onDeviceLLMService,
           ),
           SettingsScreen(
             connectionService: _connectionService,

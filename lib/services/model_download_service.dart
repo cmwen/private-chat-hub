@@ -186,6 +186,7 @@ class ModelDownloadService {
     LiteRTModel model,
     StreamController<ModelDownloadProgress> controller,
   ) async {
+    final downloadStartedAt = DateTime.now();
     try {
       controller.add(
         ModelDownloadProgress(
@@ -274,6 +275,26 @@ class ModelDownloadService {
         sink.add(chunk);
         downloadedBytes += chunk.length;
 
+        final elapsedMs = DateTime.now()
+            .difference(downloadStartedAt)
+            .inMilliseconds;
+        final bytesSinceStart = downloadedBytes - resumeFrom;
+
+        double? bytesPerSecond;
+        Duration? estimatedTimeRemaining;
+
+        if (elapsedMs > 0 && bytesSinceStart > 0) {
+          bytesPerSecond = bytesSinceStart / (elapsedMs / 1000);
+          if (bytesPerSecond > 0) {
+            final remainingBytes = totalBytes - downloadedBytes;
+            if (remainingBytes > 0) {
+              estimatedTimeRemaining = Duration(
+                seconds: (remainingBytes / bytesPerSecond).ceil(),
+              );
+            }
+          }
+        }
+
         // Emit progress (throttled to avoid too many updates)
         final progress = downloadedBytes / totalBytes;
         controller.add(
@@ -283,6 +304,8 @@ class ModelDownloadService {
             bytesDownloaded: downloadedBytes,
             totalBytes: totalBytes,
             progress: progress,
+            bytesPerSecond: bytesPerSecond,
+            estimatedTimeRemaining: estimatedTimeRemaining,
           ),
         );
       }
@@ -476,6 +499,8 @@ class ModelDownloadProgress {
   final int bytesDownloaded;
   final int totalBytes;
   final double progress; // 0.0 to 1.0
+  final double? bytesPerSecond;
+  final Duration? estimatedTimeRemaining;
   final String? error;
 
   const ModelDownloadProgress({
@@ -484,6 +509,8 @@ class ModelDownloadProgress {
     required this.bytesDownloaded,
     required this.totalBytes,
     required this.progress,
+    this.bytesPerSecond,
+    this.estimatedTimeRemaining,
     this.error,
   });
 
@@ -503,6 +530,20 @@ class ModelDownloadProgress {
 
   /// Percentage string (e.g., "42%")
   String get percentString => '${(progress * 100).toStringAsFixed(0)}%';
+
+  /// Human-readable ETA string (e.g., "1m 23s")
+  String? get estimatedTimeRemainingString {
+    final eta = estimatedTimeRemaining;
+    if (eta == null) return null;
+
+    final hours = eta.inHours;
+    final minutes = eta.inMinutes.remainder(60);
+    final seconds = eta.inSeconds.remainder(60);
+
+    if (hours > 0) return '${hours}h ${minutes}m';
+    if (minutes > 0) return '${minutes}m ${seconds}s';
+    return '${seconds}s';
+  }
 }
 
 /// Download status enum

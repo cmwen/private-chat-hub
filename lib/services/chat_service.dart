@@ -87,6 +87,7 @@ class ChatService {
   /// Set the on-device LLM service (for hybrid mode)
   void setOnDeviceLLMService(OnDeviceLLMService service) {
     _onDeviceLLMService = service;
+    _log('On-device LLM service attached');
   }
 
   /// Get current inference mode
@@ -725,6 +726,23 @@ class ChatService {
       initialConversation.modelName,
     );
 
+    _log(
+      'Routing decision: model=${initialConversation.modelName}, '
+      'isLocalModel=$isLocalModel, '
+      'inferenceMode=$currentInferenceMode, '
+      'onDeviceServiceReady=${_onDeviceLLMService != null}, '
+      'isOnline=$isOnline',
+    );
+
+    if (isLocalModel && _onDeviceLLMService == null) {
+      _log(
+        'Local model selected but on-device service is not ready; aborting instead of falling back to remote model path.',
+      );
+      throw Exception(
+        'On-device service is still initializing. Please wait a few seconds and try again.',
+      );
+    }
+
     // Route to on-device if local model is selected
     if (isLocalModel && _onDeviceLLMService != null) {
       _log('Using on-device inference (local model selected)');
@@ -813,8 +831,32 @@ class ChatService {
     }
 
     final isAvailable = await _onDeviceLLMService!.isAvailable();
+    _log(
+      'On-device availability check: isAvailable=$isAvailable, '
+      'conversationModel=${initialConversation.modelName}',
+    );
     if (!isAvailable) {
-      throw Exception('On-device inference not available on this device');
+      String reason = 'On-device inference not available on this device';
+      try {
+        final readiness = await _onDeviceLLMService!.getReadinessReport();
+        final unsupportedReasons =
+            (readiness['unsupportedReasons'] as List<dynamic>? ?? [])
+                .whereType<String>()
+                .toList();
+        if (unsupportedReasons.isNotEmpty) {
+          reason = unsupportedReasons.first;
+        }
+
+        _log(
+          'On-device readiness details: isSupported=${readiness['isSupported']}, '
+          'unsupportedReasons=$unsupportedReasons, '
+          'warnings=${readiness['warnings']}',
+        );
+      } catch (e) {
+        _log('Failed to fetch readiness report: $e');
+      }
+
+      throw Exception('On-device inference not available on this device: $reason');
     }
 
     // Add user message
@@ -868,6 +910,13 @@ class ChatService {
     () async {
       try {
         final buffer = StringBuffer();
+        var chunkCount = 0;
+        final generationStartedAt = DateTime.now();
+
+        _log(
+          'Starting on-device streaming generation: model=$onDeviceModelId, '
+          'promptLength=${text.length}, historyCount=${conversationHistory.length}',
+        );
 
         await for (final token in _onDeviceLLMService!.generateResponse(
           prompt: text,
@@ -879,7 +928,14 @@ class ChatService {
         )) {
           if (streamController.isClosed) break;
 
+          chunkCount++;
           buffer.write(token);
+
+          if (chunkCount == 1 || chunkCount % 25 == 0) {
+            _log(
+              'On-device stream progress: chunks=$chunkCount, accumulatedChars=${buffer.length}',
+            );
+          }
 
           conversation = await _updateAssistantMessage(
             conversation,
@@ -894,6 +950,13 @@ class ChatService {
         }
 
         final finalText = buffer.toString();
+        final elapsedMs = DateTime.now()
+            .difference(generationStartedAt)
+            .inMilliseconds;
+        _log(
+          'On-device stream completed: chunks=$chunkCount, chars=${finalText.length}, elapsedMs=$elapsedMs',
+        );
+
         if (finalText.trim().isEmpty) {
           _handleError(
             conversationId,
@@ -955,6 +1018,44 @@ class ChatService {
     }
 
     var conversation = initialConversation;
+
+    final isLocalModel = UnifiedModelService.isLocalModel(
+      initialConversation.modelName,
+    );
+    _log(
+      'sendMessageWithContext routing: model=${initialConversation.modelName}, '
+      'isLocalModel=$isLocalModel, '
+      'inferenceMode=$currentInferenceMode, '
+      'onDeviceServiceReady=${_onDeviceLLMService != null}, '
+      'isOnline=$isOnline',
+    );
+
+    String lastUserText(Conversation c) {
+      for (final message in c.messages.reversed) {
+        if (message.role == MessageRole.user) return message.text;
+      }
+      return '';
+    }
+
+    if (isLocalModel) {
+      if (_onDeviceLLMService == null) {
+        _log('Local model selected in sendMessageWithContext but on-device service is null');
+        throw Exception(
+          'On-device service is still initializing. Please wait a few seconds and try again.',
+        );
+      }
+
+      _log('Routing sendMessageWithContext to on-device inference (local model selected)');
+      yield* _sendMessageOnDevice(conversationId, lastUserText(conversation));
+      return;
+    }
+
+    if (currentInferenceMode == InferenceMode.onDevice &&
+        _onDeviceLLMService != null) {
+      _log('Routing sendMessageWithContext to on-device inference (onDevice mode enabled)');
+      yield* _sendMessageOnDevice(conversationId, lastUserText(conversation));
+      return;
+    }
 
     // If not online, queue the last user message and return
     if (!isOnline) {

@@ -391,6 +391,16 @@ class ModelDownloadTile extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (downloadProgress!.estimatedTimeRemainingString != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'About ${downloadProgress!.estimatedTimeRemainingString} remaining',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
               ] else if (model.isDownloaded) ...[
                 Row(
                   children: [

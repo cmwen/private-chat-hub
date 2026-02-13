@@ -58,6 +58,11 @@ class OnDeviceLLMService implements LLMService {
     return _platformChannel.isAvailable();
   }
 
+  /// Get detailed readiness report (support status, reasons, warnings)
+  Future<Map<String, dynamic>> getReadinessReport() async {
+    return _platformChannel.getReadinessReport();
+  }
+
   @override
   Future<List<ModelInfo>> getAvailableModels() async {
     return _modelManager.getAvailableModels();
@@ -91,8 +96,16 @@ class OnDeviceLLMService implements LLMService {
     double temperature = 0.7,
     int? maxTokens,
   }) async* {
+    _log(
+      'generateResponse called: modelId=$modelId, '
+      'currentModelId=$_currentModelId, '
+      'promptLength=${prompt.length}, '
+      'historyCount=${conversationHistory?.length ?? 0}',
+    );
+
     // Ensure the correct model is loaded
     if (_currentModelId != modelId) {
+      _log('Requested model differs from loaded model; loading $modelId');
       await loadModel(modelId);
     }
 
@@ -110,6 +123,8 @@ class OnDeviceLLMService implements LLMService {
       conversationHistory: conversationHistory,
     );
 
+    _log('Built full prompt length=${fullPrompt.length} chars');
+
     _log(
       'Generating response with parameters: '
       'temperature=$effectiveTemperature, '
@@ -121,6 +136,9 @@ class OnDeviceLLMService implements LLMService {
 
     try {
       // Use streaming generation for real-time response with all parameters
+      var chunkCount = 0;
+      final startedAt = DateTime.now();
+
       yield* _platformChannel.generateTextStream(
         prompt: fullPrompt,
         temperature: effectiveTemperature,
@@ -128,7 +146,18 @@ class OnDeviceLLMService implements LLMService {
         topK: effectiveTopK,
         topP: effectiveTopP,
         repetitionPenalty: effectiveRepetitionPenalty,
-      );
+      ).map((chunk) {
+        chunkCount++;
+        if (chunkCount == 1 || chunkCount % 25 == 0) {
+          _log(
+            'Streaming chunk received: chunkCount=$chunkCount, chunkLength=${chunk.length}',
+          );
+        }
+        return chunk;
+      });
+
+      final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
+      _log('generateResponse completed: chunks=$chunkCount, elapsedMs=$elapsedMs');
 
       // Reset the auto-unload timer
       _modelManager.resetUnloadTimer();

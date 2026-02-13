@@ -38,15 +38,23 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   String? _selectedModel;
   bool _isLoading = true;
   bool _isLoadingModels = false;
-  late UnifiedModelService _unifiedModelService;
+  bool _localModelRefreshScheduled = false;
 
   @override
   void initState() {
     super.initState();
-    _unifiedModelService = UnifiedModelService(
-      onDeviceLLMService: widget.chatService.onDeviceLLMService,
-    );
     _loadData();
+  }
+
+  @override
+  void didUpdateWidget(covariant ConversationListScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.chatService.onDeviceLLMService != null &&
+        !_localModelRefreshScheduled) {
+      _localModelRefreshScheduled = true;
+      Future.microtask(_loadModels);
+    }
   }
 
   Future<void> _loadData() async {
@@ -66,33 +74,42 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   }
 
   Future<void> _loadModels() async {
-    final connection = widget.connectionService.getDefaultConnection();
-    if (connection == null) {
-      if (mounted) setState(() => _isLoadingModels = false);
-      return;
-    }
-
     if (mounted) setState(() => _isLoadingModels = true);
 
-    try {
-      widget.ollamaManager.setConnection(connection);
+    final unifiedModelService = UnifiedModelService(
+      onDeviceLLMService: widget.chatService.onDeviceLLMService,
+    );
 
-      // Add a reasonable timeout for initial model loading (5 seconds)
-      // This prevents long waits when Ollama is offline
-      _ollamaModels = await widget.ollamaManager.listModels().timeout(
-        const Duration(seconds: 5),
-        onTimeout: () {
-          throw Exception('Connection timeout - Ollama may be offline');
-        },
-      );
+    try {
+      final connection = widget.connectionService.getDefaultConnection();
+
+      if (connection != null) {
+        widget.ollamaManager.setConnection(connection);
+
+        // Add a reasonable timeout for initial model loading (5 seconds)
+        // This prevents long waits when Ollama is offline
+        _ollamaModels = await widget.ollamaManager.listModels().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () {
+            throw Exception('Connection timeout - Ollama may be offline');
+          },
+        );
+      } else {
+        _ollamaModels = [];
+      }
 
       // Get unified model list (Ollama + local models)
-      _allModels = await _unifiedModelService.getUnifiedModelList(
+      _allModels = await unifiedModelService.getUnifiedModelList(
         _ollamaModels,
       );
 
-      // If no model selected, select the first one
-      if (_selectedModel == null && _allModels.isNotEmpty) {
+      // If selected model is missing or not set, select first available
+      final selectedStillExists =
+          _selectedModel != null &&
+          _allModels.any((model) => model.id == _selectedModel);
+
+      if ((!selectedStillExists || _selectedModel == null) &&
+          _allModels.isNotEmpty) {
         _selectedModel = _allModels.first.id;
         await widget.connectionService.setSelectedModel(_selectedModel!);
       }
@@ -100,11 +117,17 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
       // Failed to load Ollama models - still try to get local models
       _ollamaModels = [];
       try {
-        _allModels = await _unifiedModelService.getUnifiedModelList(
+        _allModels = await unifiedModelService.getUnifiedModelList(
           _ollamaModels,
         );
-        // Select first local model if available
-        if (_selectedModel == null && _allModels.isNotEmpty) {
+
+        final selectedStillExists =
+            _selectedModel != null &&
+            _allModels.any((model) => model.id == _selectedModel);
+
+        // Select first available model if needed
+        if ((!selectedStillExists || _selectedModel == null) &&
+            _allModels.isNotEmpty) {
           _selectedModel = _allModels.first.id;
           await widget.connectionService.setSelectedModel(_selectedModel!);
         }
@@ -143,6 +166,17 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     );
 
     widget.onConversationSelected(conversation);
+  }
+
+  String _selectedModelLabel() {
+    if (_selectedModel == null) return 'No model selected';
+
+    final selected = _allModels.where((model) => model.id == _selectedModel);
+    if (selected.isNotEmpty) {
+      return selected.first.name;
+    }
+
+    return UnifiedModelService.getDisplayName(_selectedModel!);
   }
 
   Future<void> _createComparisonConversation() async {
@@ -302,7 +336,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                                 ),
                               ),
                               Text(
-                                _selectedModel ?? 'No model selected',
+                                _selectedModelLabel(),
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
@@ -400,14 +434,14 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'No Ollama connection configured',
+                    'No models available',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.tertiary,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Go to Settings to add a connection',
+                    'Download a local model or configure an Ollama connection in Settings',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -583,7 +617,7 @@ class _ModelSelectorSheet extends StatelessWidget {
                   Text('No models found', style: TextStyle(fontSize: 16)),
                   SizedBox(height: 8),
                   Text(
-                    'Make sure Ollama is running and has models downloaded',
+                    'Make sure local models are downloaded or Ollama is running with models available',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.grey),
                   ),
