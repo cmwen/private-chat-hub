@@ -323,23 +323,12 @@ class LiteRTPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChanne
                 val responseText = response?.content ?: ""
                 */
 
-                // For now, return a placeholder response
-                // This allows UI testing while waiting for LiteRT-LM integration
-                delay(1000) // Simulate generation time
-
-                val responseText = buildString {
-                    append("This is a simulated response from LiteRT-LM.\n\n")
-                    append("Your prompt was: \"${prompt.take(100)}${if (prompt.length > 100) "..." else ""}\"\n\n")
-                    append("To enable actual on-device inference:\n")
-                    append("1. Add LiteRT-LM dependencies to build.gradle.kts\n")
-                    append("2. Download a .litertlm model file\n")
-                    append("3. Uncomment the actual LiteRT-LM code in LiteRTPlugin.kt\n\n")
-                    append("Backend: $currentBackend\n")
-                    append("Model: $currentModelId")
-                }
-
                 withContext(Dispatchers.Main) {
-                    result.success(responseText)
+                    result.error(
+                        "NOT_IMPLEMENTED",
+                        "Native LiteRT-LM inference is not integrated in this build. Replace placeholder generation in LiteRTPlugin.kt with real SDK calls.",
+                        null
+                    )
                 }
 
             } catch (e: Exception) {
@@ -387,24 +376,10 @@ class LiteRTPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChanne
                 }
                 */
 
-                // Simulate streaming generation
-                val words = listOf(
-                    "This", " is", " a", " simulated", " streaming", " response",
-                    " from", " LiteRT-LM.", "\n\n",
-                    "Each", " word", " is", " streamed", " as", " a", " separate", " token.",
-                    "\n\n",
-                    "Backend:", " $currentBackend", "\n",
-                    "Model:", " $currentModelId"
+                sendEventError(
+                    "NOT_IMPLEMENTED",
+                    "Native LiteRT-LM streaming inference is not integrated in this build. Replace placeholder streaming in LiteRTPlugin.kt with real SDK calls."
                 )
-
-                for (word in words) {
-                    if (!isGenerating) break
-                    delay(100) // Simulate token generation time
-                    sendEvent(word)
-                }
-
-                // Signal completion
-                sendEvent("[DONE]")
 
             } catch (e: CancellationException) {
                 log("Generation cancelled")

@@ -818,8 +818,9 @@ class ChatService {
   /// Sends a message using on-device inference via LiteRT-LM
   Stream<Conversation> _sendMessageOnDevice(
     String conversationId,
-    String text,
-  ) async* {
+    String text, {
+    bool addUserMessage = true,
+  }) async* {
     final initialConversation = getConversation(conversationId);
     if (initialConversation == null) {
       throw Exception('Conversation not found');
@@ -861,13 +862,17 @@ class ChatService {
       );
     }
 
-    // Add user message
-    final userMessage = Message.user(
-      id: const Uuid().v4(),
-      text: text,
-      timestamp: DateTime.now(),
-    );
-    var conversation = await addMessage(conversationId, userMessage);
+    var conversation = initialConversation;
+
+    if (addUserMessage) {
+      // Add user message for direct send flow.
+      final userMessage = Message.user(
+        id: const Uuid().v4(),
+        text: text,
+        timestamp: DateTime.now(),
+      );
+      conversation = await addMessage(conversationId, userMessage);
+    }
 
     // Create stream controller
     final streamController = StreamController<Conversation>.broadcast();
@@ -1049,19 +1054,23 @@ class ChatService {
         );
       }
 
-      _log(
-        'Routing sendMessageWithContext to on-device inference (local model selected)',
+      _log('Routing sendMessageWithContext to on-device inference (local model selected)');
+      yield* _sendMessageOnDevice(
+        conversationId,
+        lastUserText(conversation),
+        addUserMessage: false,
       );
-      yield* _sendMessageOnDevice(conversationId, lastUserText(conversation));
       return;
     }
 
     if (currentInferenceMode == InferenceMode.onDevice &&
         _onDeviceLLMService != null) {
-      _log(
-        'Routing sendMessageWithContext to on-device inference (onDevice mode enabled)',
+      _log('Routing sendMessageWithContext to on-device inference (onDevice mode enabled)');
+      yield* _sendMessageOnDevice(
+        conversationId,
+        lastUserText(conversation),
+        addUserMessage: false,
       );
-      yield* _sendMessageOnDevice(conversationId, lastUserText(conversation));
       return;
     }
 
