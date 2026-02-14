@@ -85,23 +85,23 @@ jobs:
       run: flutter test --coverage --concurrency=$(nproc)
     
     - name: Build APK
-      run: flutter build apk --release
+      run: flutter build apk --release --flavor prod
     
     - name: Build App Bundle
-      run: flutter build appbundle --release
+      run: flutter build appbundle --release --flavor prod
     
     - name: Upload APK
       uses: actions/upload-artifact@v6
       with:
         name: android-apk
-        path: build/app/outputs/flutter-apk/app-release.apk
+        path: build/app/outputs/flutter-apk/app-prod-release.apk
         retention-days: 7
     
     - name: Upload App Bundle
       uses: actions/upload-artifact@v6
       with:
         name: android-bundle
-        path: build/app/outputs/bundle/release/app-release.aab
+        path: build/app/outputs/bundle/prodRelease/app-prod-release.aab
         retention-days: 7
     
     - name: Upload Coverage
