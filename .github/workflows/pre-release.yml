@@ -101,10 +101,10 @@ jobs:
         echo "Using version: $VERSION+$BUILD_NUMBER"
     
     - name: Build signed APK
-      run: flutter build apk --release --build-name=${{ steps.version.outputs.version }} --build-number=${{ steps.version.outputs.build_number }}
+      run: flutter build apk --release --flavor dev --build-name=${{ steps.version.outputs.version }} --build-number=${{ steps.version.outputs.build_number }}
     
     - name: Build signed App Bundle
-      run: flutter build appbundle --release --build-name=${{ steps.version.outputs.version }} --build-number=${{ steps.version.outputs.build_number }}
+      run: flutter build appbundle --release --flavor dev --build-name=${{ steps.version.outputs.version }} --build-number=${{ steps.version.outputs.build_number }}
     
     # Rename artifacts with version suffix
     - name: Rename artifacts
@@ -114,9 +114,9 @@ jobs:
         APP_NAME="min-android-template"
         
         mkdir -p build/artifacts
-        cp build/app/outputs/flutter-apk/app-release.apk \
+        cp build/app/outputs/flutter-apk/app-dev-release.apk \
            build/artifacts/${APP_NAME}-${VERSION}-${RELEASE_TYPE}.apk
-        cp build/app/outputs/bundle/release/app-release.aab \
+        cp build/app/outputs/bundle/devRelease/app-dev-release.aab \
            build/artifacts/${APP_NAME}-${VERSION}-${RELEASE_TYPE}.aab
     
     - name: Upload build artifacts
