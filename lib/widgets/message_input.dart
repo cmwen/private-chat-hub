@@ -70,7 +70,8 @@ class _MessageInputState extends State<MessageInput> {
     final text = _controller.text.trim();
     if (!_canSend) return;
 
-    if (widget.onSendMessageWithAttachments != null && _attachments.isNotEmpty) {
+    if (widget.onSendMessageWithAttachments != null &&
+        _attachments.isNotEmpty) {
       widget.onSendMessageWithAttachments!(text, List.from(_attachments));
     } else if (widget.onSendMessage != null && text.isNotEmpty) {
       widget.onSendMessage!(text);

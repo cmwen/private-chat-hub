@@ -1054,7 +1054,9 @@ class ChatService {
         );
       }
 
-      _log('Routing sendMessageWithContext to on-device inference (local model selected)');
+      _log(
+        'Routing sendMessageWithContext to on-device inference (local model selected)',
+      );
       yield* _sendMessageOnDevice(
         conversationId,
         lastUserText(conversation),
@@ -1065,7 +1067,9 @@ class ChatService {
 
     if (currentInferenceMode == InferenceMode.onDevice &&
         _onDeviceLLMService != null) {
-      _log('Routing sendMessageWithContext to on-device inference (onDevice mode enabled)');
+      _log(
+        'Routing sendMessageWithContext to on-device inference (onDevice mode enabled)',
+      );
       yield* _sendMessageOnDevice(
         conversationId,
         lastUserText(conversation),
