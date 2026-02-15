@@ -274,9 +274,7 @@ class _ComparisonMessagePairState extends State<ComparisonMessagePair> {
                 OutlinedButton.icon(
                   onPressed: () async {
                     await Clipboard.setData(
-                      ClipboardData(
-                        text: message.errorMessage ?? message.text,
-                      ),
+                      ClipboardData(text: message.errorMessage ?? message.text),
                     );
 
                     if (!context.mounted) return;
