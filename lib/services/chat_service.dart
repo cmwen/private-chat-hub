@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:private_chat_hub/models/comparison_conversation.dart';
 import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
@@ -2132,7 +2133,8 @@ When you have sufficient information from tool results, provide a complete respo
 
   /// Converts raw errors to user-friendly messages.
   String _formatUserFacingError(String errorMessage) {
-    var cleaned = errorMessage.trim();
+    final rawError = errorMessage.trim();
+    var cleaned = rawError;
     cleaned = cleaned.replaceFirst(RegExp(r'^Exception:\s*'), '');
     cleaned = cleaned.replaceFirst(RegExp(r'^Error:\s*'), '');
 
@@ -2164,6 +2166,32 @@ When you have sufficient information from tool results, provide a complete respo
     }
 
     final lower = cleaned.toLowerCase();
+
+    // In dev/profile builds, prioritize diagnosability over friendlier wording.
+    // This preserves precise native/platform error details for faster debugging.
+    if (!kReleaseMode) {
+      final details = StringBuffer()
+        ..writeln('Debug error details:')
+        ..writeln('- connectivityStatus: $status')
+        ..writeln('- ollamaEndpoint: ${baseUrl ?? 'not configured'}')
+        ..writeln('- rawError: $rawError')
+        ..writeln('- normalizedError: $cleaned');
+
+      if (lower.contains('not_implemented') && lower.contains('litert')) {
+        return 'On-device inference is not implemented in this build.\n'
+            'Native LiteRT generation path is still a placeholder.\n\n'
+            '${details.toString()}\n'
+            'Hint: Implement real native generation in LiteRTPlugin (startGeneration/generateText).';
+      }
+
+      if (lower.contains('model_not_loaded') ||
+          lower.contains('on-device') ||
+          lower.contains('litert')) {
+        return 'On-device inference failed.\n\n${details.toString()}';
+      }
+
+      return 'Request failed.\n\n${details.toString()}';
+    }
 
     if (lower.contains('on-device') ||
         lower.contains('litert') ||
