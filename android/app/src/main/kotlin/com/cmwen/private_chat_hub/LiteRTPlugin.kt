@@ -10,9 +10,19 @@ import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import com.google.ai.edge.litertlm.Backend
+import com.google.ai.edge.litertlm.Conversation
+import com.google.ai.edge.litertlm.ConversationConfig
+import com.google.ai.edge.litertlm.Engine
+import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.LogSeverity
+import com.google.ai.edge.litertlm.Message
+import com.google.ai.edge.litertlm.MessageCallback
+import com.google.ai.edge.litertlm.SamplerConfig
 import kotlinx.coroutines.*
+import kotlinx.coroutines.selects.select
 import java.io.File
-import java.lang.reflect.Modifier
+import java.util.Collections
 
 /**
  * LiteRT-LM Plugin for Flutter
@@ -20,9 +30,7 @@ import java.lang.reflect.Modifier
  * This plugin provides on-device LLM inference capabilities using Google's LiteRT-LM.
  * It handles model loading, text generation, and resource management.
  *
- * This plugin now includes a runtime bridge that attempts to bind to LiteRT-LM
- * classes via reflection. This allows iterative implementation without forcing
- * compile-time dependency coupling during early integration.
+ * Uses the official LiteRT-LM Kotlin API runtime.
  */
 class LiteRTPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
 
@@ -32,8 +40,8 @@ class LiteRTPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChanne
 
     private var eventSink: EventChannel.EventSink? = null
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val runtimeBridge: LiteRtRuntimeBridge = ReflectionLiteRtRuntimeBridge()
-    private var runtimeSession: LiteRtRuntimeSession? = null
+    private var engine: Engine? = null
+    private var conversation: Conversation? = null
 
     // Coroutine scope for async operations
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -248,21 +256,31 @@ class LiteRTPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChanne
                 // Unload any existing model/session before creating a new one
                 unloadModelInternal()
 
-                if (!runtimeBridge.isRuntimeAvailable()) {
+                if (!isLiteRtApiAvailable()) {
                     withContext(Dispatchers.Main) {
                         result.error(
                             "SDK_UNAVAILABLE",
-                            runtimeBridge.getRuntimeUnavailableReason(),
+                            runtimeUnavailableReason(),
                             null
                         )
                     }
                     return@launch
                 }
 
-                runtimeSession = runtimeBridge.openSession(
+                val selectedBackend = toBackend(backend)
+                val engineConfig = EngineConfig(
                     modelPath = modelPath,
-                    backend = backend
+                    backend = selectedBackend,
+                    maxNumTokens = null,
+                    cacheDir = context.cacheDir.absolutePath,
                 )
+
+                Engine.setNativeMinLogSeverity(LogSeverity.ERROR)
+                val createdEngine = Engine(engineConfig)
+                createdEngine.initialize()
+
+                engine = createdEngine
+                conversation = createdEngine.createConversation()
 
                 lastLoadTimeMs = System.currentTimeMillis() - startTime
                 isEngineLoaded = true
@@ -299,11 +317,18 @@ class LiteRTPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChanne
         cancelGeneration()
 
         try {
-            runtimeSession?.close()
+            conversation?.close()
         } catch (e: Exception) {
-            log("Error while closing runtime session: ${e.message}")
+            log("Error while closing conversation: ${e.message}")
         }
-        runtimeSession = null
+        conversation = null
+
+        try {
+            engine?.close()
+        } catch (e: Exception) {
+            log("Error while closing engine: ${e.message}")
+        }
+        engine = null
 
         isEngineLoaded = false
         currentModelId = null
@@ -333,24 +358,22 @@ class LiteRTPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChanne
             try {
                 isGenerating = true
                 log("Generating text for prompt: ${prompt.take(50)}...")
-                val session = runtimeSession
-                if (session == null) {
+                val activeEngine = engine
+                if (activeEngine == null || !activeEngine.isInitialized()) {
                     withContext(Dispatchers.Main) {
-                        result.error("MODEL_NOT_LOADED", "No active LiteRT session", null)
+                        result.error("MODEL_NOT_LOADED", "LiteRT engine is not initialized", null)
                     }
                     return@launch
                 }
 
-                val responseText = session.generateText(
-                    prompt = prompt,
-                    options = LiteRtGenerationOptions(
-                        temperature = temperature,
-                        maxTokens = maxTokens,
-                        topK = topK,
-                        topP = topP,
-                        repetitionPenalty = repetitionPenalty,
-                    )
+                val activeConversation = createConversationForSampling(
+                    topK = topK,
+                    topP = topP,
+                    temperature = temperature,
                 )
+
+                val message = activeConversation.sendMessage(prompt)
+                val responseText = message.toString()
 
                 withContext(Dispatchers.Main) {
                     result.success(responseText)
@@ -389,38 +412,50 @@ class LiteRTPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChanne
             try {
                 isGenerating = true
                 log("Starting streaming generation for prompt: ${prompt.take(50)}...")
-                val session = runtimeSession
-                if (session == null) {
-                    sendEventError("MODEL_NOT_LOADED", "No active LiteRT session")
+                val activeEngine = engine
+                if (activeEngine == null || !activeEngine.isInitialized()) {
+                    sendEventError("MODEL_NOT_LOADED", "LiteRT engine is not initialized")
                     return@launch
                 }
 
-                val options = LiteRtGenerationOptions(
-                    temperature = temperature,
-                    maxTokens = maxTokens,
+                val activeConversation = createConversationForSampling(
                     topK = topK,
                     topP = topP,
-                    repetitionPenalty = repetitionPenalty,
+                    temperature = temperature,
                 )
 
-                val streamed = session.streamText(prompt, options) { token ->
-                    if (token.isNotEmpty()) {
-                        sendEvent(token)
+                val done = CompletableDeferred<Unit>()
+                val errored = CompletableDeferred<Throwable?>()
+
+                activeConversation.sendMessageAsync(
+                    prompt,
+                    object : MessageCallback {
+                        override fun onMessage(message: Message) {
+                            if (!isActive) return
+                            val token = message.toString()
+                            if (token.isNotEmpty()) {
+                                sendEvent(token)
+                            }
+                        }
+
+                        override fun onDone() {
+                            done.complete(Unit)
+                        }
+
+                        override fun onError(throwable: Throwable) {
+                            errored.complete(throwable)
+                        }
+                    }
+                )
+
+                select<Unit> {
+                    done.onAwait {
+                        sendEvent("[DONE]")
+                    }
+                    errored.onAwait { throwable ->
+                        throw throwable ?: IllegalStateException("Unknown streaming error")
                     }
                 }
-
-                if (!streamed) {
-                    val fullResponse = session.generateText(prompt, options)
-                    fullResponse
-                        .split(Regex("\\s+"))
-                        .filter { it.isNotBlank() }
-                        .forEach { token ->
-                            if (!isActive) return@forEach
-                            sendEvent("$token ")
-                        }
-                }
-
-                sendEvent("[DONE]")
 
             } catch (e: CancellationException) {
                 log("Generation cancelled")
@@ -436,6 +471,11 @@ class LiteRTPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChanne
 
     private fun cancelGeneration() {
         if (isGenerating) {
+            try {
+                conversation?.cancelProcess()
+            } catch (_: Exception) {
+                // Best-effort cancel; coroutine cancellation still applies.
+            }
             generationJob?.cancel()
             isGenerating = false
             log("Generation cancelled by user")
@@ -503,8 +543,8 @@ class LiteRTPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChanne
             warnings.add("No GPU/NPU acceleration detected. CPU inference may be slow")
         }
 
-        if (!runtimeBridge.isRuntimeAvailable()) {
-            unsupportedReasons.add(runtimeBridge.getRuntimeUnavailableReason())
+        if (!isLiteRtApiAvailable()) {
+            unsupportedReasons.add(runtimeUnavailableReason())
         }
 
         val isSupported = unsupportedReasons.isEmpty()
@@ -618,219 +658,66 @@ class LiteRTPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChanne
         }
     }
 
+    private fun isLiteRtApiAvailable(): Boolean {
+        return try {
+            Class.forName("com.google.ai.edge.litertlm.Engine")
+            Class.forName("com.google.ai.edge.litertlm.EngineConfig")
+            Class.forName("com.google.ai.edge.litertlm.Conversation")
+            true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    private fun runtimeUnavailableReason(): String {
+        return "LiteRT-LM runtime is not packaged in this app build. " +
+            "Add Gradle dependency com.google.ai.edge.litertlm:litertlm-android and rebuild."
+    }
+
+    private fun toBackend(backend: String): Backend {
+        return when (backend.lowercase()) {
+            BACKEND_GPU -> Backend.GPU
+            BACKEND_NPU -> Backend.NPU
+            else -> Backend.CPU
+        }
+    }
+
+    private fun createConversationForSampling(
+        topK: Int,
+        topP: Double,
+        temperature: Double,
+    ): Conversation {
+        val activeEngine = engine ?: throw IllegalStateException("LiteRT engine is not initialized")
+
+        val safeTopK = if (topK <= 0) 1 else topK
+        val safeTopP = topP.coerceIn(0.0, 1.0)
+        val safeTemperature = if (temperature < 0.0) 0.0 else temperature
+
+        try {
+            conversation?.close()
+        } catch (_: Exception) {
+            // Best effort cleanup before replacing conversation.
+        }
+
+        val config = ConversationConfig(
+            systemInstruction = null,
+            initialMessages = Collections.emptyList(),
+            tools = Collections.emptyList(),
+            samplerConfig = SamplerConfig(
+                topK = safeTopK,
+                topP = safeTopP,
+                temperature = safeTemperature,
+                seed = 0,
+            ),
+            systemMessage = null,
+        )
+
+        val newConversation = activeEngine.createConversation(config)
+        conversation = newConversation
+        return newConversation
+    }
+
     private fun log(message: String) {
         android.util.Log.d(TAG, message)
-    }
-}
-
-private data class LiteRtGenerationOptions(
-    val temperature: Double,
-    val maxTokens: Int?,
-    val topK: Int,
-    val topP: Double,
-    val repetitionPenalty: Double,
-)
-
-private interface LiteRtRuntimeSession {
-    fun generateText(prompt: String, options: LiteRtGenerationOptions): String
-    fun streamText(
-        prompt: String,
-        options: LiteRtGenerationOptions,
-        onToken: (String) -> Unit,
-    ): Boolean
-
-    fun close()
-}
-
-private interface LiteRtRuntimeBridge {
-    fun isRuntimeAvailable(): Boolean
-    fun getRuntimeUnavailableReason(): String
-    fun openSession(modelPath: String, backend: String): LiteRtRuntimeSession
-}
-
-private class ReflectionLiteRtRuntimeBridge : LiteRtRuntimeBridge {
-    private val modelAssetsClassNames = listOf(
-        "com.google.ai.edge.litert.lm.ModelAssets",
-        "com.google.ai.edge.litert.ModelAssets",
-    )
-    private val engineSettingsClassNames = listOf(
-        "com.google.ai.edge.litert.lm.EngineSettings",
-        "com.google.ai.edge.litert.EngineSettings",
-    )
-    private val engineClassNames = listOf(
-        "com.google.ai.edge.litert.lm.Engine",
-        "com.google.ai.edge.litert.Engine",
-    )
-    private val backendClassNames = listOf(
-        "com.google.ai.edge.litert.lm.Backend",
-        "com.google.ai.edge.litert.Backend",
-    )
-
-    override fun isRuntimeAvailable(): Boolean {
-        return resolveClass(modelAssetsClassNames) != null &&
-            resolveClass(engineSettingsClassNames) != null &&
-            resolveClass(engineClassNames) != null
-    }
-
-    override fun getRuntimeUnavailableReason(): String {
-        return "LiteRT-LM runtime dependency is missing. Add LiteRT-LM Android artifacts and native binaries before using on-device mode."
-    }
-
-    override fun openSession(modelPath: String, backend: String): LiteRtRuntimeSession {
-        val modelAssetsClass = resolveClass(modelAssetsClassNames)
-            ?: throw IllegalStateException(getRuntimeUnavailableReason())
-        val engineSettingsClass = resolveClass(engineSettingsClassNames)
-            ?: throw IllegalStateException(getRuntimeUnavailableReason())
-        val engineClass = resolveClass(engineClassNames)
-            ?: throw IllegalStateException(getRuntimeUnavailableReason())
-
-        val modelAssets = invokeStaticByNames(
-            clazz = modelAssetsClass,
-            methodNames = listOf("create", "fromPath"),
-            args = arrayOf(modelPath),
-        ) ?: throw IllegalStateException("Unable to create LiteRT model assets")
-
-        val backendValue = resolveBackend(backend)
-
-        val engineSettings = if (backendValue != null) {
-            invokeStaticByNames(
-                clazz = engineSettingsClass,
-                methodNames = listOf("createDefault", "create", "fromModelAssets"),
-                args = arrayOf(modelAssets, backendValue),
-            ) ?: invokeStaticByNames(
-                clazz = engineSettingsClass,
-                methodNames = listOf("createDefault", "create", "fromModelAssets"),
-                args = arrayOf(modelAssets),
-            )
-        } else {
-            invokeStaticByNames(
-                clazz = engineSettingsClass,
-                methodNames = listOf("createDefault", "create", "fromModelAssets"),
-                args = arrayOf(modelAssets),
-            )
-        } ?: throw IllegalStateException("Unable to create LiteRT engine settings")
-
-        val engine = invokeStaticByNames(
-            clazz = engineClass,
-            methodNames = listOf("createEngine", "create"),
-            args = arrayOf(engineSettings),
-        ) ?: throw IllegalStateException("Unable to create LiteRT engine instance")
-
-        val conversation = invokeInstanceByNames(
-            target = engine,
-            methodNames = listOf("createConversation", "newConversation"),
-            args = emptyArray(),
-        ) ?: engine
-
-        return ReflectionLiteRtRuntimeSession(engine = engine, conversation = conversation)
-    }
-
-    private fun resolveBackend(backend: String): Any? {
-        val backendClass = resolveClass(backendClassNames) ?: return null
-        val constants = backendClass.enumConstants ?: return null
-        return constants.firstOrNull {
-            (it as? Enum<*>)?.name?.equals(backend, ignoreCase = true) == true
-        } ?: constants.firstOrNull {
-            (it as? Enum<*>)?.name?.equals("CPU", ignoreCase = true) == true
-        }
-    }
-
-    private fun resolveClass(candidates: List<String>): Class<*>? {
-        for (candidate in candidates) {
-            try {
-                return Class.forName(candidate)
-            } catch (_: ClassNotFoundException) {
-                // Continue searching candidate names
-            }
-        }
-        return null
-    }
-
-    private fun invokeStaticByNames(clazz: Class<*>, methodNames: List<String>, args: Array<Any?>): Any? {
-        val method = clazz.methods.firstOrNull { m ->
-            Modifier.isStatic(m.modifiers) &&
-                methodNames.any { it.equals(m.name, ignoreCase = true) } &&
-                m.parameterTypes.size == args.size
-        } ?: return null
-
-        return method.invoke(null, *args)
-    }
-
-    private fun invokeInstanceByNames(target: Any, methodNames: List<String>, args: Array<Any?>): Any? {
-        val method = target.javaClass.methods.firstOrNull { m ->
-            methodNames.any { it.equals(m.name, ignoreCase = true) } &&
-                m.parameterTypes.size == args.size
-        } ?: return null
-
-        return method.invoke(target, *args)
-    }
-}
-
-private class ReflectionLiteRtRuntimeSession(
-    private val engine: Any,
-    private val conversation: Any,
-) : LiteRtRuntimeSession {
-    override fun generateText(prompt: String, options: LiteRtGenerationOptions): String {
-        val direct = invokeGeneration(prompt)
-            ?: throw IllegalStateException("No compatible LiteRT generation method found")
-
-        return extractText(direct)
-    }
-
-    override fun streamText(
-        prompt: String,
-        options: LiteRtGenerationOptions,
-        onToken: (String) -> Unit,
-    ): Boolean {
-        // Reflection-based async callback signatures are SDK-version specific.
-        // For now, rely on sync generation + token chunk fallback in caller.
-        return false
-    }
-
-    override fun close() {
-        invokeClose(conversation)
-        if (conversation !== engine) {
-            invokeClose(engine)
-        }
-    }
-
-    private fun invokeGeneration(prompt: String): Any? {
-        val methodNames = listOf("sendMessage", "generate", "run")
-        val method = conversation.javaClass.methods.firstOrNull { m ->
-            methodNames.any { it.equals(m.name, ignoreCase = true) } &&
-                m.parameterTypes.size == 1 &&
-                m.parameterTypes[0].isAssignableFrom(String::class.java)
-        } ?: conversation.javaClass.methods.firstOrNull { m ->
-            methodNames.any { it.equals(m.name, ignoreCase = true) } &&
-                m.parameterTypes.size == 1 &&
-                m.parameterTypes[0] == CharSequence::class.java
-        }
-
-        return method?.invoke(conversation, prompt)
-    }
-
-    private fun invokeClose(target: Any) {
-        val closeMethod = target.javaClass.methods.firstOrNull {
-            it.name.equals("close", ignoreCase = true) && it.parameterCount == 0
-        } ?: return
-        closeMethod.invoke(target)
-    }
-
-    private fun extractText(response: Any?): String {
-        if (response == null) return ""
-        if (response is String) return response
-
-        val method = response.javaClass.methods.firstOrNull {
-            (it.name.equals("getContent", ignoreCase = true) ||
-                it.name.equals("content", ignoreCase = true) ||
-                it.name.equals("getText", ignoreCase = true) ||
-                it.name.equals("text", ignoreCase = true)) &&
-                it.parameterCount == 0
-        }
-
-        val extracted = method?.invoke(response)
-        if (extracted is String) return extracted
-
-        return response.toString()
     }
 }
