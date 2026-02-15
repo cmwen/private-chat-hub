@@ -134,8 +134,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SnackBar(
             content: Text(
               mode == InferenceMode.onDevice
-                  ? 'Switched to on-device inference'
-                  : 'Switched to remote (Ollama) inference',
+                  ? 'Default routing set to on-device (local models always stay on-device)'
+                  : 'Default routing set to remote Ollama (local models still run on-device)',
             ),
           ),
         );
@@ -388,35 +388,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const Padding(
                     padding: EdgeInsets.all(16),
                     child: Text(
-                      'On-Device Models (LiteRT)',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.download),
-                    title: const Text('Manage On-Device Models'),
-                    subtitle: const Text(
-                      'Download and manage local LiteRT-LM models for offline use',
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: _openOnDeviceModelsScreen,
-                  ),
-                  const SizedBox(height: 12),
-                  LiteRTModelSettingsWidget(
-                    configService: widget.inferenceConfigService!,
-                    onDeviceLLMService: widget.onDeviceLLMService,
-                  ),
-                  const Divider(),
-                ],
-                // Inference Mode Section
-                if (widget.inferenceConfigService != null) ...[
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'Inference Mode',
+                      'Inference Routing',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -426,6 +398,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   InferenceModeSelector(
                     currentMode: _inferenceMode,
                     onModeChanged: _setInferenceMode,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'How routing works',
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '• Selecting a local model (prefixed with local:) always uses on-device inference.\n'
+                              '• The setting below controls the default route for non-local models.\n'
+                              '• If Ollama is unavailable, the app may still fall back to on-device when possible.',
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                   if (!_isOnDeviceSupported)
                     Padding(
@@ -493,17 +494,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                     ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'On-Device Models (LiteRT)',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.download),
+                    title: const Text('Manage On-Device Models'),
+                    subtitle: const Text(
+                      'Download and manage local LiteRT-LM models for offline use',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: _openOnDeviceModelsScreen,
+                  ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      _inferenceMode == InferenceMode.onDevice
-                          ? 'Using local on-device models (offline capable)'
-                          : 'Using remote Ollama server (requires connection)',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    child: ExpansionTile(
+                      tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+                      childrenPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.tune),
+                      title: const Text('On-device generation parameters'),
+                      subtitle: const Text(
+                        'Applies to LiteRT local model inference',
                       ),
+                      children: [
+                        LiteRTModelSettingsWidget(
+                          configService: widget.inferenceConfigService!,
+                          onDeviceLLMService: widget.onDeviceLLMService,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: ExpansionTile(
+                      tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+                      childrenPadding: const EdgeInsets.only(
+                        left: 12,
+                        right: 12,
+                        bottom: 12,
+                      ),
+                      leading: const Icon(Icons.cloud_outlined),
+                      title: const Text('Remote generation parameters'),
+                      subtitle: const Text(
+                        'Applies to Ollama; separate from LiteRT settings',
+                      ),
+                      children: [
+                        Text(
+                          'Remote (Ollama) models use server-side model configuration and per-chat parameters. '
+                          'These are independent from the LiteRT sliders above.',
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const Divider(),

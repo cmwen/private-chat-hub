@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:private_chat_hub/models/message.dart';
 
@@ -255,15 +256,41 @@ class _ComparisonMessagePairState extends State<ComparisonMessagePair> {
 
     if (message.isError) {
       return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(Icons.error_outline, color: theme.colorScheme.error, size: 20),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              message.errorMessage ?? 'An error occurred',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.error,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message.errorMessage ?? 'An error occurred',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(
+                      ClipboardData(
+                        text: message.errorMessage ?? message.text,
+                      ),
+                    );
+
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Error details copied to clipboard'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.copy, size: 16),
+                  label: const Text('Copy error details'),
+                ),
+              ],
             ),
           ),
         ],
