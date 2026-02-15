@@ -4,9 +4,11 @@ import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/project.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
+import 'package:private_chat_hub/services/llm_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
 import 'package:private_chat_hub/services/project_service.dart';
+import 'package:private_chat_hub/services/unified_model_service.dart';
 
 /// Screen showing project details and its conversations.
 class ProjectDetailScreen extends StatefulWidget {
@@ -36,7 +38,7 @@ class ProjectDetailScreen extends StatefulWidget {
 class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   late Project _project;
   List<Conversation> _conversations = [];
-  List<OllamaModelInfo> _models = [];
+  List<ModelInfo> _models = [];
   String? _selectedModel;
   bool _isLoading = true;
 
@@ -53,15 +55,36 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     _conversations = widget.chatService.getProjectConversations(_project.id);
     _selectedModel = widget.connectionService.getSelectedModel();
 
+    final unifiedModelService = UnifiedModelService(
+      onDeviceLLMService: widget.chatService.onDeviceLLMService,
+    );
+
     // Load models
-    final connection = widget.connectionService.getDefaultConnection();
-    if (connection != null) {
-      try {
+    try {
+      final connection = widget.connectionService.getDefaultConnection();
+      var ollamaModels = <OllamaModelInfo>[];
+
+      if (connection != null) {
         widget.ollamaManager.setConnection(connection);
-        _models = await widget.ollamaManager.listModels();
+        ollamaModels = await widget.ollamaManager.listModels();
+      }
+
+      _models = await unifiedModelService.getUnifiedModelList(ollamaModels);
+    } catch (_) {
+      try {
+        _models = await unifiedModelService.getUnifiedModelList([]);
       } catch (_) {
         _models = [];
       }
+    }
+
+    final selectedStillExists =
+        _selectedModel != null &&
+        _models.any((model) => model.id == _selectedModel);
+    if ((!selectedStillExists || _selectedModel == null) &&
+        _models.isNotEmpty) {
+      _selectedModel = _models.first.id;
+      await widget.connectionService.setSelectedModel(_selectedModel!);
     }
 
     setState(() => _isLoading = false);
@@ -79,7 +102,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     }
 
     // If no model selected but models are available, use the first one
-    final modelToUse = _selectedModel ?? _models.first.name;
+    final modelToUse = _selectedModel ?? _models.first.id;
 
     final result = await showDialog<Map<String, String?>>(
       context: context,

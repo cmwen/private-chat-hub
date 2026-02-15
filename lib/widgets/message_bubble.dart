@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:private_chat_hub/models/message.dart';
 import 'package:private_chat_hub/widgets/tool_widgets.dart';
 import 'package:intl/intl.dart';
@@ -93,6 +94,18 @@ class MessageBubble extends StatelessWidget {
                         fontSize: 15,
                       ),
                     ),
+                    if (message.isError && !isMe)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _copyErrorDetails(context),
+                            icon: const Icon(Icons.copy, size: 16),
+                            label: const Text('Copy error details'),
+                          ),
+                        ),
+                      ),
                     // Display web search references if present
                     if (!message.isMe && message.webSearchReferences.isNotEmpty)
                       _buildWebReferences(context),
@@ -117,6 +130,20 @@ class MessageBubble extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+
+  Future<void> _copyErrorDetails(BuildContext context) async {
+    final errorDetails = message.errorMessage ?? message.text;
+    await Clipboard.setData(ClipboardData(text: errorDetails));
+
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Error details copied to clipboard'),
+        duration: Duration(seconds: 2),
+      ),
     );
   }
 

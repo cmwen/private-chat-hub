@@ -4,30 +4,53 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-192%20Passing-brightgreen.svg)](test/)
 
-A privacy-first Android app for chatting with self-hosted AI models via Ollama. Keep your conversations private, switch between models instantly, and organize chats in projects - all with a beautiful Material Design 3 interface.
+**Universal AI Chat Platform** - One app for all your AI models. Chat with on-device models (privacy), self-hosted Ollama (control), or cloud APIs (power). You choose your balance of privacy, performance, and cost.
+
+## ✨ What Makes Us Different
+
+Unlike single-provider apps (ChatGPT, Claude) or desktop-only tools (Jan.ai, LM Studio), **Private Chat Hub** gives you:
+
+- 📱 **Mobile-First**: Native Android app, not a web wrapper
+- 🌍 **Universal Access**: Local models + Self-hosted + Cloud APIs (OpenAI, Anthropic, Google)
+- 🔒 **Privacy by Choice**: Use 100% local models, or cloud when you need them
+- 💰 **Cost Flexible**: Free local models, pay-per-use cloud APIs, or your own Ollama server
+- ⚡ **Full Offline**: Chat with on-device models anywhere, no internet required
+- 🎯 **Smart Fallbacks**: Auto-switch to available providers when one fails
+
+**Position:** The only mobile app supporting the full spectrum from on-device privacy to cloud convenience.
 
 ## ✨ Key Features
 
-- 🔒 **Privacy First**: All conversations stay on your devices and infrastructure
-- 🤖 **Multiple AI Models**: Connect to any Ollama model (30+ models supported)
-- 🔍 **Web Search with Progress**: LLMs can search the internet with real-time status updates
-- 📚 **Source References**: See clickable links to web search sources
+### v1.0 (Current)
+- 🔒 **Hybrid Architecture**: Local on-device models (LiteRT) + Self-hosted Ollama
+- 📱 **Offline Mode**: Full functionality with local models, queue messages for remote
+- 🤖 **Multiple AI Models**: Access 30+ Ollama models + on-device Gemini/Gemma
+- 🔍 **Web Search**: LLMs can search the internet with real-time progress
+- 📚 **Source References**: Clickable links to web search sources
 - 💬 **Conversation Management**: Organize chats, view history, export conversations
-- 📁 **Project Workspaces**: Group related conversations by topic or context
+- 📁 **Project Workspaces**: Group related conversations by topic
 - 🖼️ **Vision Support**: Share images with vision-capable models
 - 🔄 **Model Comparison**: Compare responses from two models side-by-side
-- 📱 **Native Android**: Built with Flutter, optimized for Android
 - 🎨 **Material Design 3**: Beautiful, accessible UI
 - ⚡ **Tool Calling**: Advanced AI capabilities with function calling
+
+### v1.5 (In Progress) - Cloud API Integration 🆕
+- ☁️ **OpenAI Integration**: GPT-4o, GPT-4o-mini, GPT-3.5-turbo, o1-preview
+- ☁️ **Anthropic Integration**: Claude 3.5 Sonnet, Opus, Haiku
+- ☁️ **Google AI Integration**: Gemini 1.5 Pro, Flash
+- 💰 **Cost Tracking**: Track token usage and costs per provider
+- 🎯 **Smart Routing**: Auto-fallback between cloud, Ollama, and local models
+- 🔐 **Secure API Keys**: Encrypted storage for all credentials
+- 📊 **Usage Analytics**: Monitor costs, set limits, get suggestions
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 **For Users:**
-- Android device (5.0+)
-- Ollama server running on your network ([Get Ollama](https://ollama.ai))
-- At least one model downloaded on Ollama (e.g., `ollama pull llama3`)
+- Android device (7.0+, API 24+)
+- Optional: Ollama server for self-hosted models ([Get Ollama](https://ollama.ai))
+- Optional: API keys for cloud providers (OpenAI, Anthropic, Google AI)
 
 **For Developers:**
 - Flutter SDK 3.10.1+
@@ -61,43 +84,60 @@ flutter build apk --release
 
 ### First-Time Setup
 
-1. **Start Ollama Server**
-   ```bash
-   ollama serve
-   ```
+Choose your preferred setup:
 
-2. **Open Private Chat Hub**
-   - Launch the app on your Android device
+#### Option A: 100% Local (Privacy-First) 🔒
+1. Open Private Chat Hub
+2. Download a local model (Settings → Local Models)
+3. Chat completely offline with on-device AI
+4. **No internet required after download**
 
-3. **Connect to Ollama**
-   - Go to Settings → Connection
-   - Enter your Ollama server IP and port (default: http://localhost:11434)
-   - Tap "Test Connection"
+#### Option B: Self-Hosted (Control + Power) 🖥️
+1. Install Ollama on your server: `curl https://ollama.ai/install.sh | sh`
+2. Download models: `ollama pull llama3`
+3. In app: Settings → Ollama Connection → Enter server IP
+4. Chat with powerful models on your infrastructure
 
-4. **Select a Model**
-   - Go to Models tab
-   - Choose from available models
-   - Start chatting!
+#### Option C: Cloud APIs (Convenience + Latest Models) ☁️
+1. Get API keys from [OpenAI](https://platform.openai.com/api-keys), [Anthropic](https://console.anthropic.com/), or [Google AI](https://makersuite.google.com/app/apikey)
+2. In app: Settings → Providers → Add API keys
+3. Access GPT-4, Claude 3.5, Gemini from your phone
+4. **Costs tracked automatically**
+
+#### Option D: Best of All Worlds (Recommended) 🌟
+1. Set up local models for privacy (free)
+2. Set up Ollama for power (free, your hardware)
+3. Add cloud API keys for latest models (pay-per-use)
+4. Let smart routing choose the best option automatically
 
 **See [GETTING_STARTED.md](GETTING_STARTED.md) for detailed setup guide.**
 
 ## 🎯 Use Cases
 
 ### Privacy-Conscious Users
-- Keep sensitive conversations completely private
-- No data sent to cloud services
+- Chat with 100% local models - conversations never leave your device
+- No cloud dependencies or data collection
 - Full control over your AI infrastructure
-- Export and backup your chat history
+- Air-gapped option for maximum security
 
-### AI Enthusiasts & Developers
-- Test and compare different models locally
-- Experiment with vision models and multimodal AI
-- Develop and test AI integrations
-- Learn about LLMs in a safe environment
+### Cost-Conscious Developers
+- Use free local models for simple tasks
+- Pay-per-use cloud APIs only when needed
+- Track costs transparently - no surprise bills
+- Smart suggestions for cheaper alternatives
 
 ### Power Users
-- Organize conversations by project or topic
-- Switch models based on task requirements
+- Access every AI model from one app
+- Compare responses across providers
+- Smart fallbacks when providers fail
+- Organize conversations by project
+- Full offline capability with local models
+
+### AI Experimenters
+- Test same prompt across multiple models
+- Compare quality, speed, and cost
+- Access latest cloud models (GPT-4, Claude 3.5, Gemini)
+- Run local models for experimentation
 - Access chat history for context and reference
 - Integrate with other local services
 

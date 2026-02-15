@@ -108,12 +108,7 @@ class _ComparisonChatScreenState extends State<ComparisonChatScreen> {
 
       _streamSubscription = stream.listen(
         (updatedConversation) {
-          if (!mounted) return;
-          setState(() {
-            _conversation = updatedConversation;
-            _messages = List.from(updatedConversation.messages);
-          });
-          _scrollToBottom();
+          _handleComparisonStreamUpdate(updatedConversation);
         },
         onError: (error) {
           if (!mounted) return;
@@ -147,6 +142,29 @@ class _ComparisonChatScreenState extends State<ComparisonChatScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  void _handleComparisonStreamUpdate(ComparisonConversation updatedConversation) {
+    if (!mounted) return;
+
+    try {
+      setState(() {
+        _conversation = updatedConversation;
+        _messages = List.from(updatedConversation.messages);
+      });
+      _scrollToBottom();
+    } catch (e, stackTrace) {
+      debugPrint('[ComparisonChatScreen] Stream update handling failed: $e');
+      debugPrint('$stackTrace');
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Runtime update error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 

@@ -1,34 +1,43 @@
 # Product Vision: Private Chat Hub
 
-**Document Version:** 1.0  
+**Document Version:** 2.0  
 **Created:** December 31, 2025  
-**Status:** Draft  
+**Last Updated:** January 26, 2026  
+**Status:** Active - Strategic Refocus  
 **Owner:** Product Team
 
 ---
 
 ## 🎯 Vision Statement
 
-**Private Chat Hub** empowers users to own their AI conversations by providing a seamless, privacy-first mobile experience for interacting with self-hosted AI models. Unlike cloud-dependent alternatives (ChatGPT, Claude), we put users in complete control of their data, conversations, and AI infrastructure.
+**Private Chat Hub** is a **unified AI chat platform** that gives users ultimate flexibility: chat with local on-device models, self-hosted infrastructure (Ollama), or cloud AI services (OpenAI, Anthropic, Google) - all from one privacy-focused mobile app. Unlike single-provider apps, we empower users to choose their preferred balance of privacy, performance, and cost.
+
+**Key Differentiator:** One app. Every AI model. Your choice. Full offline capability.
+
+---
 
 ## 💡 Value Proposition
 
 ### For Privacy-Conscious Users
-- **Complete Data Ownership**: All conversations stay on your devices and infrastructure
-- **Zero Cloud Dependencies**: No data sent to third-party services
+- **Complete Data Ownership**: Choose local/self-hosted models - conversations never leave your control
+- **Full Offline Mode**: Chat with on-device models anywhere, no internet required
 - **Export & Portability**: Own your chat history and move it anywhere
+- **Privacy by Choice**: Select privacy level per conversation (local → self-hosted → cloud)
 
 ### For AI Enthusiasts & Developers
-- **Model Flexibility**: Switch between models instantly, experiment freely; compare models side-by-side (v2)
-- **Self-Hosted Infrastructure**: Connect to your Ollama instance; extend with MCP servers (v2)
-- **Advanced Features**: Vision models, file context, tool calling (v2), extended reasoning models (v2)
-- **Resource Awareness**: Smart recommendations based on your hardware; performance metrics per model (v2)
+- **Universal Model Access**: Local (LiteRT), self-hosted (Ollama), cloud APIs (OpenAI, Anthropic, Google, Mistral)
+- **Model Comparison**: Test same prompt across providers, compare quality and speed
+- **Flexible Infrastructure**: Run models on-device, home server, or pay-per-use cloud
+- **Advanced Features**: Vision models, file context, tool calling, extended reasoning models
+- **Cost Optimization**: Smart routing to minimize cloud API costs; use free local models when appropriate
 
 ### For Power Users
 - **Organized Workspace**: Projects/spaces for topic-based conversations
 - **Context Management**: Use conversation history as context automatically
-- **Multi-Model Intelligence**: Compare responses from multiple models; let AI tools search the web (v2)
-- **Seamless Integration**: Use Android's native sharing for conversations; listen with TTS (v2); long-running tasks (v2)
+- **Multi-Model Intelligence**: Compare responses from multiple models; let AI tools search the web
+- **Seamless Integration**: Use Android's native sharing for conversations; listen with TTS; long-running tasks
+- **Smart Fallbacks**: If cloud API fails, automatically fall back to local model
+- **Offline-First**: Queue messages when offline, auto-send when connected
 
 ## 🎨 Product Principles
 
@@ -40,14 +49,18 @@
 
 ## 🌟 Key Differentiators
 
-| Feature | Private Chat Hub | ChatGPT/Claude Apps |
-|---------|------------------|---------------------|
-| Data Ownership | ✅ 100% User-Controlled | ❌ Cloud Storage |
-| Model Choice | ✅ Any Ollama Model | ❌ Provider-Locked |
-| Offline Capable | ✅ Works on Local Network | ❌ Internet Required |
-| Cost | ✅ Free (Your Hardware) | 💰 Subscription |
-| Privacy | ✅ Complete | ⚠️ Terms Apply |
-| Customization | ✅ Full Control | ⚠️ Limited |
+| Feature | Private Chat Hub | ChatGPT/Claude Apps | Jan.ai/LM Studio |
+|---------|------------------|---------------------|-------------------|
+| Model Choice | ✅ **Local + Self-Hosted + Cloud** | ❌ Provider-Locked | ⚠️ Local/Self-Hosted Only |
+| Offline Mode | ✅ Full (On-Device Models) | ❌ Internet Required | ✅ Limited (Desktop Only) |
+| Cloud APIs | ✅ OpenAI, Anthropic, Google, Mistral | ✅ Single Provider | ❌ None |
+| Mobile-First | ✅ Native Android | ✅ Native iOS/Android | ❌ Desktop Only |
+| Privacy Options | ✅ **3 Tiers** (Local/Self-Hosted/Cloud) | ❌ Cloud Only | ✅ Local Only |
+| Cost | ✅ **Flexible** (Free to Pay-Per-Use) | 💰 Subscription Required | ✅ Free (Hardware) |
+| Self-Hosted | ✅ Ollama Support | ❌ None | ✅ Multiple Backends |
+| Model Comparison | ✅ **Cross-Provider** (v2) | ❌ None | ⚠️ Local Models Only |
+
+**Unique Position:** We're the only mobile-first app supporting the **full spectrum** from on-device privacy to cloud convenience.
 
 ## 📊 Success Metrics
 
@@ -79,165 +92,274 @@
 
 ### Primary Personas
 
-**1. The Privacy Advocate** (30-45, Tech Literate)
-- Runs home servers and self-hosted services
-- Distrusts cloud AI services
-- Values complete control over data
-- Willing to invest in hardware
+**1. The Pragmatic Power User** (25-45, Tech Savvy)
+- Wants best-of-both-worlds: local privacy + cloud capabilities
+- Uses local models for personal data, cloud APIs for complex tasks
+- Values cost control and flexibility
+- Willing to manage multiple model sources
 
-**2. The AI Developer** (25-40, Professional Developer)
-- Experiments with LLMs and models
-- Needs flexible testing environment
-- Wants to integrate AI into workflows
-- Understands technical trade-offs
+**2. The Privacy Advocate** (30-50, Security-Conscious)
+- Prefers 100% local/self-hosted solutions
+- Runs home servers (Ollama, NAS)
+- Needs offline capability as backup
+- Values complete control over data flow
 
-**3. The Power User** (28-50, Early Adopter)
-- Uses AI daily for productivity
-- Concerned about subscription costs
-- Wants offline/local capabilities
-- Values customization and control
+**3. The Cost-Conscious Developer** (22-40, Budget-Aware)
+- Can't afford ChatGPT Plus subscription
+- Wants to experiment with multiple models
+- Uses free local models + pay-per-use cloud APIs
+- Needs to optimize costs per task
+
+**4. The AI Experimenter** (20-35, Early Adopter)
+- Tests different models for same prompts
+- Follows latest AI research and releases
+- Wants access to newest models (cloud + local)
+- Values comparison and benchmarking tools
 
 ### Secondary Personas
 
-**4. The Student Researcher** (18-28, Academic)
-- Learning about AI and LLMs
-- Limited budget for cloud services
-- Needs to experiment with different models
-- Values learning and exploration
+**5. The Mobile Professional** (28-50, On-The-Go Worker)
+- Needs AI assistance on mobile device
+- Wants offline capability during travel/commute
+- Prefers cloud for complex tasks, local for quick queries
+- Values Android integration (share, TTS)
 
-**5. The Enterprise User** (30-55, Corporate)
-- Cannot use cloud AI due to policies
-- Needs secure, compliant solutions
-- Requires audit trails and export
-- Budget for infrastructure
+**6. The Enterprise User** (30-55, Compliance-Focused)
+- Cannot use public cloud AI due to policies
+- Requires air-gapped or self-hosted options
+- Needs audit trails and complete data control
+- Budget for infrastructure, not subscriptions
 
 ## 🗺️ Product Roadmap
 
-### v1: MVP (Q1 2026) ✅
-**Goal**: Deliver core local chat experience
+### ✅ v1.0: Foundation (Q1 2026 - COMPLETED)
+**Goal**: Deliver hybrid local + remote (Ollama) chat experience
 
-- ✅ Connect to local Ollama instance
+- ✅ Connect to local Ollama instance (remote models)
+- ✅ On-device LLM support (LiteRT/Gemini Nano)
+- ✅ Unified model selection (local + remote)
+- ✅ Offline mode with message queueing
 - ✅ Basic text chat interface
-- ✅ Model selection and switching
 - ✅ Vision model support (image input)
 - ✅ File attachment as context
 - ✅ Model information and management
-- ✅ Basic settings and configuration
 
-### v1.1: Organization & Context (Q2 2026)
-**Goal**: Enable power users to organize and contextualize
+**Achievement**: Successfully delivered hybrid architecture with local and remote support.
 
-- Projects/Spaces for organized conversations
-- Context management from conversation history
-- Chat history management and search
-- Export functionality (JSON, Markdown, PDF)
-- Android native sharing integration
-- Conversation templates
+---
 
-### v2: Advanced AI & Integration (Q2-Q3 2026)
+### 🚀 v1.5: Cloud API Support (Q2 2026) - **IN PROGRESS**
+**Goal**: Transform into universal AI chat hub with cloud API support
+
+#### Phase 1A: Cloud Provider Integration (4-6 weeks)
+**Priority**: P0 - Strategic pivot
+
+**Core Infrastructure:**
+- 🔄 Abstract LLM provider interface (local, Ollama, cloud APIs)
+- 🔄 OpenAI API integration (GPT-4, GPT-4o, GPT-3.5)
+- 🔄 Anthropic API integration (Claude 3.5 Sonnet, Opus, Haiku)
+- 🔄 Google AI API integration (Gemini 1.5 Pro, Flash)
+- 🔄 Unified streaming interface across all providers
+- 🔄 Provider-specific error handling and rate limiting
+- 🔄 API key management (secure storage, per-provider)
+- 🔄 Provider selection UI in model picker
+- 🔄 Cost tracking per provider (token usage, estimated cost)
+
+**Smart Routing:**
+- 🔄 Automatic fallback chain (Cloud API → Ollama → Local)
+- 🔄 Provider health monitoring
+- 🔄 Offline queue for cloud API messages
+- 🔄 Model capability detection (vision, tools, context length)
+
+**Success Metrics:**
+- All 3 cloud providers working with streaming
+- API key setup < 3 minutes per provider
+- Provider failover < 2 seconds
+- 80%+ cloud API message success rate
+
+#### Phase 1B: Enhanced UX (2-3 weeks)
+**Priority**: P0 - User experience polish
+
+**Model Management:**
+- 🔄 Unified model list with provider badges (📱 Local, 🖥️ Ollama, ☁️ OpenAI, ☁️ Anthropic, ☁️ Google)
+- 🔄 Model capabilities display (context window, vision, tools, cost)
+- 🔄 Quick model switching (remember per-conversation)
+- 🔄 Model search and filtering
+- 🔄 Favorites and recents
+
+**Cost Awareness:**
+- 🔄 Token usage display per message
+- 🔄 Estimated cost per message (cloud APIs)
+- 🔄 Monthly cost tracking by provider
+- 🔄 Cost warnings and limits
+- 🔄 "Free alternative" suggestions (use local/Ollama instead)
+
+**Settings:**
+- 🔄 Provider priority preferences (prefer local/Ollama/cloud)
+- 🔄 Auto-fallback settings (enable/disable)
+- 🔄 API key management screen
+- 🔄 Cost limits per provider
+- 🔄 Token usage analytics
+
+**Success Metrics:**
+- Model switching < 2 taps
+- Cost visibility in 100% of cloud conversations
+- 60%+ users configure at least 2 providers
+
+---
+
+### v2.0: Advanced Intelligence (Q2-Q3 2026)
 **Goal**: Transform into comprehensive AI platform with tool calling, comparison, and native integration
 
-**Phase 1: Tool Calling (8-10 weeks)**
+**Phase 2A: Tool Calling (8-10 weeks)**
 - ✨ Tool calling framework (Web Search, MCP)
-- ✨ Web search integration with results
+- ✨ Web search integration with Jina AI
 - ✨ Tool error handling and fallbacks
-- ✨ Ollama function calling support
+- ✨ Ollama + Cloud API function calling support
+- ✨ MCP protocol support for Ollama
 
-**Phase 2: Model Comparison (6-8 weeks)**
-- ✨ Side-by-side model comparison chat
+**Phase 2B: Model Comparison (6-8 weeks)**
+- ✨ Side-by-side model comparison (any providers)
 - ✨ Parallel model requests (2-4 models)
 - ✨ Performance metrics per model
-- ✨ Model switching mid-conversation
+- ✨ Cost comparison across providers
+- ✨ Quality scoring (user ratings)
 
-**Phase 3: Native Android Integration (6-8 weeks)**
+**Phase 2C: Native Android Integration (4-6 weeks)**
 - ✨ Share intent (receive text & images from other apps)
 - ✨ Share conversations to other apps
 - ✨ Text-to-speech for AI responses
 - ✨ Clipboard quick actions
+- ✨ Notification actions
 
-**Phase 4: Thinking Models & Long-Running Tasks (8-10 weeks)**
+**Phase 2D: Thinking Models & Long Tasks (8-10 weeks)**
 - ✨ Extended reasoning model support
 - ✨ Multi-step task orchestration
 - ✨ Background task execution
-- ✨ Task progress tracking and templates
-
-**Phase 5: Remote MCP Integration (6-8 weeks)**
-- ✨ MCP server discovery and management
-- ✨ Dynamic tool invocation via MCP
-- ✨ Tool permissions and security
+- ✨ Task progress tracking
 
 **Release Target**: Q2-Q3 2026
 
-### v2.1+: Future Enhancements
+---
+
+### v2.1+: Organization & Polish (Q3-Q4 2026)
+**Goal**: Enterprise-ready features and power user workflows
+
+- Projects/Spaces for organized conversations
+- Context management from conversation history
+- Advanced search and filtering
+- Export functionality (JSON, Markdown, PDF)
+- Conversation templates and agents
 - Voice input (speech-to-text)
 - Scheduled/recurring tasks
-- Advanced analytics and insights
 - Custom agent creation (GPT-like)
-- Model performance benchmarking
+
+---
 
 ### Future Considerations (v3+)
-- Multi-device sync (local network)
-- API gateway support (LiteLLM, OpenRouter)
+- Additional cloud providers (Mistral AI, Cohere, Groq, Together AI)
+- API gateway support (LiteLLM, OpenRouter) for unified API access
+- Multi-device sync (encrypted, user-controlled)
 - Cloud backup (encrypted, user-controlled)
-- Desktop companion app
-- Collaborative spaces (local network)
-- Enterprise features (team management, audit logs)
+- Desktop companion app (Windows, Mac, Linux)
+- Collaborative spaces (local network or cloud)
+- Enterprise features (team management, audit logs, SSO)
+- Plugin/extension system for community tools
+- Model fine-tuning integration
 
 ## 🎬 Go-to-Market Strategy
 
 ### Launch Approach
-1. **Beta Program**: Target r/selfhosted, r/LocalLLaMA communities
-2. **Open Source**: Build in public, gather feedback early
-3. **Documentation**: Comprehensive setup guides for Ollama
-4. **Content Marketing**: Blog posts, tutorials, video guides
-5. **Community Building**: Discord, GitHub Discussions
+1. **Community Engagement**: Target r/selfhosted, r/LocalLLaMA, r/OpenAI, r/ClaudeAI communities
+2. **Multi-Channel Marketing**: Emphasize flexibility (local + cloud + self-hosted)
+3. **Open Source**: Build in public, gather feedback early
+4. **Documentation**: Comprehensive setup guides for all backends (Ollama, OpenAI, Anthropic, Google AI, LiteRT)
+5. **Content Marketing**: Blog posts comparing privacy/cost trade-offs, tutorials, video guides
+6. **Partnerships**: Collaborate with Ollama, LiteRT communities
 
 ### Distribution
 - **Google Play Store**: Primary distribution
-- **F-Droid**: Privacy-focused users
+- **F-Droid**: Privacy-focused users (remove cloud API code for F-Droid build)
 - **GitHub Releases**: Power users, beta testers
 - **Direct APK**: For enterprise and restricted environments
+
+### Positioning Strategy
+
+**Against ChatGPT/Claude Apps:**
+- "One app for all models - no vendor lock-in"
+- "Your data, your choice: local, self-hosted, or cloud"
+- "Save money with smart model routing"
+
+**Against Jan.ai/LM Studio:**
+- "Mobile-first with full offline capability"
+- "Best of both worlds: local privacy + cloud power"
+- "Access latest GPT-4, Claude 3.5 when you need them"
 
 ### Pricing Model
 - **Free & Open Source**: Core app always free
 - **Optional Pro Features** (Future):
-  - Cloud backup (encrypted)
-  - Advanced analytics
-  - Priority support
-  - Custom themes
+  - Advanced cost analytics and optimization
+  - Team spaces and collaboration
+  - Priority cloud API routing
+  - Advanced export formats
+  - Custom themes and UI
+- **Fair Use**: No artificial limitations on free tier
 
 ## 🔮 Long-Term Vision (2-3 years)
 
-**Private Chat Hub** becomes the **de facto standard** for private, self-hosted AI interactions on mobile. We envision:
+**Private Chat Hub** becomes the **universal AI interface** - a single app to chat with any AI model from any source. We envision:
 
-- **Platform Expansion**: iOS, desktop (Windows, Mac, Linux)
-- **Ecosystem**: Plugin system for community extensions
-- **Enterprise Edition**: Team features, admin controls, compliance tools
-- **AI Assistant OS**: Not just chat, but an AI-powered productivity platform
-- **Federated Network**: Secure sharing between Private Chat Hub users (optional)
+- **Platform Expansion**: iOS, desktop (Windows, Mac, Linux), web interface
+- **Universal API Gateway**: Built-in support for LiteLLM, OpenRouter for 100+ models
+- **Ecosystem**: Plugin system for community extensions and custom tools
+- **Enterprise Edition**: Team features, admin controls, compliance tools, SSO
+- **AI Router OS**: Not just chat, but an intelligent routing layer that automatically selects optimal model per task
+- **Federated Network**: Secure sharing between Private Chat Hub users (optional, privacy-preserved)
+- **Model Marketplace**: Discover and connect to community-hosted models
+
+**Ultimate Goal**: Every user has access to every AI model (local, self-hosted, cloud) through one beautifully designed, privacy-respecting mobile app.
 
 ---
 
 ## 📋 Related Documents
 
-### v1 Documentation
-- [PRODUCT_REQUIREMENTS.md](PRODUCT_REQUIREMENTS.md) - v1 functional requirements
-- [USER_PERSONAS.md](USER_PERSONAS.md) - Complete user persona definitions
-- [USER_STORIES_MVP.md](USER_STORIES_MVP.md) - MVP user stories with acceptance criteria
+### Core Planning (Updated for v1.5)
+- [PRODUCT_REQUIREMENTS_V1.5.md](PRODUCT_REQUIREMENTS_V1.5.md) - **NEW**: Cloud API integration requirements
+- [ARCHITECTURE_CLOUD_API_INTEGRATION.md](ARCHITECTURE_CLOUD_API_INTEGRATION.md) - **NEW**: Cloud provider architecture
+- [PRODUCT_ROADMAP_V1.5.md](PRODUCT_ROADMAP_V1.5.md) - **NEW**: Detailed v1.5 roadmap and timelines
 
-### v2 Planning (NEW)
-- [PRODUCT_ROADMAP_V2.md](PRODUCT_ROADMAP_V2.md) - Complete v2 roadmap with 5 phases, timelines, and architecture
-- [USER_STORIES_V2.md](USER_STORIES_V2.md) - 26 user stories with detailed acceptance criteria
-- [REQUIREMENTS_V2.md](REQUIREMENTS_V2.md) - Functional and non-functional requirements for v2
-- [V2_PLANNING_QUICK_REFERENCE.md](V2_PLANNING_QUICK_REFERENCE.md) - Quick reference guide and next steps
+### v1 Documentation (Baseline)
+- [PRODUCT_REQUIREMENTS.md](PRODUCT_REQUIREMENTS.md) - v1 functional requirements (Ollama + LiteRT)
+- [ARCHITECTURE_LOCAL_REMOTE_MODEL_SYSTEM.md](ARCHITECTURE_LOCAL_REMOTE_MODEL_SYSTEM.md) - v1 architecture (local + Ollama)
+- [USER_PERSONAS.md](USER_PERSONAS.md) - Original user personas (needs update for cloud users)
+- [USER_STORIES_MVP.md](USER_STORIES_MVP.md) - v1 user stories
 
-### Architecture
-- [ARCHITECTURE_DECISIONS.md](ARCHITECTURE_DECISIONS.md) - v1 technical decisions
+### v2 Planning (Future)
+- [PRODUCT_ROADMAP_V2.md](PRODUCT_ROADMAP_V2.md) - Complete v2 roadmap (tool calling, comparison, etc.)
+- [USER_STORIES_V2.md](USER_STORIES_V2.md) - v2 user stories
+- [REQUIREMENTS_V2.md](REQUIREMENTS_V2.md) - v2 functional requirements
+
+### Documentation Status
+
+**🔄 Needs Updating for v1.5:**
+- USER_PERSONAS.md - Add cloud API personas
+- ARCHITECTURE_DECISIONS.md - Document cloud provider decisions
+- UX_DESIGN_LOCAL_REMOTE_MODEL_SYSTEM.md - Update to include cloud providers
+
+**✅ To Be Created:**
+- PRODUCT_REQUIREMENTS_V1.5.md
+- ARCHITECTURE_CLOUD_API_INTEGRATION.md
+- PRODUCT_ROADMAP_V1.5.md
+- USER_STORIES_V1.5.md
+- UX_DESIGN_CLOUD_API.md
 
 ---
 
 **Next Steps:**
-1. Review and validate with stakeholders
-2. Prioritize MVP features with development team
-3. Create detailed user stories for Phase 1
-4. Begin technical architecture planning
+1. ✅ Update PRODUCT_VISION.md with cloud API strategy (COMPLETED)
+2. 🔄 Create PRODUCT_REQUIREMENTS_V1.5.md with cloud API requirements
+3. 🔄 Create ARCHITECTURE_CLOUD_API_INTEGRATION.md with provider abstraction design
+4. 🔄 Create PRODUCT_ROADMAP_V1.5.md with detailed timelines
+5. 🔄 Update USER_PERSONAS.md with cloud-focused personas
+6. 🔄 Create USER_STORIES_V1.5.md for cloud API features
+7. 🔄 Archive/deprecate outdated v2 planning documents that conflict with v1.5
