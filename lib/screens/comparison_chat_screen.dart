@@ -145,7 +145,9 @@ class _ComparisonChatScreenState extends State<ComparisonChatScreen> {
     }
   }
 
-  void _handleComparisonStreamUpdate(ComparisonConversation updatedConversation) {
+  void _handleComparisonStreamUpdate(
+    ComparisonConversation updatedConversation,
+  ) {
     if (!mounted) return;
 
     try {

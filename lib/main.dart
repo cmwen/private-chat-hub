@@ -63,12 +63,15 @@ void main() {
     return true;
   };
 
-  runZonedGuarded(() async {
-    await _bootstrapApp();
-  }, (Object error, StackTrace stackTrace) {
-    debugPrint('[GlobalError] Unhandled zoned error: $error');
-    debugPrint('$stackTrace');
-  });
+  runZonedGuarded(
+    () async {
+      await _bootstrapApp();
+    },
+    (Object error, StackTrace stackTrace) {
+      debugPrint('[GlobalError] Unhandled zoned error: $error');
+      debugPrint('$stackTrace');
+    },
+  );
 }
 
 /// The root widget of the application.
