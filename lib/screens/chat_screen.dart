@@ -114,13 +114,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() => _isLoading = true);
       _streamSubscription = activeStream.listen(
         (updatedConversation) {
-          if (!mounted) return;
-          setState(() {
-            _conversation = updatedConversation;
-            _messages = List.from(updatedConversation.messages);
-          });
-          _scrollToBottom();
-          _handleTtsStreaming(updatedConversation);
+          _handleConversationStreamUpdate(updatedConversation);
         },
         onError: (error) {
           if (!mounted) return;
@@ -296,13 +290,7 @@ class _ChatScreenState extends State<ChatScreen> {
           .sendMessage(_conversation!.id, text)
           .listen(
             (updatedConversation) {
-              if (!mounted) return;
-              setState(() {
-                _conversation = updatedConversation;
-                _messages = List.from(updatedConversation.messages);
-              });
-              _scrollToBottom();
-              _handleTtsStreaming(updatedConversation);
+              _handleConversationStreamUpdate(updatedConversation);
             },
             onError: (error) {
               if (!mounted) return;
@@ -553,13 +541,7 @@ class _ChatScreenState extends State<ChatScreen> {
           .sendMessageWithContext(_conversation!.id)
           .listen(
             (updatedConversation) {
-              if (!mounted) return;
-              setState(() {
-                _conversation = updatedConversation;
-                _messages = List.from(updatedConversation.messages);
-              });
-              _scrollToBottom();
-              _handleTtsStreaming(updatedConversation);
+              _handleConversationStreamUpdate(updatedConversation);
             },
             onError: (error) {
               if (!mounted) return;
@@ -633,19 +615,65 @@ class _ChatScreenState extends State<ChatScreen> {
           newContent.endsWith('!') ||
           newContent.endsWith('?')) {
         _lastSpokenText = lastMessage.text;
-        _ttsService.speak(newContent, messageId: lastMessage.id);
+        unawaited(
+          _ttsService
+              .speak(newContent, messageId: lastMessage.id)
+              .catchError((Object error, StackTrace stackTrace) {
+                // ignore: avoid_print
+                print('[ChatScreen] TTS streaming speak failed: $error');
+                // ignore: avoid_print
+                print('$stackTrace');
+                return false;
+              }),
+        );
       }
     } else if (_lastSpokenText == null || _lastSpokenText!.isEmpty) {
       // First chunk of text
       _lastSpokenText = lastMessage.text;
       if (lastMessage.text.isNotEmpty) {
-        _ttsService.speak(lastMessage.text, messageId: lastMessage.id);
+        unawaited(
+          _ttsService
+              .speak(lastMessage.text, messageId: lastMessage.id)
+              .catchError((Object error, StackTrace stackTrace) {
+                // ignore: avoid_print
+                print('[ChatScreen] Initial TTS speak failed: $error');
+                // ignore: avoid_print
+                print('$stackTrace');
+                return false;
+              }),
+        );
       }
     }
 
     // Reset when message is no longer streaming
     if (!lastMessage.isStreaming && _lastSpokenText != null) {
       _lastSpokenText = null;
+    }
+  }
+
+  void _handleConversationStreamUpdate(Conversation updatedConversation) {
+    if (!mounted) return;
+
+    try {
+      setState(() {
+        _conversation = updatedConversation;
+        _messages = List.from(updatedConversation.messages);
+      });
+      _scrollToBottom();
+      _handleTtsStreaming(updatedConversation);
+    } catch (e, stackTrace) {
+      // ignore: avoid_print
+      print('[ChatScreen] Stream update handling failed: $e');
+      // ignore: avoid_print
+      print('$stackTrace');
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Runtime update error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 

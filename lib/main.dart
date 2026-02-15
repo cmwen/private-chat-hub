@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:private_chat_hub/models/comparison_conversation.dart';
 import 'package:private_chat_hub/models/conversation.dart';
@@ -21,7 +23,7 @@ import 'package:private_chat_hub/services/tool_config_service.dart';
 import 'package:private_chat_hub/services/tool_executor_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() async {
+Future<void> _bootstrapApp() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize services
@@ -42,6 +44,31 @@ void main() async {
   runApp(
     MyApp(storageService: storageService, toolConfigService: toolConfigService),
   );
+}
+
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    Zone.current.handleUncaughtError(
+      details.exception,
+      details.stack ?? StackTrace.current,
+    );
+  };
+
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stackTrace) {
+    debugPrint('[GlobalError] Unhandled platform error: $error');
+    debugPrint('$stackTrace');
+    return true;
+  };
+
+  runZonedGuarded(() async {
+    await _bootstrapApp();
+  }, (Object error, StackTrace stackTrace) {
+    debugPrint('[GlobalError] Unhandled zoned error: $error');
+    debugPrint('$stackTrace');
+  });
 }
 
 /// The root widget of the application.
