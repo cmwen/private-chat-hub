@@ -1,9 +1,12 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 /// Service for managing local notifications in the app.
 ///
 /// Handles notification setup, display, and interaction for background tasks.
-class NotificationService {
+/// Only shows notifications when the app is in the background or the
+/// user is not currently viewing the conversation that completed.
+class NotificationService with WidgetsBindingObserver {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
@@ -20,6 +23,23 @@ class NotificationService {
 
   // Maximum length for notification preview text
   static const int _maxPreviewLength = 100;
+
+  // App lifecycle tracking
+  bool _isAppInForeground = true;
+
+  // The conversation ID the user is currently viewing (null if not in a chat)
+  String? _activeConversationId;
+
+  /// Whether the app is currently in the foreground.
+  bool get isAppInForeground => _isAppInForeground;
+
+  /// Set the conversation ID the user is currently viewing.
+  void setActiveConversation(String? conversationId) {
+    _activeConversationId = conversationId;
+  }
+
+  /// Get the currently active conversation ID.
+  String? get activeConversationId => _activeConversationId;
 
   /// Gets the conversation ID if the app was opened from a notification.
   String? get conversationIdFromNotification => _conversationIdFromNotification;
@@ -43,7 +63,15 @@ class NotificationService {
       onDidReceiveNotificationResponse: _onNotificationTapped,
     );
 
+    // Register for app lifecycle events
+    WidgetsBinding.instance.addObserver(this);
+
     _initialized = true;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _isAppInForeground = state == AppLifecycleState.resumed;
   }
 
   /// Handle notification tap events.
@@ -69,6 +97,9 @@ class NotificationService {
   }
 
   /// Show a notification when an AI response is complete.
+  ///
+  /// Only shows the notification if the app is in the background or the user
+  /// is not currently viewing the conversation that completed.
   Future<void> showResponseCompleteNotification({
     required String conversationId,
     required String conversationTitle,
@@ -76,6 +107,11 @@ class NotificationService {
   }) async {
     if (!_initialized) {
       await initialize();
+    }
+
+    // Skip notification if user is currently viewing this conversation
+    if (_isAppInForeground && _activeConversationId == conversationId) {
+      return;
     }
 
     // Get or assign a unique notification ID for this conversation

@@ -7,6 +7,7 @@ import 'package:private_chat_hub/models/message.dart';
 import 'package:private_chat_hub/models/tool_models.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connectivity_service.dart';
+import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/tts_service.dart';
 import 'package:private_chat_hub/widgets/capability_widgets.dart';
 import 'package:private_chat_hub/widgets/message_bubble.dart';
@@ -62,6 +63,8 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {});
       }
     });
+    // Mark this conversation as active so notifications are suppressed
+    NotificationService().setActiveConversation(_conversation?.id);
     _loadMessages();
     _setupConnectivityListener();
     _setupQueueListener();
@@ -73,6 +76,8 @@ class _ChatScreenState extends State<ChatScreen> {
     super.didUpdateWidget(oldWidget);
     if (widget.conversation?.id != oldWidget.conversation?.id) {
       _conversation = widget.conversation;
+      // Update active conversation for notification suppression
+      NotificationService().setActiveConversation(_conversation?.id);
       _loadMessages();
       _setupQueueListener();
       _setupConversationUpdatesListener();
@@ -81,6 +86,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    // Clear active conversation so notifications resume
+    NotificationService().setActiveConversation(null);
     _scrollController.dispose();
     _ttsService.dispose();
     // Don't cancel the stream - let it continue in the background

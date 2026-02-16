@@ -750,13 +750,10 @@ class ChatService {
       return;
     }
 
-    // Check inference mode - route to on-device if explicitly enabled
-    if (currentInferenceMode == InferenceMode.onDevice &&
-        _onDeviceLLMService != null) {
-      _log('Using on-device inference mode (explicitly enabled)');
-      yield* _sendMessageOnDevice(conversationId, text);
-      return;
-    }
+    // NOTE: When inference mode is onDevice but the conversation uses a
+    // remote (Ollama) model, respect the model selection and use Ollama.
+    // The inference mode only affects the *default* model selection, not
+    // override an explicitly chosen remote model.
 
     // Check if offline - try on-device fallback before queueing
     if (!isOnline) {
@@ -913,15 +910,19 @@ class ChatService {
         .toList();
 
     // Start on-device generation in background so stream subscribers
-    // receive token updates in real time.
+    // receive token updates in real time (when streaming is enabled).
     () async {
       try {
         final buffer = StringBuffer();
         var chunkCount = 0;
         final generationStartedAt = DateTime.now();
 
+        // Respect the streaming mode setting
+        final streamingEnabled = await _configService.getStreamEnabled();
+
         _log(
-          'Starting on-device streaming generation: model=$onDeviceModelId, '
+          'Starting on-device generation: model=$onDeviceModelId, '
+          'streamingEnabled=$streamingEnabled, '
           'promptLength=${text.length}, historyCount=${conversationHistory.length}',
         );
 
@@ -944,15 +945,18 @@ class ChatService {
             );
           }
 
-          conversation = await _updateAssistantMessage(
-            conversation,
-            assistantMessageId,
-            buffer.toString(),
-            isStreaming: true,
-          );
+          // Only push incremental updates when streaming mode is enabled
+          if (streamingEnabled) {
+            conversation = await _updateAssistantMessage(
+              conversation,
+              assistantMessageId,
+              buffer.toString(),
+              isStreaming: true,
+            );
 
-          if (!streamController.isClosed) {
-            streamController.add(conversation);
+            if (!streamController.isClosed) {
+              streamController.add(conversation);
+            }
           }
         }
 
@@ -1065,18 +1069,9 @@ class ChatService {
       return;
     }
 
-    if (currentInferenceMode == InferenceMode.onDevice &&
-        _onDeviceLLMService != null) {
-      _log(
-        'Routing sendMessageWithContext to on-device inference (onDevice mode enabled)',
-      );
-      yield* _sendMessageOnDevice(
-        conversationId,
-        lastUserText(conversation),
-        addUserMessage: false,
-      );
-      return;
-    }
+    // NOTE: When inference mode is onDevice but the conversation uses a
+    // remote (Ollama) model, respect the model selection and use Ollama.
+    // The inference mode only affects the *default* model selection.
 
     // If not online, queue the last user message and return
     if (!isOnline) {
