@@ -14,32 +14,26 @@
     Documentation: https://developer.android.com/training/articles/security-config
 -->
 <network-security-config>
-    <!-- Base configuration for all connections -->
-    <base-config cleartextTrafficPermitted="false">
+    <!-- 
+        Base configuration: allow cleartext (HTTP) traffic.
+        
+        This app connects to user-configured self-hosted Ollama servers
+        that typically run on LAN over HTTP. Blocking cleartext would
+        prevent connections to any non-HTTPS server on a physical device.
+        
+        For production apps with fixed HTTPS endpoints, change this to false.
+    -->
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <!-- Trust system CAs -->
             <certificates src="system"/>
         </trust-anchors>
     </base-config>
 
-    <!-- Development-only exceptions for local testing -->
-    <!-- Remove or modify for production builds if needed -->
-    <domain-config cleartextTrafficPermitted="true">
-        <!-- Local development server -->
-        <domain includeSubdomains="true">localhost</domain>
-        <!-- Android emulator host (maps to your computer's localhost) -->
-        <domain includeSubdomains="true">10.0.2.2</domain>
-        <!-- 
-            For physical device testing on local network, add your 
-            development server's IP address or hostname here, e.g.:
-            <domain includeSubdomains="true">192.168.1.100</domain>
-        -->
-    </domain-config>
-
     <!-- 
-        To allow cleartext for specific domains (not recommended):
+        To restrict cleartext to specific domains only:
         <domain-config cleartextTrafficPermitted="true">
-            <domain includeSubdomains="true">example.com</domain>
+            <domain includeSubdomains="true">your-server.local</domain>
         </domain-config>
     -->
 </network-security-config>

@@ -24,8 +24,6 @@ import 'package:private_chat_hub/services/tool_executor_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> _bootstrapApp() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
   // Initialize services
   final storageService = StorageService();
   await storageService.init();
@@ -47,23 +45,22 @@ Future<void> _bootstrapApp() async {
 }
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FlutterError.presentError(details);
-    Zone.current.handleUncaughtError(
-      details.exception,
-      details.stack ?? StackTrace.current,
-    );
-  };
-
-  PlatformDispatcher.instance.onError = (Object error, StackTrace stackTrace) {
-    debugPrint('[GlobalError] Unhandled platform error: $error');
-    debugPrint('$stackTrace');
-    return true;
-  };
-
   runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details);
+      debugPrint('[FlutterError] ${details.exception}');
+      debugPrint('${details.stack}');
+    };
+
+    PlatformDispatcher.instance.onError =
+        (Object error, StackTrace stackTrace) {
+      debugPrint('[GlobalError] Unhandled platform error: $error');
+      debugPrint('$stackTrace');
+      return true;
+    };
+
     await _bootstrapApp();
   }, (Object error, StackTrace stackTrace) {
     debugPrint('[GlobalError] Unhandled zoned error: $error');

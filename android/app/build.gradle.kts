@@ -135,7 +135,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     // LiteRT-LM Kotlin API + native runtime
-    implementation("com.google.ai.edge.litertlm:litertlm-android:latest.release")
+    // Pinned version — update manually when upgrading.
+    // To find newer versions: https://maven.google.com/web/index.html (search litertlm)
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.9.0-alpha03")
 }
 
 // Force JVM 17 for all dependency projects
