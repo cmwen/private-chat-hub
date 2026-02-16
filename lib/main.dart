@@ -45,27 +45,30 @@ Future<void> _bootstrapApp() async {
 }
 
 void main() {
-  runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
 
-    FlutterError.onError = (FlutterErrorDetails details) {
-      FlutterError.presentError(details);
-      debugPrint('[FlutterError] ${details.exception}');
-      debugPrint('${details.stack}');
-    };
+      FlutterError.onError = (FlutterErrorDetails details) {
+        FlutterError.presentError(details);
+        debugPrint('[FlutterError] ${details.exception}');
+        debugPrint('${details.stack}');
+      };
 
-    PlatformDispatcher.instance.onError =
-        (Object error, StackTrace stackTrace) {
-      debugPrint('[GlobalError] Unhandled platform error: $error');
+      PlatformDispatcher.instance.onError =
+          (Object error, StackTrace stackTrace) {
+            debugPrint('[GlobalError] Unhandled platform error: $error');
+            debugPrint('$stackTrace');
+            return true;
+          };
+
+      await _bootstrapApp();
+    },
+    (Object error, StackTrace stackTrace) {
+      debugPrint('[GlobalError] Unhandled zoned error: $error');
       debugPrint('$stackTrace');
-      return true;
-    };
-
-    await _bootstrapApp();
-  }, (Object error, StackTrace stackTrace) {
-    debugPrint('[GlobalError] Unhandled zoned error: $error');
-    debugPrint('$stackTrace');
-  });
+    },
+  );
 }
 
 /// The root widget of the application.

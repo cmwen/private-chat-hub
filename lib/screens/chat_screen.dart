@@ -616,15 +616,16 @@ class _ChatScreenState extends State<ChatScreen> {
           newContent.endsWith('?')) {
         _lastSpokenText = lastMessage.text;
         unawaited(
-          _ttsService
-              .speak(newContent, messageId: lastMessage.id)
-              .catchError((Object error, StackTrace stackTrace) {
-                // ignore: avoid_print
-                print('[ChatScreen] TTS streaming speak failed: $error');
-                // ignore: avoid_print
-                print('$stackTrace');
-                return false;
-              }),
+          _ttsService.speak(newContent, messageId: lastMessage.id).catchError((
+            Object error,
+            StackTrace stackTrace,
+          ) {
+            // ignore: avoid_print
+            print('[ChatScreen] TTS streaming speak failed: $error');
+            // ignore: avoid_print
+            print('$stackTrace');
+            return false;
+          }),
         );
       }
     } else if (_lastSpokenText == null || _lastSpokenText!.isEmpty) {
