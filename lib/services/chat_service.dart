@@ -1073,8 +1073,18 @@ class ChatService {
     // remote (Ollama) model, respect the model selection and use Ollama.
     // The inference mode only affects the *default* model selection.
 
-    // If not online, queue the last user message and return
+    // If not online, try on-device fallback before queueing
     if (!isOnline) {
+      if (_onDeviceLLMService != null && await isOnDeviceAvailable()) {
+        _log('Ollama offline in sendMessageWithContext: falling back to on-device inference');
+        yield* _sendMessageOnDevice(
+          conversationId,
+          lastUserText(conversation),
+          addUserMessage: false,
+        );
+        return;
+      }
+
       final lastUserMessage = conversation.messages.lastWhere(
         (m) => m.role == MessageRole.user,
         orElse: () => Message.user(id: '', text: '', timestamp: DateTime.now()),

@@ -8,13 +8,11 @@ import 'package:private_chat_hub/screens/on_device_models_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/inference_config_service.dart';
-import 'package:private_chat_hub/services/litert_platform_channel.dart';
-import 'package:private_chat_hub/services/llm_service.dart';
 import 'package:private_chat_hub/services/network_discovery_service.dart';
+import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:private_chat_hub/services/tool_config_service.dart';
-import 'package:private_chat_hub/widgets/inference_settings_widget.dart';
 import 'package:private_chat_hub/widgets/litert_model_settings_widget.dart';
 import 'package:private_chat_hub/widgets/tool_settings_widget.dart';
 
@@ -55,13 +53,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _streamingEnabled = true;
   int _timeout = OllamaConfigService.defaultTimeout;
   final OllamaConfigService _ollamaConfigService = OllamaConfigService();
-  final LiteRTPlatformChannel _liteRTPlatformChannel = LiteRTPlatformChannel();
-
-  // Inference mode state
-  InferenceMode _inferenceMode = InferenceMode.remote;
-  bool _isOnDeviceSupported = true;
-  List<String> _onDeviceUnsupportedReasons = [];
-  List<String> _onDeviceWarnings = [];
+  final NotificationService _notificationService = NotificationService();
+  NotificationMode _notificationMode = NotificationMode.smart;
 
   @override
   void initState() {
@@ -71,76 +64,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadAppVersion();
     _loadStreamingPreference();
     _loadTimeout();
-    _loadInferenceMode();
-    _loadOnDeviceReadiness();
+    _loadNotificationMode();
   }
 
-  Future<void> _loadOnDeviceReadiness() async {
-    if (widget.inferenceConfigService == null) return;
-
-    try {
-      final readiness = await _liteRTPlatformChannel.getReadinessReport();
-      if (!mounted) return;
-
-      setState(() {
-        _isOnDeviceSupported = readiness['isSupported'] as bool? ?? false;
-        _onDeviceUnsupportedReasons =
-            (readiness['unsupportedReasons'] as List<dynamic>? ?? [])
-                .whereType<String>()
-                .toList();
-        _onDeviceWarnings = (readiness['warnings'] as List<dynamic>? ?? [])
-            .whereType<String>()
-            .toList();
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _isOnDeviceSupported = false;
-        _onDeviceUnsupportedReasons = ['Failed to detect device capabilities'];
-        _onDeviceWarnings = [];
-      });
-    }
+  Future<void> _loadNotificationMode() async {
+    await _notificationService.initialize();
+    if (!mounted) return;
+    setState(() {
+      _notificationMode = _notificationService.notificationMode;
+    });
   }
 
-  Future<void> _loadInferenceMode() async {
-    if (widget.inferenceConfigService != null) {
-      setState(() {
-        _inferenceMode = widget.inferenceConfigService!.inferenceMode;
-      });
-    }
-  }
-
-  Future<void> _setInferenceMode(InferenceMode mode) async {
-    if (mode == InferenceMode.onDevice && !_isOnDeviceSupported) {
-      if (mounted) {
-        final reason = _onDeviceUnsupportedReasons.isNotEmpty
-            ? _onDeviceUnsupportedReasons.first
-            : 'This device does not meet on-device inference requirements';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('On-device mode unavailable: $reason')),
-        );
-      }
-      return;
-    }
-
-    if (widget.inferenceConfigService != null) {
-      await widget.inferenceConfigService!.setInferenceMode(mode);
-      setState(() {
-        _inferenceMode = mode;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              mode == InferenceMode.onDevice
-                  ? 'Default routing set to on-device (local models always stay on-device)'
-                  : 'Default routing set to remote Ollama (local models still run on-device)',
-            ),
-          ),
-        );
-      }
-    }
+  Future<void> _setNotificationMode(NotificationMode mode) async {
+    await _notificationService.setNotificationMode(mode);
+    setState(() {
+      _notificationMode = mode;
+    });
   }
 
   void _openOnDeviceModelsScreen() {
@@ -319,13 +258,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    'Ollama Connections',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
+                // ── Ollama Connections ──────────────────────────────
+                _SectionHeader(title: 'Ollama Connections'),
                 if (_connections.isEmpty)
                   Card(
                     margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -381,236 +315,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       label: const Text('Add Connection'),
                     ),
                   ),
-                const SizedBox(height: 32),
-                const Divider(),
-                // On-Device Models Section - Always visible
+                const Divider(height: 32),
+
+                // ── On-Device Models ───────────────────────────────
                 if (widget.inferenceConfigService != null) ...[
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'Inference Routing',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  InferenceModeSelector(
-                    currentMode: _inferenceMode,
-                    onModeChanged: _setInferenceMode,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'How routing works',
-                              style: Theme.of(context).textTheme.titleSmall
-                                  ?.copyWith(fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '• Selecting a local model (prefixed with local:) always uses on-device inference.\n'
-                              '• The setting below controls the default route for non-local models.\n'
-                              '• If Ollama is unavailable, the app may still fall back to on-device when possible.',
-                              style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (!_isOnDeviceSupported)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Card(
-                        color: Theme.of(context).colorScheme.errorContainer,
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(
-                                Icons.warning_amber_rounded,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onErrorContainer,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _onDeviceUnsupportedReasons.isNotEmpty
-                                      ? _onDeviceUnsupportedReasons.first
-                                      : 'On-device mode is not supported on this device.',
-                                  style: TextStyle(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onErrorContainer,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (_isOnDeviceSupported && _onDeviceWarnings.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Card(
-                        color: Theme.of(context).colorScheme.secondaryContainer,
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(
-                                Icons.info_outline,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSecondaryContainer,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _onDeviceWarnings.first,
-                                  style: TextStyle(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSecondaryContainer,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 12),
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'On-Device Models (LiteRT)',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                  _SectionHeader(title: 'On-Device Models'),
                   ListTile(
-                    leading: const Icon(Icons.download),
+                    leading: const Icon(Icons.phone_android),
                     title: const Text('Manage On-Device Models'),
                     subtitle: const Text(
-                      'Download and manage local LiteRT-LM models for offline use',
+                      'Download local models for offline use',
                     ),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: _openOnDeviceModelsScreen,
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: ExpansionTile(
-                      tilePadding: const EdgeInsets.symmetric(horizontal: 8),
-                      childrenPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.tune),
-                      title: const Text('On-device generation parameters'),
-                      subtitle: const Text(
-                        'Applies to LiteRT local model inference',
-                      ),
-                      children: [
-                        LiteRTModelSettingsWidget(
-                          configService: widget.inferenceConfigService!,
-                          onDeviceLLMService: widget.onDeviceLLMService,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: ExpansionTile(
-                      tilePadding: const EdgeInsets.symmetric(horizontal: 8),
-                      childrenPadding: const EdgeInsets.only(
-                        left: 12,
-                        right: 12,
-                        bottom: 12,
-                      ),
-                      leading: const Icon(Icons.cloud_outlined),
-                      title: const Text('Remote generation parameters'),
-                      subtitle: const Text(
-                        'Applies to Ollama; separate from LiteRT settings',
-                      ),
-                      children: [
-                        Text(
-                          'Remote (Ollama) models use server-side model configuration and per-chat parameters. '
-                          'These are independent from the LiteRT sliders above.',
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(),
-                ],
-                if (widget.chatService != null) ...[
-                  const Padding(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
-                      'AI Features',
+                      'Local models run on-device automatically. '
+                      'When Ollama is offline, on-device models are used as a fallback.',
                       style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.stream),
-                    title: const Text('Streaming Mode'),
-                    subtitle: Text(
-                      _streamingEnabled
-                          ? 'Responses stream in real-time (may cause more UI updates)'
-                          : 'Responses load all at once (reduces UI pressure)',
-                    ),
-                    trailing: Switch(
-                      value: _streamingEnabled,
-                      onChanged: _setStreamingPreference,
-                    ),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.schedule),
-                    title: const Text('Request Timeout'),
-                    subtitle: Text(
-                      '$_timeout seconds (${_getTimeoutLabel(_timeout)})',
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: _showTimeoutDialog,
-                  ),
-                  if (widget.toolConfigService != null)
-                    ToolSettingsWidget(
-                      config: _toolConfig,
-                      onConfigChanged: _saveToolConfig,
-                    ),
-                  const Divider(),
+                  const Divider(height: 32),
                 ],
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    'Appearance',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+
+                // ── Chat Settings ──────────────────────────────────
+                _SectionHeader(title: 'Chat'),
+                ListTile(
+                  leading: const Icon(Icons.stream),
+                  title: const Text('Streaming Mode'),
+                  subtitle: Text(
+                    _streamingEnabled
+                        ? 'Responses appear word-by-word'
+                        : 'Responses appear all at once',
+                  ),
+                  trailing: Switch(
+                    value: _streamingEnabled,
+                    onChanged: _setStreamingPreference,
                   ),
                 ),
                 ListTile(
+                  leading: const Icon(Icons.notifications_outlined),
+                  title: const Text('Notifications'),
+                  subtitle: Text(_notificationModeLabel(_notificationMode)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _showNotificationModeDialog,
+                ),
+                const Divider(height: 32),
+
+                // ── Appearance ─────────────────────────────────────
+                _SectionHeader(title: 'Appearance'),
+                ListTile(
                   leading: const Icon(Icons.palette_outlined),
-                  title: const Text('Theme Mode'),
+                  title: const Text('Theme'),
                   subtitle: Text(
                     _getThemeModeLabel(
                       widget.currentThemeMode ?? ThemeMode.system,
@@ -619,7 +380,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _showThemeModeDialog,
                 ),
-                const Divider(),
+                const Divider(height: 32),
+
+                // ── Advanced ───────────────────────────────────────
+                Theme(
+                  data: Theme.of(context).copyWith(
+                    dividerColor: Colors.transparent,
+                  ),
+                  child: ExpansionTile(
+                    leading: const Icon(Icons.tune),
+                    title: const Text(
+                      'Advanced',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    childrenPadding: EdgeInsets.zero,
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.schedule),
+                        title: const Text('Request Timeout'),
+                        subtitle: Text(
+                          '$_timeout seconds (${_getTimeoutLabel(_timeout)})',
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: _showTimeoutDialog,
+                      ),
+                      if (widget.toolConfigService != null)
+                        ToolSettingsWidget(
+                          config: _toolConfig,
+                          onConfigChanged: _saveToolConfig,
+                        ),
+                      if (widget.inferenceConfigService != null) ...[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: ExpansionTile(
+                            tilePadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                            ),
+                            childrenPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.memory),
+                            title: const Text(
+                              'On-device generation parameters',
+                            ),
+                            subtitle: const Text(
+                              'Temperature, top-k, top-p, etc.',
+                            ),
+                            children: [
+                              LiteRTModelSettingsWidget(
+                                configService:
+                                    widget.inferenceConfigService!,
+                                onDeviceLLMService:
+                                    widget.onDeviceLLMService,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const Divider(height: 32),
+
+                // ── About ──────────────────────────────────────────
                 ListTile(
                   leading: const Icon(Icons.info_outline),
                   title: const Text('About'),
@@ -640,8 +464,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     );
                   },
                 ),
+                const SizedBox(height: 32),
               ],
             ),
+    );
+  }
+
+  String _notificationModeLabel(NotificationMode mode) {
+    switch (mode) {
+      case NotificationMode.smart:
+        return 'Only when not viewing the chat';
+      case NotificationMode.always:
+        return 'Always notify';
+      case NotificationMode.never:
+        return 'Off';
+    }
+  }
+
+  void _showNotificationModeDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Notifications'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _NotificationModeOption(
+              title: 'Smart',
+              subtitle: 'Only when you\'re not watching the response',
+              value: NotificationMode.smart,
+              groupValue: _notificationMode,
+              onTap: () {
+                _setNotificationMode(NotificationMode.smart);
+                Navigator.pop(dialogContext);
+              },
+            ),
+            _NotificationModeOption(
+              title: 'Always',
+              subtitle: 'Notify for every completed response',
+              value: NotificationMode.always,
+              groupValue: _notificationMode,
+              onTap: () {
+                _setNotificationMode(NotificationMode.always);
+                Navigator.pop(dialogContext);
+              },
+            ),
+            _NotificationModeOption(
+              title: 'Off',
+              subtitle: 'Never show notifications',
+              value: NotificationMode.never,
+              groupValue: _notificationMode,
+              onTap: () {
+                _setNotificationMode(NotificationMode.never);
+                Navigator.pop(dialogContext);
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -809,6 +689,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Text(
+        title,
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+}
+
+class _NotificationModeOption extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final NotificationMode value;
+  final NotificationMode groupValue;
+  final VoidCallback onTap;
+
+  const _NotificationModeOption({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.groupValue,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      title: Text(title),
+      subtitle: Text(subtitle),
+      leading: Radio<NotificationMode>(
+        value: value,
+        groupValue: groupValue,
+        onChanged: (_) => onTap(),
+      ),
+      onTap: onTap,
     );
   }
 }

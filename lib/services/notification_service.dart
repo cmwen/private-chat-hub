@@ -1,5 +1,18 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// Notification behavior modes.
+enum NotificationMode {
+  /// Only notify when user is not viewing the response (default).
+  smart,
+
+  /// Always show notifications when a response completes.
+  always,
+
+  /// Never show notifications.
+  never,
+}
 
 /// Service for managing local notifications in the app.
 ///
@@ -24,14 +37,23 @@ class NotificationService with WidgetsBindingObserver {
   // Maximum length for notification preview text
   static const int _maxPreviewLength = 100;
 
+  // Preference key for notification mode
+  static const String _notificationModeKey = 'notification_mode';
+
   // App lifecycle tracking
   bool _isAppInForeground = true;
 
   // The conversation ID the user is currently viewing (null if not in a chat)
   String? _activeConversationId;
 
+  // Cached notification mode
+  NotificationMode _notificationMode = NotificationMode.smart;
+
   /// Whether the app is currently in the foreground.
   bool get isAppInForeground => _isAppInForeground;
+
+  /// Current notification mode.
+  NotificationMode get notificationMode => _notificationMode;
 
   /// Set the conversation ID the user is currently viewing.
   void setActiveConversation(String? conversationId) {
@@ -66,7 +88,32 @@ class NotificationService with WidgetsBindingObserver {
     // Register for app lifecycle events
     WidgetsBinding.instance.addObserver(this);
 
+    // Load notification mode preference
+    await _loadNotificationMode();
+
     _initialized = true;
+  }
+
+  Future<void> _loadNotificationMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final modeString = prefs.getString(_notificationModeKey);
+    switch (modeString) {
+      case 'always':
+        _notificationMode = NotificationMode.always;
+        break;
+      case 'never':
+        _notificationMode = NotificationMode.never;
+        break;
+      default:
+        _notificationMode = NotificationMode.smart;
+    }
+  }
+
+  /// Set notification mode preference.
+  Future<void> setNotificationMode(NotificationMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_notificationModeKey, mode.name);
+    _notificationMode = mode;
   }
 
   @override
@@ -98,8 +145,10 @@ class NotificationService with WidgetsBindingObserver {
 
   /// Show a notification when an AI response is complete.
   ///
-  /// Only shows the notification if the app is in the background or the user
-  /// is not currently viewing the conversation that completed.
+  /// Respects the configured [NotificationMode]:
+  /// - [NotificationMode.smart]: Only when user is not viewing the conversation.
+  /// - [NotificationMode.always]: Always show.
+  /// - [NotificationMode.never]: Never show.
   Future<void> showResponseCompleteNotification({
     required String conversationId,
     required String conversationTitle,
@@ -109,9 +158,14 @@ class NotificationService with WidgetsBindingObserver {
       await initialize();
     }
 
-    // Skip notification if user is currently viewing this conversation
-    if (_isAppInForeground && _activeConversationId == conversationId) {
-      return;
+    // Check notification mode
+    if (_notificationMode == NotificationMode.never) return;
+
+    if (_notificationMode == NotificationMode.smart) {
+      // Skip notification if user is currently viewing this conversation
+      if (_isAppInForeground && _activeConversationId == conversationId) {
+        return;
+      }
     }
 
     // Get or assign a unique notification ID for this conversation
