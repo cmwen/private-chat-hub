@@ -384,9 +384,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                 // ── Advanced ───────────────────────────────────────
                 Theme(
-                  data: Theme.of(context).copyWith(
-                    dividerColor: Colors.transparent,
-                  ),
+                  data: Theme.of(
+                    context,
+                  ).copyWith(dividerColor: Colors.transparent),
                   child: ExpansionTile(
                     leading: const Icon(Icons.tune),
                     title: const Text(
@@ -429,10 +429,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                             children: [
                               LiteRTModelSettingsWidget(
-                                configService:
-                                    widget.inferenceConfigService!,
-                                onDeviceLLMService:
-                                    widget.onDeviceLLMService,
+                                configService: widget.inferenceConfigService!,
+                                onDeviceLLMService: widget.onDeviceLLMService,
                               ),
                             ],
                           ),

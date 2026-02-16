@@ -1076,7 +1076,9 @@ class ChatService {
     // If not online, try on-device fallback before queueing
     if (!isOnline) {
       if (_onDeviceLLMService != null && await isOnDeviceAvailable()) {
-        _log('Ollama offline in sendMessageWithContext: falling back to on-device inference');
+        _log(
+          'Ollama offline in sendMessageWithContext: falling back to on-device inference',
+        );
         yield* _sendMessageOnDevice(
           conversationId,
           lastUserText(conversation),
