@@ -1071,7 +1071,6 @@ class ChatService {
 
     // If not online, queue for retry — honour the user's remote model choice.
     if (!isOnline) {
-<<<<<<< HEAD
       if (_onDeviceLLMService != null && await isOnDeviceAvailable()) {
         _log(
           'Ollama offline in sendMessageWithContext: falling back to on-device inference',
@@ -1084,9 +1083,7 @@ class ChatService {
         return;
       }
 
-=======
       _log('Offline mode in sendMessageWithContext: queueing for remote model');
->>>>>>> 9e637cb (feat: Add Hugging Face token management and math preprocessing)
       final lastUserMessage = conversation.messages.lastWhere(
         (m) => m.role == MessageRole.user,
         orElse: () => Message.user(id: '', text: '', timestamp: DateTime.now()),
