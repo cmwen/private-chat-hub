@@ -4,11 +4,19 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
         {
-            "name": "private-chat-hub",
+            "name": "private-chat-hub (Dev)",
             "request": "launch",
-            "type": "dart"
+            "type": "dart",
+            "program": "lib/main.dart",
+            "args": ["--flavor", "dev"]
+        },
+        {
+            "name": "private-chat-hub (Prod)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "args": ["--flavor", "prod"]
         },
         {
             "name": "private-chat-hub (profile mode)",
