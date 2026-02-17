@@ -2,16 +2,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_markdown_latex/flutter_markdown_latex.dart';
+import 'package:markdown/markdown.dart' as md;
 import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
 import 'package:private_chat_hub/models/tool_models.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connectivity_service.dart';
+import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/tts_service.dart';
 import 'package:private_chat_hub/widgets/capability_widgets.dart';
 import 'package:private_chat_hub/widgets/message_bubble.dart';
 import 'package:private_chat_hub/widgets/message_input.dart';
 import 'package:private_chat_hub/widgets/queue_status_banner.dart';
+import 'package:private_chat_hub/utils/math_preprocessor.dart';
 
 /// Main chat screen displaying messages and input field.
 class ChatScreen extends StatefulWidget {
@@ -62,6 +66,8 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {});
       }
     });
+    // Mark this conversation as active so notifications are suppressed
+    NotificationService().setActiveConversation(_conversation?.id);
     _loadMessages();
     _setupConnectivityListener();
     _setupQueueListener();
@@ -73,6 +79,8 @@ class _ChatScreenState extends State<ChatScreen> {
     super.didUpdateWidget(oldWidget);
     if (widget.conversation?.id != oldWidget.conversation?.id) {
       _conversation = widget.conversation;
+      // Update active conversation for notification suppression
+      NotificationService().setActiveConversation(_conversation?.id);
       _loadMessages();
       _setupQueueListener();
       _setupConversationUpdatesListener();
@@ -81,6 +89,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    // Clear active conversation so notifications resume
+    NotificationService().setActiveConversation(null);
     _scrollController.dispose();
     _ttsService.dispose();
     // Don't cancel the stream - let it continue in the background
@@ -114,13 +124,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() => _isLoading = true);
       _streamSubscription = activeStream.listen(
         (updatedConversation) {
-          if (!mounted) return;
-          setState(() {
-            _conversation = updatedConversation;
-            _messages = List.from(updatedConversation.messages);
-          });
-          _scrollToBottom();
-          _handleTtsStreaming(updatedConversation);
+          _handleConversationStreamUpdate(updatedConversation);
         },
         onError: (error) {
           if (!mounted) return;
@@ -296,13 +300,7 @@ class _ChatScreenState extends State<ChatScreen> {
           .sendMessage(_conversation!.id, text)
           .listen(
             (updatedConversation) {
-              if (!mounted) return;
-              setState(() {
-                _conversation = updatedConversation;
-                _messages = List.from(updatedConversation.messages);
-              });
-              _scrollToBottom();
-              _handleTtsStreaming(updatedConversation);
+              _handleConversationStreamUpdate(updatedConversation);
             },
             onError: (error) {
               if (!mounted) return;
@@ -553,13 +551,7 @@ class _ChatScreenState extends State<ChatScreen> {
           .sendMessageWithContext(_conversation!.id)
           .listen(
             (updatedConversation) {
-              if (!mounted) return;
-              setState(() {
-                _conversation = updatedConversation;
-                _messages = List.from(updatedConversation.messages);
-              });
-              _scrollToBottom();
-              _handleTtsStreaming(updatedConversation);
+              _handleConversationStreamUpdate(updatedConversation);
             },
             onError: (error) {
               if (!mounted) return;
@@ -633,19 +625,66 @@ class _ChatScreenState extends State<ChatScreen> {
           newContent.endsWith('!') ||
           newContent.endsWith('?')) {
         _lastSpokenText = lastMessage.text;
-        _ttsService.speak(newContent, messageId: lastMessage.id);
+        unawaited(
+          _ttsService.speak(newContent, messageId: lastMessage.id).catchError((
+            Object error,
+            StackTrace stackTrace,
+          ) {
+            // ignore: avoid_print
+            print('[ChatScreen] TTS streaming speak failed: $error');
+            // ignore: avoid_print
+            print('$stackTrace');
+            return false;
+          }),
+        );
       }
     } else if (_lastSpokenText == null || _lastSpokenText!.isEmpty) {
       // First chunk of text
       _lastSpokenText = lastMessage.text;
       if (lastMessage.text.isNotEmpty) {
-        _ttsService.speak(lastMessage.text, messageId: lastMessage.id);
+        unawaited(
+          _ttsService
+              .speak(lastMessage.text, messageId: lastMessage.id)
+              .catchError((Object error, StackTrace stackTrace) {
+                // ignore: avoid_print
+                print('[ChatScreen] Initial TTS speak failed: $error');
+                // ignore: avoid_print
+                print('$stackTrace');
+                return false;
+              }),
+        );
       }
     }
 
     // Reset when message is no longer streaming
     if (!lastMessage.isStreaming && _lastSpokenText != null) {
       _lastSpokenText = null;
+    }
+  }
+
+  void _handleConversationStreamUpdate(Conversation updatedConversation) {
+    if (!mounted) return;
+
+    try {
+      setState(() {
+        _conversation = updatedConversation;
+        _messages = List.from(updatedConversation.messages);
+      });
+      _scrollToBottom();
+      _handleTtsStreaming(updatedConversation);
+    } catch (e, stackTrace) {
+      // ignore: avoid_print
+      print('[ChatScreen] Stream update handling failed: $e');
+      // ignore: avoid_print
+      print('$stackTrace');
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Runtime update error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -1723,8 +1762,26 @@ class _MarkdownMessageBubble extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     MarkdownBody(
-                      data: message.text,
+                      data: preprocessMathDelimiters(message.text),
                       selectable: true,
+                      builders: {
+                        'latex': LatexElementBuilder(
+                          textStyle: TextStyle(
+                            fontSize: 15,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      },
+                      extensionSet: md.ExtensionSet(
+                        <md.BlockSyntax>[
+                          LatexBlockSyntax(),
+                          ...md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+                        ],
+                        <md.InlineSyntax>[
+                          LatexInlineSyntax(),
+                          ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
+                        ],
+                      ),
                       styleSheet: MarkdownStyleSheet(
                         p: TextStyle(
                           fontSize: 15,

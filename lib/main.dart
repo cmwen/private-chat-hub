@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:private_chat_hub/models/comparison_conversation.dart';
 import 'package:private_chat_hub/models/conversation.dart';
@@ -10,18 +12,18 @@ import 'package:private_chat_hub/screens/projects_screen.dart';
 import 'package:private_chat_hub/screens/settings_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
+import 'package:private_chat_hub/services/inference_config_service.dart';
 import 'package:private_chat_hub/services/jina_search_service.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
+import 'package:private_chat_hub/services/on_device_llm_service.dart';
 import 'package:private_chat_hub/services/project_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:private_chat_hub/services/tool_config_service.dart';
 import 'package:private_chat_hub/services/tool_executor_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
+Future<void> _bootstrapApp() async {
   // Initialize services
   final storageService = StorageService();
   await storageService.init();
@@ -39,6 +41,33 @@ void main() async {
 
   runApp(
     MyApp(storageService: storageService, toolConfigService: toolConfigService),
+  );
+}
+
+void main() {
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+
+      FlutterError.onError = (FlutterErrorDetails details) {
+        FlutterError.presentError(details);
+        debugPrint('[FlutterError] ${details.exception}');
+        debugPrint('${details.stack}');
+      };
+
+      PlatformDispatcher.instance.onError =
+          (Object error, StackTrace stackTrace) {
+            debugPrint('[GlobalError] Unhandled platform error: $error');
+            debugPrint('$stackTrace');
+            return true;
+          };
+
+      await _bootstrapApp();
+    },
+    (Object error, StackTrace stackTrace) {
+      debugPrint('[GlobalError] Unhandled zoned error: $error');
+      debugPrint('$stackTrace');
+    },
   );
 }
 
@@ -143,6 +172,8 @@ class _HomeScreenState extends State<HomeScreen> {
   late final ConnectionService _connectionService;
   late final ChatService _chatService;
   late final ProjectService _projectService;
+  InferenceConfigService? _inferenceConfigService;
+  OnDeviceLLMService? _onDeviceLLMService;
 
   int _currentIndex = 0;
   Conversation? _selectedConversation;
@@ -185,8 +216,59 @@ class _HomeScreenState extends State<HomeScreen> {
     // Set up Ollama connection if one exists
     _setupConnection();
 
+    // Initialize inference services asynchronously
+    _initializeInferenceServices();
+
     // Check if app was opened from a notification
     _checkNotificationLaunch();
+  }
+
+  Future<void> _initializeInferenceServices() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final inferenceConfigService = InferenceConfigService(prefs);
+
+      // Always set inference config service so the toggle is visible
+      if (!mounted) return;
+      setState(() {
+        _inferenceConfigService = inferenceConfigService;
+      });
+
+      // Update chat service with inference config service
+      _chatService.setInferenceConfigService(inferenceConfigService);
+
+      // Try to initialize on-device service separately
+      try {
+        final onDeviceLLMService = OnDeviceLLMService(
+          widget.storageService,
+          configService: inferenceConfigService,
+        );
+
+        if (!mounted) return;
+        setState(() {
+          _onDeviceLLMService = onDeviceLLMService;
+        });
+
+        // Update chat service with on-device service
+        _chatService.setOnDeviceLLMService(onDeviceLLMService);
+
+        print(
+          '[HomeScreen._initializeInferenceServices] On-device service initialized successfully',
+        );
+      } catch (e) {
+        print(
+          '[HomeScreen._initializeInferenceServices] WARNING: Failed to initialize on-device service: $e',
+        );
+        print(
+          '[HomeScreen._initializeInferenceServices] The on-device mode toggle will still be available, but on-device inference may not work.',
+        );
+      }
+    } catch (e) {
+      print(
+        '[HomeScreen._initializeInferenceServices] ERROR: Failed to initialize inference services: $e',
+      );
+      // Still try to continue without these services
+    }
   }
 
   Future<void> _checkNotificationLaunch() async {
@@ -298,12 +380,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ModelsScreen(
             ollamaManager: _ollamaManager,
             connectionService: _connectionService,
+            onDeviceLLMService: _onDeviceLLMService,
           ),
           SettingsScreen(
             connectionService: _connectionService,
             ollamaManager: _ollamaManager,
             chatService: _chatService,
             toolConfigService: widget.toolConfigService,
+            inferenceConfigService: _inferenceConfigService,
+            storageService: widget.storageService,
+            onDeviceLLMService: _onDeviceLLMService,
             onThemeModeChanged: widget.onThemeModeChanged,
             currentThemeMode: widget.currentThemeMode,
           ),

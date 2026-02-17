@@ -3,8 +3,10 @@ import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/screens/search_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
+import 'package:private_chat_hub/services/llm_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
+import 'package:private_chat_hub/services/unified_model_service.dart';
 import 'package:private_chat_hub/widgets/dual_model_selector.dart';
 import 'package:intl/intl.dart';
 
@@ -31,15 +33,29 @@ class ConversationListScreen extends StatefulWidget {
 
 class _ConversationListScreenState extends State<ConversationListScreen> {
   List<Conversation> _conversations = [];
-  List<OllamaModelInfo> _models = [];
+  List<OllamaModelInfo> _ollamaModels = [];
+  List<ModelInfo> _allModels = []; // Combined list
   String? _selectedModel;
   bool _isLoading = true;
   bool _isLoadingModels = false;
+  bool _localModelRefreshScheduled = false;
+  bool _isOllamaOnline = true;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void didUpdateWidget(covariant ConversationListScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.chatService.onDeviceLLMService != null &&
+        !_localModelRefreshScheduled) {
+      _localModelRefreshScheduled = true;
+      Future.microtask(_loadModels);
+    }
   }
 
   Future<void> _loadData() async {
@@ -59,36 +75,74 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   }
 
   Future<void> _loadModels() async {
-    final connection = widget.connectionService.getDefaultConnection();
-    if (connection == null) {
-      if (mounted) setState(() => _isLoadingModels = false);
-      return;
-    }
-
     if (mounted) setState(() => _isLoadingModels = true);
 
+    final unifiedModelService = UnifiedModelService(
+      onDeviceLLMService: widget.chatService.onDeviceLLMService,
+    );
+
     try {
-      widget.ollamaManager.setConnection(connection);
+      final connection = widget.connectionService.getDefaultConnection();
 
-      // Add a reasonable timeout for initial model loading (5 seconds)
-      // This prevents long waits when Ollama is offline
-      _models = await widget.ollamaManager.listModels().timeout(
-        const Duration(seconds: 5),
-        onTimeout: () {
-          throw Exception('Connection timeout - Ollama may be offline');
-        },
-      );
+      if (connection != null) {
+        widget.ollamaManager.setConnection(connection);
 
-      // If no model selected, select the first one
-      if (_selectedModel == null && _models.isNotEmpty) {
-        _selectedModel = _models.first.name;
+        // Add a reasonable timeout for initial model loading (5 seconds)
+        // This prevents long waits when Ollama is offline
+        _ollamaModels = await widget.ollamaManager.listModels().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () {
+            throw Exception('Connection timeout - Ollama may be offline');
+          },
+        );
+      } else {
+        _ollamaModels = [];
+      }
+
+      _isOllamaOnline = true;
+
+      // Get unified model list (Ollama + local models)
+      _allModels = await unifiedModelService.getUnifiedModelList(_ollamaModels);
+
+      // Cache the remote models for offline fallback
+      await UnifiedModelService.cacheRemoteModels(_allModels);
+
+      // If selected model is missing or not set, select first available
+      final selectedStillExists =
+          _selectedModel != null &&
+          _allModels.any((model) => model.id == _selectedModel);
+
+      if ((!selectedStillExists || _selectedModel == null) &&
+          _allModels.isNotEmpty) {
+        _selectedModel = _allModels.first.id;
         await widget.connectionService.setSelectedModel(_selectedModel!);
       }
     } catch (e) {
-      // Failed to load models - this is OK, user can still view conversations
-      _models = [];
-      // Only show error message if explicitly requested (on refresh)
-      // Silent failure on initial load for better UX
+      // Ollama is unreachable — use cached remote models so the user can
+      // still select a remote model (messages will be queued).
+      _ollamaModels = [];
+      _isOllamaOnline = false;
+
+      try {
+        final cachedRemote = await UnifiedModelService.getCachedRemoteModels();
+        final localModels = await unifiedModelService.getUnifiedModelList([]);
+        _allModels = [...cachedRemote, ...localModels];
+
+        // Preserve the selected model if it exists in the combined list
+        // (including cached remote models). Only change selection when the
+        // current selection doesn't appear at all.
+        final selectedStillExists =
+            _selectedModel != null &&
+            _allModels.any((model) => model.id == _selectedModel);
+
+        if ((!selectedStillExists || _selectedModel == null) &&
+            _allModels.isNotEmpty) {
+          _selectedModel = _allModels.first.id;
+          await widget.connectionService.setSelectedModel(_selectedModel!);
+        }
+      } catch (localError) {
+        _allModels = [];
+      }
     }
 
     if (mounted) setState(() => _isLoadingModels = false);
@@ -123,23 +177,38 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     widget.onConversationSelected(conversation);
   }
 
+  String _selectedModelLabel() {
+    if (_selectedModel == null) return 'No model selected';
+
+    final selected = _allModels.where((model) => model.id == _selectedModel);
+    if (selected.isNotEmpty) {
+      return selected.first.name;
+    }
+
+    return UnifiedModelService.getDisplayName(_selectedModel!);
+  }
+
   Future<void> _createComparisonConversation() async {
-    if (_models.length < 2) {
+    if (_ollamaModels.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('You need at least 2 models to compare'),
+          content: Text('You need at least 2 Ollama models to compare'),
           backgroundColor: Colors.orange,
         ),
       );
       return;
     }
 
-    // Show dual model selector
+    // Show dual model selector (only Ollama models for comparison)
     await showDialog(
       context: context,
       builder: (dialogContext) => DualModelSelector(
-        models: _models,
-        initialModel1: _selectedModel,
+        models: _ollamaModels,
+        initialModel1:
+            _selectedModel != null &&
+                !UnifiedModelService.isLocalModel(_selectedModel!)
+            ? _selectedModel
+            : null,
         onModelsSelected: (model1, model2) async {
           // Create comparison conversation using the service method
           final conversation = await widget.chatService
@@ -202,12 +271,13 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     showModalBottomSheet(
       context: context,
       builder: (sheetContext) => _ModelSelectorSheet(
-        models: _models,
+        models: _allModels,
         selectedModel: _selectedModel,
+        isOllamaOnline: _isOllamaOnline,
         onModelSelected: (model) async {
-          await widget.connectionService.setSelectedModel(model.name);
+          await widget.connectionService.setSelectedModel(model.id);
           if (!mounted) return;
-          setState(() => _selectedModel = model.name);
+          setState(() => _selectedModel = model.id);
           if (sheetContext.mounted) Navigator.pop(sheetContext);
         },
         isLoading: _isLoadingModels,
@@ -276,12 +346,24 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                                 ),
                               ),
                               Text(
-                                _selectedModel ?? 'No model selected',
+                                _selectedModelLabel(),
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
+                              if (!_isOllamaOnline &&
+                                  _selectedModel != null &&
+                                  !UnifiedModelService.isLocalModel(
+                                    _selectedModel!,
+                                  ))
+                                Text(
+                                  'Server offline — messages will be queued',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.orange.shade700,
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -316,7 +398,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (_models.length >= 2)
+          if (_ollamaModels.length >= 2)
             FloatingActionButton.extended(
               heroTag: 'compare_models_fab',
               onPressed: _createComparisonConversation,
@@ -325,7 +407,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
               backgroundColor: Theme.of(context).colorScheme.tertiary,
               foregroundColor: Theme.of(context).colorScheme.onTertiary,
             ),
-          if (_models.length >= 2) const SizedBox(height: 12),
+          if (_ollamaModels.length >= 2) const SizedBox(height: 12),
           FloatingActionButton.extended(
             heroTag: 'conversation_list_fab',
             onPressed: _createNewConversation,
@@ -364,7 +446,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            if (_models.isEmpty && !_isLoadingModels)
+            if (_allModels.isEmpty && !_isLoadingModels)
               Column(
                 children: [
                   Icon(
@@ -374,14 +456,14 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'No Ollama connection configured',
+                    'No models available',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.tertiary,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Go to Settings to add a connection',
+                    'Download a local model or configure an Ollama connection in Settings',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -502,15 +584,17 @@ class _ConversationTile extends StatelessWidget {
 }
 
 class _ModelSelectorSheet extends StatelessWidget {
-  final List<OllamaModelInfo> models;
+  final List<ModelInfo> models;
   final String? selectedModel;
-  final Function(OllamaModelInfo) onModelSelected;
+  final bool isOllamaOnline;
+  final Function(ModelInfo) onModelSelected;
   final bool isLoading;
   final VoidCallback onRefresh;
 
   const _ModelSelectorSheet({
     required this.models,
     required this.selectedModel,
+    required this.isOllamaOnline,
     required this.onModelSelected,
     required this.isLoading,
     required this.onRefresh,
@@ -557,7 +641,7 @@ class _ModelSelectorSheet extends StatelessWidget {
                   Text('No models found', style: TextStyle(fontSize: 16)),
                   SizedBox(height: 8),
                   Text(
-                    'Make sure Ollama is running and has models downloaded',
+                    'Make sure local models are downloaded or Ollama is running with models available',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.grey),
                   ),
@@ -571,7 +655,7 @@ class _ModelSelectorSheet extends StatelessWidget {
                 itemCount: models.length,
                 itemBuilder: (context, index) {
                   final model = models[index];
-                  final isSelected = model.name == selectedModel;
+                  final isSelected = model.id == selectedModel;
 
                   return ListTile(
                     leading: CircleAvatar(
@@ -581,31 +665,112 @@ class _ModelSelectorSheet extends StatelessWidget {
                               context,
                             ).colorScheme.surfaceContainerHighest,
                       child: Icon(
-                        Icons.psychology,
+                        model.isLocal ? Icons.phone_android : Icons.cloud,
                         color: isSelected
                             ? Colors.white
                             : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    title: Text(model.name),
+                    title: Row(
+                      children: [
+                        Expanded(child: Text(model.name)),
+                        if (model.isLocal) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: Colors.green.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.offline_bolt,
+                                  size: 14,
+                                  color: Colors.green,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'LOCAL',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (!model.isLocal && !isOllamaOnline) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: Colors.orange.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.cloud_off,
+                                  size: 14,
+                                  color: Colors.orange,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'OFFLINE',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orange,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          '${model.sizeFormatted}${model.parameterCount != null ? ' • ${model.parameterCount}' : ''}',
-                        ),
+                        if (!model.isLocal && !isOllamaOnline)
+                          Text(
+                            'Messages will be queued until server is back',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.orange.shade700,
+                            ),
+                          )
+                        else
+                          Text(model.sizeString),
                         const SizedBox(height: 4),
                         Wrap(
                           spacing: 4,
                           runSpacing: 2,
                           children: [
-                            if (model.capabilities?.supportsVision == true)
+                            if (model.capabilities.contains('vision'))
                               _CapabilityBadge(
                                 icon: Icons.visibility,
                                 label: 'Vision',
                                 color: Colors.purple,
                               ),
-                            if (model.capabilities?.supportsTools == true)
+                            if (model.capabilities.contains('tools'))
                               _CapabilityBadge(
                                 icon: Icons.build,
                                 label: 'Tools',

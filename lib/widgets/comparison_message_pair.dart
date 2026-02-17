@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_markdown_latex/flutter_markdown_latex.dart';
+import 'package:markdown/markdown.dart' as md;
 import 'package:private_chat_hub/models/message.dart';
+import 'package:private_chat_hub/utils/math_preprocessor.dart';
 
 /// Displays side-by-side or swipeable comparison of two model responses.
 class ComparisonMessagePair extends StatefulWidget {
@@ -255,15 +259,39 @@ class _ComparisonMessagePairState extends State<ComparisonMessagePair> {
 
     if (message.isError) {
       return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(Icons.error_outline, color: theme.colorScheme.error, size: 20),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              message.errorMessage ?? 'An error occurred',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.error,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message.errorMessage ?? 'An error occurred',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(
+                      ClipboardData(text: message.errorMessage ?? message.text),
+                    );
+
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Error details copied to clipboard'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.copy, size: 16),
+                  label: const Text('Copy error details'),
+                ),
+              ],
             ),
           ),
         ],
@@ -281,8 +309,21 @@ class _ComparisonMessagePairState extends State<ComparisonMessagePair> {
     }
 
     return MarkdownBody(
-      data: message.text,
+      data: preprocessMathDelimiters(message.text),
       selectable: true,
+      builders: {
+        'latex': LatexElementBuilder(textStyle: theme.textTheme.bodyMedium),
+      },
+      extensionSet: md.ExtensionSet(
+        <md.BlockSyntax>[
+          LatexBlockSyntax(),
+          ...md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+        ],
+        <md.InlineSyntax>[
+          LatexInlineSyntax(),
+          ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
+        ],
+      ),
       styleSheet: MarkdownStyleSheet(
         p: theme.textTheme.bodyMedium,
         code: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),

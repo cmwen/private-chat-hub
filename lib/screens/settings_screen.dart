@@ -4,11 +4,16 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:private_chat_hub/models/connection.dart';
 import 'package:private_chat_hub/models/tool_models.dart';
 import 'package:private_chat_hub/ollama_toolkit/services/ollama_config_service.dart';
+import 'package:private_chat_hub/screens/on_device_models_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
+import 'package:private_chat_hub/services/inference_config_service.dart';
 import 'package:private_chat_hub/services/network_discovery_service.dart';
+import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
+import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:private_chat_hub/services/tool_config_service.dart';
+import 'package:private_chat_hub/widgets/litert_model_settings_widget.dart';
 import 'package:private_chat_hub/widgets/tool_settings_widget.dart';
 
 /// Settings screen for managing Ollama connections.
@@ -17,6 +22,9 @@ class SettingsScreen extends StatefulWidget {
   final OllamaConnectionManager ollamaManager;
   final ChatService? chatService;
   final ToolConfigService? toolConfigService;
+  final InferenceConfigService? inferenceConfigService;
+  final StorageService? storageService;
+  final dynamic onDeviceLLMService; // OnDeviceLLMService
   final Function(ThemeMode)? onThemeModeChanged;
   final ThemeMode? currentThemeMode;
 
@@ -26,6 +34,9 @@ class SettingsScreen extends StatefulWidget {
     required this.ollamaManager,
     this.chatService,
     this.toolConfigService,
+    this.inferenceConfigService,
+    this.storageService,
+    this.onDeviceLLMService,
     this.onThemeModeChanged,
     this.currentThemeMode,
   });
@@ -42,6 +53,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _streamingEnabled = true;
   int _timeout = OllamaConfigService.defaultTimeout;
   final OllamaConfigService _ollamaConfigService = OllamaConfigService();
+  final NotificationService _notificationService = NotificationService();
+  NotificationMode _notificationMode = NotificationMode.smart;
 
   @override
   void initState() {
@@ -51,6 +64,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadAppVersion();
     _loadStreamingPreference();
     _loadTimeout();
+    _loadNotificationMode();
+  }
+
+  Future<void> _loadNotificationMode() async {
+    await _notificationService.initialize();
+    if (!mounted) return;
+    setState(() {
+      _notificationMode = _notificationService.notificationMode;
+    });
+  }
+
+  Future<void> _setNotificationMode(NotificationMode mode) async {
+    await _notificationService.setNotificationMode(mode);
+    setState(() {
+      _notificationMode = mode;
+    });
+  }
+
+  void _openOnDeviceModelsScreen() {
+    if (widget.storageService == null ||
+        widget.inferenceConfigService == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('On-device models not available')),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OnDeviceModelsScreen(
+          storageService: widget.storageService!,
+          inferenceConfigService: widget.inferenceConfigService!,
+        ),
+      ),
+    );
   }
 
   Future<void> _loadAppVersion() async {
@@ -209,13 +258,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    'Ollama Connections',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
+                // ── Ollama Connections ──────────────────────────────
+                _SectionHeader(title: 'Ollama Connections'),
                 if (_connections.isEmpty)
                   Card(
                     margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -271,58 +315,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       label: const Text('Add Connection'),
                     ),
                   ),
-                const SizedBox(height: 32),
-                const Divider(),
-                if (widget.chatService != null) ...[
-                  const Padding(
-                    padding: EdgeInsets.all(16),
+                const Divider(height: 32),
+
+                // ── On-Device Models ───────────────────────────────
+                if (widget.inferenceConfigService != null) ...[
+                  _SectionHeader(title: 'On-Device Models'),
+                  ListTile(
+                    leading: const Icon(Icons.phone_android),
+                    title: const Text('Manage On-Device Models'),
+                    subtitle: const Text(
+                      'Download local models for offline use',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: _openOnDeviceModelsScreen,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
-                      'AI Features',
+                      'Local models run on-device automatically. '
+                      'When Ollama is offline, on-device models are used as a fallback.',
                       style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.stream),
-                    title: const Text('Streaming Mode'),
-                    subtitle: Text(
-                      _streamingEnabled
-                          ? 'Responses stream in real-time (may cause more UI updates)'
-                          : 'Responses load all at once (reduces UI pressure)',
-                    ),
-                    trailing: Switch(
-                      value: _streamingEnabled,
-                      onChanged: _setStreamingPreference,
-                    ),
+                  const SizedBox(height: 8),
+                  _HuggingFaceTokenBanner(
+                    inferenceConfigService: widget.inferenceConfigService!,
+                    onDeviceLLMService: widget.onDeviceLLMService,
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.schedule),
-                    title: const Text('Request Timeout'),
-                    subtitle: Text(
-                      '$_timeout seconds (${_getTimeoutLabel(_timeout)})',
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: _showTimeoutDialog,
-                  ),
-                  if (widget.toolConfigService != null)
-                    ToolSettingsWidget(
-                      config: _toolConfig,
-                      onConfigChanged: _saveToolConfig,
-                    ),
-                  const Divider(),
+                  const Divider(height: 32),
                 ],
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    'Appearance',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+
+                // ── Chat Settings ──────────────────────────────────
+                _SectionHeader(title: 'Chat'),
+                ListTile(
+                  leading: const Icon(Icons.stream),
+                  title: const Text('Streaming Mode'),
+                  subtitle: Text(
+                    _streamingEnabled
+                        ? 'Responses appear word-by-word'
+                        : 'Responses appear all at once',
+                  ),
+                  trailing: Switch(
+                    value: _streamingEnabled,
+                    onChanged: _setStreamingPreference,
                   ),
                 ),
                 ListTile(
+                  leading: const Icon(Icons.notifications_outlined),
+                  title: const Text('Notifications'),
+                  subtitle: Text(_notificationModeLabel(_notificationMode)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _showNotificationModeDialog,
+                ),
+                const Divider(height: 32),
+
+                // ── Appearance ─────────────────────────────────────
+                _SectionHeader(title: 'Appearance'),
+                ListTile(
                   leading: const Icon(Icons.palette_outlined),
-                  title: const Text('Theme Mode'),
+                  title: const Text('Theme'),
                   subtitle: Text(
                     _getThemeModeLabel(
                       widget.currentThemeMode ?? ThemeMode.system,
@@ -331,7 +385,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _showThemeModeDialog,
                 ),
-                const Divider(),
+                const Divider(height: 32),
+
+                // ── Advanced ───────────────────────────────────────
+                Theme(
+                  data: Theme.of(
+                    context,
+                  ).copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    leading: const Icon(Icons.tune),
+                    title: const Text(
+                      'Advanced',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    childrenPadding: EdgeInsets.zero,
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.schedule),
+                        title: const Text('Request Timeout'),
+                        subtitle: Text(
+                          '$_timeout seconds (${_getTimeoutLabel(_timeout)})',
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: _showTimeoutDialog,
+                      ),
+                      if (widget.toolConfigService != null)
+                        ToolSettingsWidget(
+                          config: _toolConfig,
+                          onConfigChanged: _saveToolConfig,
+                        ),
+                      if (widget.inferenceConfigService != null) ...[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: ExpansionTile(
+                            tilePadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                            ),
+                            childrenPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.memory),
+                            title: const Text(
+                              'On-device generation parameters',
+                            ),
+                            subtitle: const Text(
+                              'Temperature, top-k, top-p, etc.',
+                            ),
+                            children: [
+                              LiteRTModelSettingsWidget(
+                                configService: widget.inferenceConfigService!,
+                                onDeviceLLMService: widget.onDeviceLLMService,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const Divider(height: 32),
+
+                // ── About ──────────────────────────────────────────
                 ListTile(
                   leading: const Icon(Icons.info_outline),
                   title: const Text('About'),
@@ -352,8 +467,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     );
                   },
                 ),
+                const SizedBox(height: 32),
               ],
             ),
+    );
+  }
+
+  String _notificationModeLabel(NotificationMode mode) {
+    switch (mode) {
+      case NotificationMode.smart:
+        return 'Only when not viewing the chat';
+      case NotificationMode.always:
+        return 'Always notify';
+      case NotificationMode.never:
+        return 'Off';
+    }
+  }
+
+  void _showNotificationModeDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Notifications'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _NotificationModeOption(
+              title: 'Smart',
+              subtitle: 'Only when you\'re not watching the response',
+              value: NotificationMode.smart,
+              groupValue: _notificationMode,
+              onTap: () {
+                _setNotificationMode(NotificationMode.smart);
+                Navigator.pop(dialogContext);
+              },
+            ),
+            _NotificationModeOption(
+              title: 'Always',
+              subtitle: 'Notify for every completed response',
+              value: NotificationMode.always,
+              groupValue: _notificationMode,
+              onTap: () {
+                _setNotificationMode(NotificationMode.always);
+                Navigator.pop(dialogContext);
+              },
+            ),
+            _NotificationModeOption(
+              title: 'Off',
+              subtitle: 'Never show notifications',
+              value: NotificationMode.never,
+              groupValue: _notificationMode,
+              onTap: () {
+                _setNotificationMode(NotificationMode.never);
+                Navigator.pop(dialogContext);
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -521,6 +692,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Text(
+        title,
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+}
+
+class _NotificationModeOption extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final NotificationMode value;
+  final NotificationMode groupValue;
+  final VoidCallback onTap;
+
+  const _NotificationModeOption({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.groupValue,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      title: Text(title),
+      subtitle: Text(subtitle),
+      leading: Radio<NotificationMode>(
+        value: value,
+        groupValue: groupValue,
+        onChanged: (_) => onTap(),
+      ),
+      onTap: onTap,
     );
   }
 }
@@ -973,6 +1191,239 @@ class _AddConnectionDialogState extends State<AddConnectionDialog> {
         ),
         ElevatedButton(onPressed: _save, child: const Text('Save')),
       ],
+    );
+  }
+}
+
+/// Banner shown in the On-Device Models section to indicate HF token status
+/// and provide a quick way to set it up.
+class _HuggingFaceTokenBanner extends StatefulWidget {
+  final InferenceConfigService inferenceConfigService;
+  final dynamic onDeviceLLMService;
+
+  const _HuggingFaceTokenBanner({
+    required this.inferenceConfigService,
+    this.onDeviceLLMService,
+  });
+
+  @override
+  State<_HuggingFaceTokenBanner> createState() =>
+      _HuggingFaceTokenBannerState();
+}
+
+class _HuggingFaceTokenBannerState extends State<_HuggingFaceTokenBanner> {
+  bool get _hasToken =>
+      (widget.inferenceConfigService.huggingFaceToken ?? '').isNotEmpty;
+
+  Future<void> _showTokenDialog() async {
+    final controller = TextEditingController(
+      text: widget.inferenceConfigService.huggingFaceToken ?? '',
+    );
+    bool obscured = true;
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.key, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              const Text('Hugging Face Token'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Required to download on-device models from Hugging Face. '
+                'This is a one-time setup.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Get a free token at huggingface.co/settings/tokens',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                obscureText: obscured,
+                decoration: InputDecoration(
+                  hintText: 'hf_...',
+                  labelText: 'API Token',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      obscured ? Icons.visibility : Icons.visibility_off,
+                    ),
+                    onPressed: () => setDialogState(() => obscured = !obscured),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            if (controller.text.isNotEmpty)
+              TextButton(
+                onPressed: () => Navigator.pop(context, ''),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Remove'),
+              ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != null) {
+      final token = result.isEmpty ? null : result;
+      await widget.inferenceConfigService.setHuggingFaceToken(token);
+      if (widget.onDeviceLLMService != null) {
+        widget.onDeviceLLMService.updateHuggingFaceToken(token);
+      }
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              token == null
+                  ? 'Hugging Face token removed'
+                  : 'Hugging Face token saved',
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+
+    controller.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+
+    if (_hasToken) {
+      // Token is configured — show a compact success indicator
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: InkWell(
+          onTap: _showTokenDialog,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: colorScheme.primaryContainer),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle, size: 20, color: colorScheme.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Hugging Face token configured',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        'Tap to update or remove',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.edit_outlined,
+                  size: 18,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Token not configured — show a prominent setup banner
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Card(
+        elevation: 0,
+        color: colorScheme.errorContainer.withValues(alpha: 0.4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: colorScheme.error.withValues(alpha: 0.3)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.key_off, size: 20, color: colorScheme.error),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Hugging Face token required',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onErrorContainer,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'To download on-device models, you need a free Hugging Face API token. '
+                'This is a one-time setup.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onErrorContainer.withValues(alpha: 0.8),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _showTokenDialog,
+                  icon: const Icon(Icons.key, size: 18),
+                  label: const Text('Set Up Token'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

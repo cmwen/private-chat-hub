@@ -1,18 +1,23 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
+import 'package:private_chat_hub/services/llm_service.dart';
+import 'package:private_chat_hub/services/on_device_llm_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
+import 'package:private_chat_hub/services/unified_model_service.dart';
 
 /// Screen for managing Ollama models.
 class ModelsScreen extends StatefulWidget {
   final OllamaConnectionManager ollamaManager;
   final ConnectionService connectionService;
+  final OnDeviceLLMService? onDeviceLLMService;
 
   const ModelsScreen({
     super.key,
     required this.ollamaManager,
     required this.connectionService,
+    this.onDeviceLLMService,
   });
 
   @override
@@ -21,6 +26,7 @@ class ModelsScreen extends StatefulWidget {
 
 class _ModelsScreenState extends State<ModelsScreen> {
   List<OllamaModelInfo> _models = [];
+  List<ModelInfo> _localModels = [];
   bool _isLoading = true;
   String? _error;
   String? _selectedModel;
@@ -39,30 +45,49 @@ class _ModelsScreenState extends State<ModelsScreen> {
       _error = null;
     });
 
-    try {
-      final connection = widget.connectionService.getDefaultConnection();
-      if (connection == null) {
-        setState(() {
-          _error =
-              'No Ollama connection configured. Go to Settings to add one.';
-          _isLoading = false;
-        });
-        return;
+    String? remoteError;
+    var remoteModels = <OllamaModelInfo>[];
+    var localModels = <ModelInfo>[];
+
+    final connection = widget.connectionService.getDefaultConnection();
+    if (connection != null) {
+      try {
+        widget.ollamaManager.setConnection(connection);
+        remoteModels = await widget.ollamaManager.listModels();
+      } catch (e) {
+        remoteError = e.toString();
       }
-
-      widget.ollamaManager.setConnection(connection);
-
-      final models = await widget.ollamaManager.listModels();
-      setState(() {
-        _models = models;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
     }
+
+    try {
+      final unifiedService = UnifiedModelService(
+        onDeviceLLMService: widget.onDeviceLLMService,
+      );
+      final unifiedModels = await unifiedService.getUnifiedModelList([]);
+      localModels = unifiedModels.where((model) => model.isLocal).toList();
+    } catch (_) {
+      localModels = [];
+    }
+
+    final hasAnyModel = remoteModels.isNotEmpty || localModels.isNotEmpty;
+    final selectedStillExists =
+        _selectedModel != null &&
+        (remoteModels.any((model) => model.name == _selectedModel) ||
+            localModels.any((model) => model.id == _selectedModel));
+
+    if ((!selectedStillExists || _selectedModel == null) && hasAnyModel) {
+      _selectedModel = remoteModels.isNotEmpty
+          ? remoteModels.first.name
+          : localModels.first.id;
+      await widget.connectionService.setSelectedModel(_selectedModel!);
+    }
+
+    setState(() {
+      _models = remoteModels;
+      _localModels = localModels;
+      _error = !hasAnyModel && remoteError != null ? remoteError : null;
+      _isLoading = false;
+    });
   }
 
   Future<void> _deleteModel(OllamaModelInfo model) async {
@@ -113,6 +138,16 @@ class _ModelsScreenState extends State<ModelsScreen> {
   Future<void> _selectModel(OllamaModelInfo model) async {
     await widget.connectionService.setSelectedModel(model.name);
     setState(() => _selectedModel = model.name);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${model.name} selected as active model')),
+      );
+    }
+  }
+
+  Future<void> _selectLocalModel(ModelInfo model) async {
+    await widget.connectionService.setSelectedModel(model.id);
+    setState(() => _selectedModel = model.id);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${model.name} selected as active model')),
@@ -259,7 +294,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
       );
     }
 
-    if (_models.isEmpty) {
+    if (_models.isEmpty && _localModels.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -341,21 +376,52 @@ class _ModelsScreenState extends State<ModelsScreen> {
         Expanded(
           child: RefreshIndicator(
             onRefresh: _loadModels,
-            child: ListView.builder(
+            child: ListView(
               padding: const EdgeInsets.only(bottom: 80),
-              itemCount: _models.length,
-              itemBuilder: (context, index) {
-                final model = _models[index];
-                final isSelected = model.name == _selectedModel;
-
-                return _ModelCard(
-                  model: model,
-                  isSelected: isSelected,
-                  onTap: () => _showModelDetails(model),
-                  onSelect: () => _selectModel(model),
-                  onDelete: () => _deleteModel(model),
-                );
-              },
+              children: [
+                if (_localModels.isNotEmpty) ...[
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+                    child: Text(
+                      'On-Device Models',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  ..._localModels.map((model) {
+                    final isSelected = model.id == _selectedModel;
+                    return _LocalModelCard(
+                      model: model,
+                      isSelected: isSelected,
+                      onSelect: () => _selectLocalModel(model),
+                    );
+                  }),
+                ],
+                if (_models.isNotEmpty) ...[
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Text(
+                      'Ollama Models',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  ..._models.map((model) {
+                    final isSelected = model.name == _selectedModel;
+                    return _ModelCard(
+                      model: model,
+                      isSelected: isSelected,
+                      onTap: () => _showModelDetails(model),
+                      onSelect: () => _selectModel(model),
+                      onDelete: () => _deleteModel(model),
+                    );
+                  }),
+                ],
+              ],
             ),
           ),
         ),
@@ -369,6 +435,44 @@ class _DownloadProgress {
   final double? progress;
 
   _DownloadProgress({required this.status, this.progress});
+}
+
+class _LocalModelCard extends StatelessWidget {
+  final ModelInfo model;
+  final bool isSelected;
+  final VoidCallback onSelect;
+
+  const _LocalModelCard({
+    required this.model,
+    required this.isSelected,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: isSelected
+              ? colorScheme.primary
+              : colorScheme.surfaceContainerHighest,
+          child: Icon(
+            Icons.phone_android,
+            color: isSelected ? Colors.white : colorScheme.onSurfaceVariant,
+          ),
+        ),
+        title: Text(model.name),
+        subtitle: Text(model.sizeString),
+        trailing: isSelected
+            ? const Icon(Icons.check_circle, color: Colors.green)
+            : TextButton(onPressed: onSelect, child: const Text('Set Active')),
+        onTap: onSelect,
+      ),
+    );
+  }
 }
 
 class _ModelCard extends StatelessWidget {

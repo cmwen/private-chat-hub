@@ -7,16 +7,21 @@ import 'package:private_chat_hub/models/queue_item.dart';
 import 'package:private_chat_hub/models/tool_models.dart' as app_tools;
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
 import 'package:private_chat_hub/services/connectivity_service.dart';
+import 'package:private_chat_hub/services/inference_config_service.dart';
+import 'package:private_chat_hub/services/llm_service.dart';
 import 'package:private_chat_hub/services/message_queue_service.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
+import 'package:private_chat_hub/services/on_device_llm_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:private_chat_hub/services/tool_executor_service.dart';
+import 'package:private_chat_hub/services/unified_model_service.dart';
 import 'package:uuid/uuid.dart';
 
 /// Service for managing chat conversations and sending messages to Ollama using the toolkit.
 ///
 /// This is a clean rewrite that properly integrates with the ollama_toolkit.
+/// Now also supports hybrid mode with on-device inference via LiteRT-LM.
 class ChatService {
   final OllamaConnectionManager _ollamaManager;
   final StorageService _storage;
@@ -24,6 +29,10 @@ class ChatService {
   final app_tools.ToolConfig? _toolConfig;
   final OllamaConfigService _configService = OllamaConfigService();
   final NotificationService _notificationService = NotificationService();
+
+  // Hybrid inference mode support
+  InferenceConfigService? _inferenceConfigService;
+  OnDeviceLLMService? _onDeviceLLMService;
 
   // Conversation update stream (for UI sync)
   final StreamController<Conversation> _conversationUpdatesController =
@@ -51,8 +60,12 @@ class ChatService {
     this._storage, {
     ToolExecutorService? toolExecutor,
     app_tools.ToolConfig? toolConfig,
+    InferenceConfigService? inferenceConfigService,
+    OnDeviceLLMService? onDeviceLLMService,
   }) : _toolExecutor = toolExecutor,
-       _toolConfig = toolConfig {
+       _toolConfig = toolConfig,
+       _inferenceConfigService = inferenceConfigService,
+       _onDeviceLLMService = onDeviceLLMService {
     // Initialize offline mode services
     _connectivityService = ConnectivityService(_ollamaManager);
     _queueService = MessageQueueService(_storage);
@@ -65,6 +78,31 @@ class ChatService {
       }
     });
   }
+
+  /// Set the inference configuration service (for hybrid mode)
+  void setInferenceConfigService(InferenceConfigService service) {
+    _inferenceConfigService = service;
+  }
+
+  /// Set the on-device LLM service (for hybrid mode)
+  void setOnDeviceLLMService(OnDeviceLLMService service) {
+    _onDeviceLLMService = service;
+    _log('On-device LLM service attached');
+  }
+
+  /// Get current inference mode
+  InferenceMode get currentInferenceMode {
+    return _inferenceConfigService?.inferenceMode ?? InferenceMode.remote;
+  }
+
+  /// Check if on-device inference is available
+  Future<bool> isOnDeviceAvailable() async {
+    if (_onDeviceLLMService == null) return false;
+    return _onDeviceLLMService!.isAvailable();
+  }
+
+  /// Get the on-device LLM service
+  OnDeviceLLMService? get onDeviceLLMService => _onDeviceLLMService;
 
   void _log(String message) {
     _debugLog(message);
@@ -671,7 +709,11 @@ class ChatService {
   /// Sends a message and gets a streaming response from Ollama.
   ///
   /// Returns a stream of updated conversations as the response streams in.
-  /// If offline, queues the message instead.
+  /// Routing rules:
+  /// - Local models (local: prefix) always use on-device inference.
+  /// - Remote (Ollama) models always use Ollama; if offline the message is
+  ///   queued and retried when the connection is restored. The user can
+  ///   switch to a local model if they want an immediate on-device response.
   Stream<Conversation> sendMessage(String conversationId, String text) async* {
     await cancelMessageGeneration(conversationId);
 
@@ -680,9 +722,46 @@ class ChatService {
       throw Exception('Conversation not found');
     }
 
-    // Check if not online (offline or Ollama unreachable) - queue the message instead
+    // Check if model is a local model (has local: prefix)
+    final isLocalModel = UnifiedModelService.isLocalModel(
+      initialConversation.modelName,
+    );
+
+    _log(
+      'Routing decision: model=${initialConversation.modelName}, '
+      'isLocalModel=$isLocalModel, '
+      'inferenceMode=$currentInferenceMode, '
+      'onDeviceServiceReady=${_onDeviceLLMService != null}, '
+      'isOnline=$isOnline',
+    );
+
+    if (isLocalModel && _onDeviceLLMService == null) {
+      _log(
+        'Local model selected but on-device service is not ready; aborting instead of falling back to remote model path.',
+      );
+      throw Exception(
+        'On-device service is still initializing. Please wait a few seconds and try again.',
+      );
+    }
+
+    // Route to on-device if local model is selected
+    if (isLocalModel && _onDeviceLLMService != null) {
+      _log('Using on-device inference (local model selected)');
+      yield* _sendMessageOnDevice(conversationId, text);
+      return;
+    }
+
+    // NOTE: When inference mode is onDevice but the conversation uses a
+    // remote (Ollama) model, respect the model selection and use Ollama.
+    // The inference mode only affects the *default* model selection, not
+    // override an explicitly chosen remote model.
+
+    // Check if offline - queue the message for retry when back online.
+    // The user explicitly chose a remote model; honour that choice by
+    // queueing instead of silently falling back to a less capable on-device
+    // model. The user can always switch to a local model if they prefer.
     if (!isOnline) {
-      _log('Offline/disconnected mode: queueing message');
+      _log('Offline mode: queueing message for remote model');
       final conversation = await queueMessage(conversationId, text);
       yield conversation;
       return;
@@ -729,6 +808,211 @@ class ChatService {
     }
   }
 
+  /// Sends a message using on-device inference via LiteRT-LM
+  Stream<Conversation> _sendMessageOnDevice(
+    String conversationId,
+    String text, {
+    bool addUserMessage = true,
+  }) async* {
+    final initialConversation = getConversation(conversationId);
+    if (initialConversation == null) {
+      throw Exception('Conversation not found');
+    }
+
+    // Check if on-device service is available
+    if (_onDeviceLLMService == null) {
+      throw Exception('On-device inference not configured');
+    }
+
+    final isAvailable = await _onDeviceLLMService!.isAvailable();
+    _log(
+      'On-device availability check: isAvailable=$isAvailable, '
+      'conversationModel=${initialConversation.modelName}',
+    );
+    if (!isAvailable) {
+      String reason = 'On-device inference not available on this device';
+      try {
+        final readiness = await _onDeviceLLMService!.getReadinessReport();
+        final unsupportedReasons =
+            (readiness['unsupportedReasons'] as List<dynamic>? ?? [])
+                .whereType<String>()
+                .toList();
+        if (unsupportedReasons.isNotEmpty) {
+          reason = unsupportedReasons.first;
+        }
+
+        _log(
+          'On-device readiness details: isSupported=${readiness['isSupported']}, '
+          'unsupportedReasons=$unsupportedReasons, '
+          'warnings=${readiness['warnings']}',
+        );
+      } catch (e) {
+        _log('Failed to fetch readiness report: $e');
+      }
+
+      throw Exception(
+        'On-device inference not available on this device: $reason',
+      );
+    }
+
+    var conversation = initialConversation;
+
+    if (addUserMessage) {
+      // Add user message for direct send flow.
+      final userMessage = Message.user(
+        id: const Uuid().v4(),
+        text: text,
+        timestamp: DateTime.now(),
+      );
+      conversation = await addMessage(conversationId, userMessage);
+    }
+
+    // Create stream controller
+    final streamController = StreamController<Conversation>.broadcast();
+    _activeStreams[conversationId] = streamController;
+
+    streamController.add(conversation);
+    yield conversation;
+
+    // Create placeholder assistant message
+    final assistantMessageId = const Uuid().v4();
+    var assistantMessage = Message.assistant(
+      id: assistantMessageId,
+      text: '',
+      timestamp: DateTime.now(),
+      isStreaming: true,
+    );
+    conversation = await addMessage(conversationId, assistantMessage);
+    streamController.add(conversation);
+    yield conversation;
+
+    // Get the on-device model to use
+    // If conversation has local: prefix, extract the actual model ID
+    String onDeviceModelId;
+    if (UnifiedModelService.isLocalModel(initialConversation.modelName)) {
+      onDeviceModelId = UnifiedModelService.getLocalModelId(
+        initialConversation.modelName,
+      );
+      _log('Using local model from conversation: $onDeviceModelId');
+    } else {
+      onDeviceModelId =
+          _inferenceConfigService?.lastOnDeviceModel ?? 'gemma3-1b';
+      _log('Using default on-device model: $onDeviceModelId');
+    }
+
+    // Build conversation history (exclude the placeholder assistant message)
+    final conversationHistory = conversation.messages
+        .where((m) => m.id != assistantMessageId && !m.isError)
+        .toList();
+
+    // Start on-device generation in background so stream subscribers
+    // receive token updates in real time (when streaming is enabled).
+    () async {
+      try {
+        final buffer = StringBuffer();
+        var chunkCount = 0;
+        final generationStartedAt = DateTime.now();
+
+        // Respect the streaming mode setting
+        final streamingEnabled = await _configService.getStreamEnabled();
+
+        _log(
+          'Starting on-device generation: model=$onDeviceModelId, '
+          'streamingEnabled=$streamingEnabled, '
+          'promptLength=${text.length}, historyCount=${conversationHistory.length}',
+        );
+
+        await for (final token in _onDeviceLLMService!.generateResponse(
+          prompt: text,
+          modelId: onDeviceModelId,
+          conversationHistory: conversationHistory,
+          systemPrompt: conversation.systemPrompt,
+          temperature: conversation.parameters.temperature,
+          maxTokens: conversation.parameters.maxTokens,
+        )) {
+          if (streamController.isClosed) break;
+
+          chunkCount++;
+          buffer.write(token);
+
+          if (chunkCount == 1 || chunkCount % 25 == 0) {
+            _log(
+              'On-device stream progress: chunks=$chunkCount, accumulatedChars=${buffer.length}',
+            );
+          }
+
+          // Only push incremental updates when streaming mode is enabled
+          if (streamingEnabled) {
+            conversation = await _updateAssistantMessage(
+              conversation,
+              assistantMessageId,
+              buffer.toString(),
+              isStreaming: true,
+            );
+
+            if (!streamController.isClosed) {
+              streamController.add(conversation);
+            }
+          }
+        }
+
+        final finalText = buffer.toString();
+        final elapsedMs = DateTime.now()
+            .difference(generationStartedAt)
+            .inMilliseconds;
+        _log(
+          'On-device stream completed: chunks=$chunkCount, chars=${finalText.length}, elapsedMs=$elapsedMs',
+        );
+
+        if (finalText.trim().isEmpty) {
+          _handleError(
+            conversationId,
+            conversation,
+            assistantMessageId,
+            streamController,
+            'On-device model returned an empty response. Try again or switch model/backend.',
+          );
+          return;
+        }
+
+        // Finalize the message
+        conversation = await _updateAssistantMessage(
+          conversation,
+          assistantMessageId,
+          finalText,
+          isStreaming: false,
+        );
+
+        if (!streamController.isClosed) {
+          streamController.add(conversation);
+          await streamController.close();
+        }
+
+        // Show notification
+        await _showResponseCompleteNotification(conversation, finalText);
+
+        // Update last used on-device model
+        await _inferenceConfigService?.setLastOnDeviceModel(onDeviceModelId);
+      } catch (e) {
+        _log('On-device generation error: $e');
+        _handleError(
+          conversationId,
+          conversation,
+          assistantMessageId,
+          streamController,
+          'On-device inference error: ${e.toString()}',
+        );
+      } finally {
+        _cleanupStream(conversationId);
+      }
+    }();
+
+    // Yield updates as they arrive
+    await for (final updatedConversation in streamController.stream) {
+      yield updatedConversation;
+    }
+  }
+
   /// Streams a response for the current conversation context.
   ///
   /// Used when messages (with attachments) have already been added.
@@ -742,8 +1026,64 @@ class ChatService {
 
     var conversation = initialConversation;
 
-    // If not online, queue the last user message and return
+    final isLocalModel = UnifiedModelService.isLocalModel(
+      initialConversation.modelName,
+    );
+    _log(
+      'sendMessageWithContext routing: model=${initialConversation.modelName}, '
+      'isLocalModel=$isLocalModel, '
+      'inferenceMode=$currentInferenceMode, '
+      'onDeviceServiceReady=${_onDeviceLLMService != null}, '
+      'isOnline=$isOnline',
+    );
+
+    String lastUserText(Conversation c) {
+      for (final message in c.messages.reversed) {
+        if (message.role == MessageRole.user) return message.text;
+      }
+      return '';
+    }
+
+    if (isLocalModel) {
+      if (_onDeviceLLMService == null) {
+        _log(
+          'Local model selected in sendMessageWithContext but on-device service is null',
+        );
+        throw Exception(
+          'On-device service is still initializing. Please wait a few seconds and try again.',
+        );
+      }
+
+      _log(
+        'Routing sendMessageWithContext to on-device inference (local model selected)',
+      );
+      yield* _sendMessageOnDevice(
+        conversationId,
+        lastUserText(conversation),
+        addUserMessage: false,
+      );
+      return;
+    }
+
+    // NOTE: When inference mode is onDevice but the conversation uses a
+    // remote (Ollama) model, respect the model selection and use Ollama.
+    // The inference mode only affects the *default* model selection.
+
+    // If not online, queue for retry — honour the user's remote model choice.
     if (!isOnline) {
+      if (_onDeviceLLMService != null && await isOnDeviceAvailable()) {
+        _log(
+          'Ollama offline in sendMessageWithContext: falling back to on-device inference',
+        );
+        yield* _sendMessageOnDevice(
+          conversationId,
+          lastUserText(conversation),
+          addUserMessage: false,
+        );
+        return;
+      }
+
+      _log('Offline mode in sendMessageWithContext: queueing for remote model');
       final lastUserMessage = conversation.messages.lastWhere(
         (m) => m.role == MessageRole.user,
         orElse: () => Message.user(id: '', text: '', timestamp: DateTime.now()),
@@ -1671,6 +2011,10 @@ class ChatService {
     // Dispose offline mode services
     _connectivityService.dispose();
     _queueService.dispose();
+
+    // Dispose on-device LLM service if present
+    _onDeviceLLMService?.dispose();
+    _inferenceConfigService?.dispose();
   }
 
   // ============================================================================
@@ -1792,6 +2136,26 @@ When you have sufficient information from tool results, provide a complete respo
 
   /// Converts raw errors to user-friendly messages.
   String _formatUserFacingError(String errorMessage) {
+    final rawError = errorMessage.trim();
+    var cleaned = rawError;
+    cleaned = cleaned.replaceFirst(RegExp(r'^Exception:\s*'), '');
+    cleaned = cleaned.replaceFirst(RegExp(r'^Error:\s*'), '');
+
+    if (cleaned.startsWith('PlatformException(') && cleaned.endsWith(')')) {
+      final parts = cleaned.substring(
+        'PlatformException('.length,
+        cleaned.length - 1,
+      );
+      final segments = parts.split(',');
+      if (segments.length >= 2) {
+        cleaned = segments[1].trim();
+      }
+    }
+
+    if (cleaned.isEmpty) {
+      return 'Something went wrong while generating a response. Please try again.';
+    }
+
     final status = _connectivityService.currentStatus;
     final baseUrl = _ollamaManager.connection?.url;
     final location = baseUrl != null ? ' at $baseUrl' : '';
@@ -1804,7 +2168,39 @@ When you have sufficient information from tool results, provide a complete respo
       return 'Cannot reach Ollama$location. Make sure it is running and reachable.';
     }
 
-    final lower = errorMessage.toLowerCase();
+    final lower = cleaned.toLowerCase();
+
+    final details = StringBuffer()
+      ..writeln('Debug error details:')
+      ..writeln('- connectivityStatus: $status')
+      ..writeln('- ollamaEndpoint: ${baseUrl ?? 'not configured'}')
+      ..writeln('- rawError: $rawError')
+      ..writeln('- normalizedError: $cleaned');
+
+    if (lower.contains('not_implemented') && lower.contains('litert')) {
+      return 'On-device inference is not implemented in this build.\n'
+          'Native LiteRT generation path is still a placeholder.\n\n'
+          '${details.toString()}\n'
+          'Hint: Implement real native generation in LiteRTPlugin (startGeneration/generateText).';
+    }
+
+    if (lower.contains('model_not_loaded') ||
+        lower.contains('on-device') ||
+        lower.contains('litert')) {
+      return 'On-device inference failed.\n\n${details.toString()}';
+    }
+
+    if (lower.contains('not available on this device')) {
+      return 'On-device inference is not supported on this device. Use a remote model instead.';
+    }
+
+    if (lower.contains('not downloaded')) {
+      return 'This local model is not downloaded yet. Download it from Settings > On-device Models and retry.';
+    }
+
+    if (lower.contains('generation_in_progress')) {
+      return 'A response is already being generated. Please wait for it to finish.';
+    }
 
     if (lower.contains('no ollama connection configured')) {
       return 'No Ollama connection configured. Add one in Settings.';
@@ -1825,10 +2221,10 @@ When you have sufficient information from tool results, provide a complete respo
     }
 
     if (lower.contains('ollamaexception')) {
-      return errorMessage.replaceFirst(RegExp(r'^OllamaException:\s*'), '');
+      return cleaned.replaceFirst(RegExp(r'^OllamaException:\s*'), '');
     }
 
-    return errorMessage;
+    return cleaned;
   }
 }
 

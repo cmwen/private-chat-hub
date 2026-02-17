@@ -128,6 +128,16 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // Kotlin Coroutines for async operations in LiteRT plugin
+    // Version 1.10.2 - Latest stable (2024), recommended for Java 17 + Kotlin 2.0+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+
+    // LiteRT-LM Kotlin API + native runtime
+    // Pinned version — update manually when upgrading.
+    // To find newer versions: https://maven.google.com/web/index.html (search litertlm)
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.9.0-alpha03")
 }
 
 // Force JVM 17 for all dependency projects
