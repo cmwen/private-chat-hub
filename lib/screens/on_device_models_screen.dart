@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:private_chat_hub/services/inference_config_service.dart';
 import 'package:private_chat_hub/services/litert_platform_channel.dart';
 import 'package:private_chat_hub/services/llm_service.dart';
@@ -117,13 +118,19 @@ class _OnDeviceModelsScreenState extends State<OnDeviceModelsScreen> {
 
         // Show user-friendly error message
         String errorMessage = 'Download failed';
+        String? actionUrl;
         if (e is HuggingFaceAuthException) {
           errorMessage = e.message;
+          // Extract URL from error message if present
+          final urlMatch = RegExp(r'https://[^\s]+').firstMatch(errorMessage);
+          if (urlMatch != null) {
+            actionUrl = urlMatch.group(0);
+          }
         } else {
           errorMessage = 'Download failed: $e';
         }
 
-        _showErrorDialog('Download Error', errorMessage);
+        _showErrorDialog('Download Error', errorMessage, actionUrl: actionUrl);
 
         // Remove progress on error
         setState(() {
@@ -222,7 +229,7 @@ class _OnDeviceModelsScreenState extends State<OnDeviceModelsScreen> {
     );
   }
 
-  void _showErrorDialog(String title, String message) {
+  void _showErrorDialog(String title, String message, {String? actionUrl}) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -237,9 +244,59 @@ class _OnDeviceModelsScreenState extends State<OnDeviceModelsScreen> {
           ],
         ),
         content: SingleChildScrollView(
-          child: SelectableText(message, style: const TextStyle(fontSize: 14)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SelectableText(message, style: const TextStyle(fontSize: 14)),
+              if (actionUrl != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Action Required:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SelectableText(
+                        actionUrl,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '1. Copy the URL above\n2. Open it in your browser\n3. Accept the license agreement\n4. Return and retry the download',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
         actions: [
+          if (actionUrl != null)
+            TextButton.icon(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: actionUrl));
+                _showSnackBar('URL copied to clipboard');
+              },
+              icon: const Icon(Icons.copy),
+              label: const Text('Copy URL'),
+            ),
           if (message.contains('Hugging Face token'))
             TextButton.icon(
               onPressed: () {

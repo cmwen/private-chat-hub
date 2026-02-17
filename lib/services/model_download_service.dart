@@ -231,9 +231,11 @@ class ModelDownloadService {
       }
 
       if (response.statusCode == 403) {
+        final repoUrl = 'https://huggingface.co/${_extractRepoFromUrl(model.downloadUrl)}';
         throw HuggingFaceAuthException(
-          'Access denied. You may need to accept the model\'s license agreement at '
-          'https://huggingface.co/${_extractRepoFromUrl(model.downloadUrl)}',
+          'Access denied to ${model.name}. You must accept the model\'s license agreement before downloading.\n\n'
+          'Visit this page to accept the license:\n$repoUrl\n\n'
+          'After accepting, return to the app and retry the download.',
         );
       }
 
