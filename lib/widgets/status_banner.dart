@@ -34,7 +34,7 @@ class _StatusBannerState extends State<StatusBanner> {
     if (_message == null || _message!.isEmpty) return const SizedBox.shrink();
     return MaterialBanner(
       content: Text(_message!),
-      backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
       actions: [
         TextButton(
           onPressed: () => StatusService().setPersistent(null),

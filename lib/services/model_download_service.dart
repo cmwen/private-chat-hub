@@ -233,7 +233,8 @@ class ModelDownloadService {
       }
 
       if (response.statusCode == 403) {
-        final repoUrl = 'https://huggingface.co/${_extractRepoFromUrl(model.downloadUrl)}';
+        final repoUrl =
+            'https://huggingface.co/${_extractRepoFromUrl(model.downloadUrl)}';
         throw HuggingFaceAuthException(
           'Access denied to ${model.name}. You must accept the model\'s license agreement before downloading.\n\n'
           'Visit this page to accept the license:\n$repoUrl\n\n'
@@ -244,7 +245,8 @@ class ModelDownloadService {
       // Treat 404 as a potential authentication/authorization or incorrect URL issue.
       if (response.statusCode == 404) {
         _log('Not found (404) for ${model.downloadUrl}');
-        final repoUrl = 'https://huggingface.co/${_extractRepoFromUrl(model.downloadUrl)}';
+        final repoUrl =
+            'https://huggingface.co/${_extractRepoFromUrl(model.downloadUrl)}';
         throw HuggingFaceAuthException(
           'Model file not found (HTTP 404) when accessing ${model.name}.\n'
           'Possible causes:\n'

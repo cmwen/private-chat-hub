@@ -207,7 +207,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Initialize tool executor with proper config from settings
     final toolConfig = widget.toolConfigService.getConfig();
-    final toolConfigMsg = '[HomeScreen.initState] Tool config: enabled=${toolConfig.enabled}, webSearchEnabled=${toolConfig.webSearchEnabled}, hasJinaKey=${toolConfig.jinaApiKey != null && toolConfig.jinaApiKey!.isNotEmpty}';
+    final toolConfigMsg =
+        '[HomeScreen.initState] Tool config: enabled=${toolConfig.enabled}, webSearchEnabled=${toolConfig.webSearchEnabled}, hasJinaKey=${toolConfig.jinaApiKey != null && toolConfig.jinaApiKey!.isNotEmpty}';
     print(toolConfigMsg);
     StatusService().showTransient(toolConfigMsg);
 
@@ -222,7 +223,8 @@ class _HomeScreenState extends State<HomeScreen> {
           )
         : null;
 
-    final executorMsg = '[HomeScreen.initState] Tool executor created: ${toolExecutor != null}';
+    final executorMsg =
+        '[HomeScreen.initState] Tool executor created: ${toolExecutor != null}';
     print(executorMsg);
     StatusService().showTransient(executorMsg);
 
@@ -273,16 +275,21 @@ class _HomeScreenState extends State<HomeScreen> {
         // Update chat service with on-device service
         _chatService.setOnDeviceLLMService(onDeviceLLMService);
 
-        final onDeviceMsg = '[HomeScreen._initializeInferenceServices] On-device service initialized successfully';
+        final onDeviceMsg =
+            '[HomeScreen._initializeInferenceServices] On-device service initialized successfully';
         print(onDeviceMsg);
         StatusService().showTransient(onDeviceMsg);
       } catch (e) {
-        final warnMsg = '[HomeScreen._initializeInferenceServices] WARNING: Failed to initialize on-device service: $e';
+        final warnMsg =
+            '[HomeScreen._initializeInferenceServices] WARNING: Failed to initialize on-device service: $e';
         print(warnMsg);
         StatusService().showTransient(warnMsg);
-        final hintMsg = '[HomeScreen._initializeInferenceServices] The on-device mode toggle will still be available, but on-device inference may not work.';
+        final hintMsg =
+            '[HomeScreen._initializeInferenceServices] The on-device mode toggle will still be available, but on-device inference may not work.';
         print(hintMsg);
-        StatusService().setPersistent('On-device initialization failed — some features may be unavailable');
+        StatusService().setPersistent(
+          'On-device initialization failed — some features may be unavailable',
+        );
       }
     } catch (e) {
       print(
@@ -390,36 +397,36 @@ class _HomeScreenState extends State<HomeScreen> {
             child: IndexedStack(
               index: _currentIndex,
               children: [
-          ConversationListScreen(
-            chatService: _chatService,
-            connectionService: _connectionService,
-            ollamaManager: _ollamaManager,
-            onConversationSelected: _onConversationSelected,
-            onNewConversation: () {},
-          ),
-          ProjectsScreen(
-            projectService: _projectService,
-            chatService: _chatService,
-            connectionService: _connectionService,
-            ollamaManager: _ollamaManager,
-            onConversationSelected: _onConversationSelected,
-          ),
-          ModelsScreen(
-            ollamaManager: _ollamaManager,
-            connectionService: _connectionService,
-            onDeviceLLMService: _onDeviceLLMService,
-          ),
-          SettingsScreen(
-            connectionService: _connectionService,
-            ollamaManager: _ollamaManager,
-            chatService: _chatService,
-            toolConfigService: widget.toolConfigService,
-            inferenceConfigService: _inferenceConfigService,
-            storageService: widget.storageService,
-            onDeviceLLMService: _onDeviceLLMService,
-            onThemeModeChanged: widget.onThemeModeChanged,
-            currentThemeMode: widget.currentThemeMode,
-          ),
+                ConversationListScreen(
+                  chatService: _chatService,
+                  connectionService: _connectionService,
+                  ollamaManager: _ollamaManager,
+                  onConversationSelected: _onConversationSelected,
+                  onNewConversation: () {},
+                ),
+                ProjectsScreen(
+                  projectService: _projectService,
+                  chatService: _chatService,
+                  connectionService: _connectionService,
+                  ollamaManager: _ollamaManager,
+                  onConversationSelected: _onConversationSelected,
+                ),
+                ModelsScreen(
+                  ollamaManager: _ollamaManager,
+                  connectionService: _connectionService,
+                  onDeviceLLMService: _onDeviceLLMService,
+                ),
+                SettingsScreen(
+                  connectionService: _connectionService,
+                  ollamaManager: _ollamaManager,
+                  chatService: _chatService,
+                  toolConfigService: widget.toolConfigService,
+                  inferenceConfigService: _inferenceConfigService,
+                  storageService: widget.storageService,
+                  onDeviceLLMService: _onDeviceLLMService,
+                  onThemeModeChanged: widget.onThemeModeChanged,
+                  currentThemeMode: widget.currentThemeMode,
+                ),
               ],
             ),
           ),
