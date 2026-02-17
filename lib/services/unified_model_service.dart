@@ -1,11 +1,20 @@
+import 'dart:convert';
+
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
 import 'package:private_chat_hub/services/llm_service.dart';
 import 'package:private_chat_hub/services/on_device_llm_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Service that provides a unified list of available models from both
 /// Ollama (remote) and on-device (LiteRT) sources.
+///
+/// When remote models are fetched successfully they are cached to
+/// SharedPreferences so they remain visible when Ollama goes offline.
 class UnifiedModelService {
   final OnDeviceLLMService? _onDeviceLLMService;
+
+  /// SharedPreferences key for cached remote model list.
+  static const String _cachedRemoteModelsKey = 'cached_remote_models';
 
   UnifiedModelService({OnDeviceLLMService? onDeviceLLMService})
     : _onDeviceLLMService = onDeviceLLMService;
@@ -98,5 +107,37 @@ class UnifiedModelService {
       return getLocalModelId(modelName);
     }
     return modelName;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Remote model caching
+  // ---------------------------------------------------------------------------
+
+  /// Persist the remote (non-local) models from [allModels] to
+  /// SharedPreferences so they can be shown when Ollama is offline.
+  static Future<void> cacheRemoteModels(List<ModelInfo> allModels) async {
+    final remoteOnly = allModels.where((m) => !m.isLocal).toList();
+    final prefs = await SharedPreferences.getInstance();
+    final jsonList = remoteOnly.map((m) => jsonEncode(m.toJson())).toList();
+    await prefs.setStringList(_cachedRemoteModelsKey, jsonList);
+  }
+
+  /// Load previously-cached remote models.  Returns an empty list if nothing
+  /// has been cached yet.
+  static Future<List<ModelInfo>> getCachedRemoteModels() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonList = prefs.getStringList(_cachedRemoteModelsKey);
+    if (jsonList == null || jsonList.isEmpty) return [];
+    try {
+      return jsonList
+          .map(
+            (s) => ModelInfo.fromJson(
+              jsonDecode(s) as Map<String, dynamic>,
+            ),
+          )
+          .toList();
+    } catch (_) {
+      return [];
+    }
   }
 }

@@ -39,6 +39,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   bool _isLoading = true;
   bool _isLoadingModels = false;
   bool _localModelRefreshScheduled = false;
+  bool _isOllamaOnline = true;
 
   @override
   void initState() {
@@ -98,8 +99,13 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
         _ollamaModels = [];
       }
 
+      _isOllamaOnline = true;
+
       // Get unified model list (Ollama + local models)
       _allModels = await unifiedModelService.getUnifiedModelList(_ollamaModels);
+
+      // Cache the remote models for offline fallback
+      await UnifiedModelService.cacheRemoteModels(_allModels);
 
       // If selected model is missing or not set, select first available
       final selectedStillExists =
@@ -112,18 +118,23 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
         await widget.connectionService.setSelectedModel(_selectedModel!);
       }
     } catch (e) {
-      // Failed to load Ollama models - still try to get local models
+      // Ollama is unreachable — use cached remote models so the user can
+      // still select a remote model (messages will be queued).
       _ollamaModels = [];
-      try {
-        _allModels = await unifiedModelService.getUnifiedModelList(
-          _ollamaModels,
-        );
+      _isOllamaOnline = false;
 
+      try {
+        final cachedRemote = await UnifiedModelService.getCachedRemoteModels();
+        final localModels = await unifiedModelService.getUnifiedModelList([]);
+        _allModels = [...cachedRemote, ...localModels];
+
+        // Preserve the selected model if it exists in the combined list
+        // (including cached remote models). Only change selection when the
+        // current selection doesn't appear at all.
         final selectedStillExists =
             _selectedModel != null &&
             _allModels.any((model) => model.id == _selectedModel);
 
-        // Select first available model if needed
         if ((!selectedStillExists || _selectedModel == null) &&
             _allModels.isNotEmpty) {
           _selectedModel = _allModels.first.id;
@@ -262,6 +273,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
       builder: (sheetContext) => _ModelSelectorSheet(
         models: _allModels,
         selectedModel: _selectedModel,
+        isOllamaOnline: _isOllamaOnline,
         onModelSelected: (model) async {
           await widget.connectionService.setSelectedModel(model.id);
           if (!mounted) return;
@@ -340,6 +352,18 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
+                              if (!_isOllamaOnline &&
+                                  _selectedModel != null &&
+                                  !UnifiedModelService.isLocalModel(
+                                    _selectedModel!,
+                                  ))
+                                Text(
+                                  'Server offline — messages will be queued',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.orange.shade700,
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -562,6 +586,7 @@ class _ConversationTile extends StatelessWidget {
 class _ModelSelectorSheet extends StatelessWidget {
   final List<ModelInfo> models;
   final String? selectedModel;
+  final bool isOllamaOnline;
   final Function(ModelInfo) onModelSelected;
   final bool isLoading;
   final VoidCallback onRefresh;
@@ -569,6 +594,7 @@ class _ModelSelectorSheet extends StatelessWidget {
   const _ModelSelectorSheet({
     required this.models,
     required this.selectedModel,
+    required this.isOllamaOnline,
     required this.onModelSelected,
     required this.isLoading,
     required this.onRefresh,
@@ -683,12 +709,56 @@ class _ModelSelectorSheet extends StatelessWidget {
                             ),
                           ),
                         ],
+                        if (!model.isLocal && !isOllamaOnline) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: Colors.orange.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.cloud_off,
+                                  size: 14,
+                                  color: Colors.orange,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'OFFLINE',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orange,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(model.sizeString),
+                        if (!model.isLocal && !isOllamaOnline)
+                          Text(
+                            'Messages will be queued until server is back',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.orange.shade700,
+                            ),
+                          )
+                        else
+                          Text(model.sizeString),
                         const SizedBox(height: 4),
                         Wrap(
                           spacing: 4,

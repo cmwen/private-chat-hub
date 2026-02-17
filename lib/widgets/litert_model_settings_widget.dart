@@ -33,21 +33,15 @@ class _LiteRTModelSettingsWidgetState extends State<LiteRTModelSettingsWidget> {
   late int _maxTokens;
   late double _repetitionPenalty;
   bool _isExpanded = false;
-  late TextEditingController _tokenController;
-  bool _tokenObscured = true;
 
   @override
   void initState() {
     super.initState();
-    _tokenController = TextEditingController(
-      text: widget.configService.huggingFaceToken ?? '',
-    );
     _loadSettings();
   }
 
   @override
   void dispose() {
-    _tokenController.dispose();
     super.dispose();
   }
 
@@ -86,44 +80,6 @@ class _LiteRTModelSettingsWidgetState extends State<LiteRTModelSettingsWidget> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error saving settings: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _saveToken() async {
-    try {
-      final token = _tokenController.text.trim();
-      await widget.configService.setHuggingFaceToken(
-        token.isEmpty ? null : token,
-      );
-
-      // Update the token in the service immediately
-      if (widget.onDeviceLLMService != null) {
-        widget.onDeviceLLMService.updateHuggingFaceToken(
-          token.isEmpty ? null : token,
-        );
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              token.isEmpty
-                  ? 'Hugging Face token removed'
-                  : 'Hugging Face token saved',
-            ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving token: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -202,75 +158,6 @@ class _LiteRTModelSettingsWidgetState extends State<LiteRTModelSettingsWidget> {
                 ),
               ),
             ],
-          ),
-        ),
-
-        // Hugging Face Token Input
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Card(
-            elevation: 0,
-            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.key, size: 16, color: colorScheme.secondary),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Hugging Face API Token',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Required for downloading models. Get a free token at huggingface.co/settings/tokens',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _tokenController,
-                    obscureText: _tokenObscured,
-                    decoration: InputDecoration(
-                      hintText: 'hf_...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      suffixIcon: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              _tokenObscured
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _tokenObscured = !_tokenObscured;
-                              });
-                            },
-                          ),
-                          if (_tokenController.text.isNotEmpty)
-                            IconButton(
-                              icon: const Icon(Icons.save),
-                              onPressed: _saveToken,
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ),
         ),
 

@@ -340,6 +340,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  _HuggingFaceTokenBanner(
+                    inferenceConfigService: widget.inferenceConfigService!,
+                    onDeviceLLMService: widget.onDeviceLLMService,
+                  ),
                   const Divider(height: 32),
                 ],
 
@@ -1186,6 +1191,246 @@ class _AddConnectionDialogState extends State<AddConnectionDialog> {
         ),
         ElevatedButton(onPressed: _save, child: const Text('Save')),
       ],
+    );
+  }
+}
+
+/// Banner shown in the On-Device Models section to indicate HF token status
+/// and provide a quick way to set it up.
+class _HuggingFaceTokenBanner extends StatefulWidget {
+  final InferenceConfigService inferenceConfigService;
+  final dynamic onDeviceLLMService;
+
+  const _HuggingFaceTokenBanner({
+    required this.inferenceConfigService,
+    this.onDeviceLLMService,
+  });
+
+  @override
+  State<_HuggingFaceTokenBanner> createState() =>
+      _HuggingFaceTokenBannerState();
+}
+
+class _HuggingFaceTokenBannerState extends State<_HuggingFaceTokenBanner> {
+  bool get _hasToken =>
+      (widget.inferenceConfigService.huggingFaceToken ?? '').isNotEmpty;
+
+  Future<void> _showTokenDialog() async {
+    final controller = TextEditingController(
+      text: widget.inferenceConfigService.huggingFaceToken ?? '',
+    );
+    bool obscured = true;
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.key, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              const Text('Hugging Face Token'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Required to download on-device models from Hugging Face. '
+                'This is a one-time setup.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Get a free token at huggingface.co/settings/tokens',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                obscureText: obscured,
+                decoration: InputDecoration(
+                  hintText: 'hf_...',
+                  labelText: 'API Token',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      obscured ? Icons.visibility : Icons.visibility_off,
+                    ),
+                    onPressed: () =>
+                        setDialogState(() => obscured = !obscured),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            if (controller.text.isNotEmpty)
+              TextButton(
+                onPressed: () => Navigator.pop(context, ''),
+                style:
+                    TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Remove'),
+              ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.pop(context, controller.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != null) {
+      final token = result.isEmpty ? null : result;
+      await widget.inferenceConfigService.setHuggingFaceToken(token);
+      if (widget.onDeviceLLMService != null) {
+        widget.onDeviceLLMService.updateHuggingFaceToken(token);
+      }
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              token == null
+                  ? 'Hugging Face token removed'
+                  : 'Hugging Face token saved',
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+
+    controller.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+
+    if (_hasToken) {
+      // Token is configured — show a compact success indicator
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: InkWell(
+          onTap: _showTokenDialog,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: colorScheme.primaryContainer,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle, size: 20, color: colorScheme.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Hugging Face token configured',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        'Tap to update or remove',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.edit_outlined,
+                  size: 18,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Token not configured — show a prominent setup banner
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Card(
+        elevation: 0,
+        color: colorScheme.errorContainer.withValues(alpha: 0.4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: colorScheme.error.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.key_off, size: 20, color: colorScheme.error),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Hugging Face token required',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onErrorContainer,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'To download on-device models, you need a free Hugging Face API token. '
+                'This is a one-time setup.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onErrorContainer.withValues(alpha: 0.8),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _showTokenDialog,
+                  icon: const Icon(Icons.key, size: 18),
+                  label: const Text('Set Up Token'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_markdown_latex/flutter_markdown_latex.dart';
+import 'package:markdown/markdown.dart' as md;
 import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
 import 'package:private_chat_hub/models/tool_models.dart';
@@ -13,6 +15,7 @@ import 'package:private_chat_hub/widgets/capability_widgets.dart';
 import 'package:private_chat_hub/widgets/message_bubble.dart';
 import 'package:private_chat_hub/widgets/message_input.dart';
 import 'package:private_chat_hub/widgets/queue_status_banner.dart';
+import 'package:private_chat_hub/utils/math_preprocessor.dart';
 
 /// Main chat screen displaying messages and input field.
 class ChatScreen extends StatefulWidget {
@@ -1759,8 +1762,20 @@ class _MarkdownMessageBubble extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     MarkdownBody(
-                      data: message.text,
+                      data: preprocessMathDelimiters(message.text),
                       selectable: true,
+                      builders: {
+                        'latex': LatexElementBuilder(
+                          textStyle: TextStyle(
+                            fontSize: 15,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      },
+                      extensionSet: md.ExtensionSet(
+                        <md.BlockSyntax>[LatexBlockSyntax(), ...md.ExtensionSet.gitHubFlavored.blockSyntaxes],
+                        <md.InlineSyntax>[LatexInlineSyntax(), ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes],
+                      ),
                       styleSheet: MarkdownStyleSheet(
                         p: TextStyle(
                           fontSize: 15,

@@ -292,6 +292,11 @@ class _OnDeviceModelsScreenState extends State<OnDeviceModelsScreen> {
               onRefresh: _loadData,
               child: ListView(
                 children: [
+                  // Hugging Face token warning if not configured
+                  if ((widget.inferenceConfigService.huggingFaceToken ?? '')
+                      .isEmpty)
+                    _buildHuggingFaceTokenWarning(context),
+
                   // Device resources card
                   DeviceResourceInfo(
                     memoryInfo: _memoryInfo,
@@ -355,6 +360,63 @@ class _OnDeviceModelsScreenState extends State<OnDeviceModelsScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildHuggingFaceTokenWarning(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      elevation: 0,
+      color: colorScheme.errorContainer.withValues(alpha: 0.4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: colorScheme.error.withValues(alpha: 0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.warning_amber_rounded, color: colorScheme.error, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hugging Face token not set',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onErrorContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'A Hugging Face API token is required to download models. '
+                    'Go to Settings to set it up.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onErrorContainer.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.settings, size: 16),
+                    label: const Text('Go to Settings'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colorScheme.error,
+                      side: BorderSide(color: colorScheme.error.withValues(alpha: 0.5)),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

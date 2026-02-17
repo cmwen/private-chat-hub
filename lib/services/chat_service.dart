@@ -709,10 +709,11 @@ class ChatService {
   /// Sends a message and gets a streaming response from Ollama.
   ///
   /// Returns a stream of updated conversations as the response streams in.
-  /// If offline and on-device models available, automatically uses local inference.
-  /// Otherwise queues the message.
-  /// Supports hybrid mode: uses on-device inference when mode is set to onDevice or as fallback.
-  /// Also detects local models by prefix and routes to on-device inference automatically.
+  /// Routing rules:
+  /// - Local models (local: prefix) always use on-device inference.
+  /// - Remote (Ollama) models always use Ollama; if offline the message is
+  ///   queued and retried when the connection is restored. The user can
+  ///   switch to a local model if they want an immediate on-device response.
   Stream<Conversation> sendMessage(String conversationId, String text) async* {
     await cancelMessageGeneration(conversationId);
 
@@ -755,17 +756,12 @@ class ChatService {
     // The inference mode only affects the *default* model selection, not
     // override an explicitly chosen remote model.
 
-    // Check if offline - try on-device fallback before queueing
+    // Check if offline - queue the message for retry when back online.
+    // The user explicitly chose a remote model; honour that choice by
+    // queueing instead of silently falling back to a less capable on-device
+    // model. The user can always switch to a local model if they prefer.
     if (!isOnline) {
-      // Check if on-device inference is available as fallback
-      if (_onDeviceLLMService != null && await isOnDeviceAvailable()) {
-        _log('Ollama offline: falling back to on-device inference');
-        yield* _sendMessageOnDevice(conversationId, text);
-        return;
-      }
-
-      // No on-device fallback available - queue the message
-      _log('Offline mode: queueing message (no on-device models available)');
+      _log('Offline mode: queueing message for remote model');
       final conversation = await queueMessage(conversationId, text);
       yield conversation;
       return;
@@ -1073,8 +1069,9 @@ class ChatService {
     // remote (Ollama) model, respect the model selection and use Ollama.
     // The inference mode only affects the *default* model selection.
 
-    // If not online, try on-device fallback before queueing
+    // If not online, queue for retry — honour the user's remote model choice.
     if (!isOnline) {
+<<<<<<< HEAD
       if (_onDeviceLLMService != null && await isOnDeviceAvailable()) {
         _log(
           'Ollama offline in sendMessageWithContext: falling back to on-device inference',
@@ -1087,6 +1084,9 @@ class ChatService {
         return;
       }
 
+=======
+      _log('Offline mode in sendMessageWithContext: queueing for remote model');
+>>>>>>> 9e637cb (feat: Add Hugging Face token management and math preprocessing)
       final lastUserMessage = conversation.messages.lastWhere(
         (m) => m.role == MessageRole.user,
         orElse: () => Message.user(id: '', text: '', timestamp: DateTime.now()),
