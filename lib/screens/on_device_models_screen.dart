@@ -379,7 +379,11 @@ class _OnDeviceModelsScreenState extends State<OnDeviceModelsScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.warning_amber_rounded, color: colorScheme.error, size: 24),
+            Icon(
+              Icons.warning_amber_rounded,
+              color: colorScheme.error,
+              size: 24,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -397,7 +401,9 @@ class _OnDeviceModelsScreenState extends State<OnDeviceModelsScreen> {
                     'A Hugging Face API token is required to download models. '
                     'Go to Settings to set it up.',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onErrorContainer.withValues(alpha: 0.8),
+                      color: colorScheme.onErrorContainer.withValues(
+                        alpha: 0.8,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -407,7 +413,9 @@ class _OnDeviceModelsScreenState extends State<OnDeviceModelsScreen> {
                     label: const Text('Go to Settings'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: colorScheme.error,
-                      side: BorderSide(color: colorScheme.error.withValues(alpha: 0.5)),
+                      side: BorderSide(
+                        color: colorScheme.error.withValues(alpha: 0.5),
+                      ),
                       visualDensity: VisualDensity.compact,
                     ),
                   ),

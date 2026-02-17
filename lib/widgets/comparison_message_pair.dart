@@ -312,13 +312,17 @@ class _ComparisonMessagePairState extends State<ComparisonMessagePair> {
       data: preprocessMathDelimiters(message.text),
       selectable: true,
       builders: {
-        'latex': LatexElementBuilder(
-          textStyle: theme.textTheme.bodyMedium,
-        ),
+        'latex': LatexElementBuilder(textStyle: theme.textTheme.bodyMedium),
       },
       extensionSet: md.ExtensionSet(
-        <md.BlockSyntax>[LatexBlockSyntax(), ...md.ExtensionSet.gitHubFlavored.blockSyntaxes],
-        <md.InlineSyntax>[LatexInlineSyntax(), ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes],
+        <md.BlockSyntax>[
+          LatexBlockSyntax(),
+          ...md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+        ],
+        <md.InlineSyntax>[
+          LatexInlineSyntax(),
+          ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
+        ],
       ),
       styleSheet: MarkdownStyleSheet(
         p: theme.textTheme.bodyMedium,

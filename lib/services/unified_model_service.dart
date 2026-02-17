@@ -130,11 +130,7 @@ class UnifiedModelService {
     if (jsonList == null || jsonList.isEmpty) return [];
     try {
       return jsonList
-          .map(
-            (s) => ModelInfo.fromJson(
-              jsonDecode(s) as Map<String, dynamic>,
-            ),
-          )
+          .map((s) => ModelInfo.fromJson(jsonDecode(s) as Map<String, dynamic>))
           .toList();
     } catch (_) {
       return [];

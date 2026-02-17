@@ -8,10 +8,7 @@ void main() {
     });
 
     test('should return plain text unchanged', () {
-      expect(
-        preprocessMathDelimiters('Hello, world!'),
-        'Hello, world!',
-      );
+      expect(preprocessMathDelimiters('Hello, world!'), 'Hello, world!');
     });
 
     test('should not modify existing dollar-sign math', () {
@@ -29,10 +26,7 @@ void main() {
 
       test('should convert multi-line \\[...\\]', () {
         const input = '\\[\ny = ax^2\n\\]';
-        expect(
-          preprocessMathDelimiters(input),
-          '\$\$\ny = ax^2\n\$\$',
-        );
+        expect(preprocessMathDelimiters(input), '\$\$\ny = ax^2\n\$\$');
       });
     });
 
@@ -136,7 +130,8 @@ void main() {
       test('should convert ( \\displaystyle \\frac{b}{2a} )', () {
         expect(
           preprocessMathDelimiters(
-              r'Halve it: ( \displaystyle \frac{b}{2a} ).'),
+            r'Halve it: ( \displaystyle \frac{b}{2a} ).',
+          ),
           r'Halve it: $\displaystyle \frac{b}{2a}$.',
         );
       });
@@ -174,7 +169,8 @@ void main() {
 
     group('mixed content', () {
       test('should handle text with multiple math blocks', () {
-        const input = 'Given:\n'
+        const input =
+            'Given:\n'
             r'[ y = ax^{2}+bx+c \qquad (a\neq 0) ]'
             '\nGoal: vertex form\n'
             r'[ y = a\bigl(x-h\bigr)^{2}+k ]';
@@ -186,7 +182,8 @@ void main() {
       });
 
       test('should handle text with inline and block math', () {
-        const input = 'Take \\(\\frac{b}{a}\\) and compute:\n'
+        const input =
+            'Take \\(\\frac{b}{a}\\) and compute:\n'
             r'[ y = \frac{b^2}{4a} ]';
         final result = preprocessMathDelimiters(input);
         expect(result, contains(r'$\frac{b}{a}$'));

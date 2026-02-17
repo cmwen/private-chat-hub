@@ -1265,8 +1265,7 @@ class _HuggingFaceTokenBannerState extends State<_HuggingFaceTokenBanner> {
                     icon: Icon(
                       obscured ? Icons.visibility : Icons.visibility_off,
                     ),
-                    onPressed: () =>
-                        setDialogState(() => obscured = !obscured),
+                    onPressed: () => setDialogState(() => obscured = !obscured),
                   ),
                 ),
               ),
@@ -1276,8 +1275,7 @@ class _HuggingFaceTokenBannerState extends State<_HuggingFaceTokenBanner> {
             if (controller.text.isNotEmpty)
               TextButton(
                 onPressed: () => Navigator.pop(context, ''),
-                style:
-                    TextButton.styleFrom(foregroundColor: Colors.red),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
                 child: const Text('Remove'),
               ),
             TextButton(
@@ -1285,8 +1283,7 @@ class _HuggingFaceTokenBannerState extends State<_HuggingFaceTokenBanner> {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () =>
-                  Navigator.pop(context, controller.text.trim()),
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
               child: const Text('Save'),
             ),
           ],
@@ -1335,9 +1332,7 @@ class _HuggingFaceTokenBannerState extends State<_HuggingFaceTokenBanner> {
             decoration: BoxDecoration(
               color: colorScheme.primaryContainer.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: colorScheme.primaryContainer,
-              ),
+              border: Border.all(color: colorScheme.primaryContainer),
             ),
             child: Row(
               children: [
@@ -1382,9 +1377,7 @@ class _HuggingFaceTokenBannerState extends State<_HuggingFaceTokenBanner> {
         color: colorScheme.errorContainer.withValues(alpha: 0.4),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: colorScheme.error.withValues(alpha: 0.3),
-          ),
+          side: BorderSide(color: colorScheme.error.withValues(alpha: 0.3)),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),

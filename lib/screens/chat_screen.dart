@@ -1773,8 +1773,14 @@ class _MarkdownMessageBubble extends StatelessWidget {
                         ),
                       },
                       extensionSet: md.ExtensionSet(
-                        <md.BlockSyntax>[LatexBlockSyntax(), ...md.ExtensionSet.gitHubFlavored.blockSyntaxes],
-                        <md.InlineSyntax>[LatexInlineSyntax(), ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes],
+                        <md.BlockSyntax>[
+                          LatexBlockSyntax(),
+                          ...md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+                        ],
+                        <md.InlineSyntax>[
+                          LatexInlineSyntax(),
+                          ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
+                        ],
                       ),
                       styleSheet: MarkdownStyleSheet(
                         p: TextStyle(

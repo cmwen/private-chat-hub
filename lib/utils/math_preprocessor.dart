@@ -15,9 +15,9 @@ library;
 /// subscripts, braces, etc.
 final _mathIndicatorPattern = RegExp(
   r'\\[a-zA-Z]+|' // LaTeX commands like \frac, \sqrt, \neq
-  r'\^{|_{|'       // Superscript/subscript with braces: x^{2}, a_{n}
+  r'\^{|_{|' // Superscript/subscript with braces: x^{2}, a_{n}
   r'\^[0-9a-zA-Z]|' // Simple superscript: x^2, x^n
-  r'_[0-9a-zA-Z]'   // Simple subscript: a_1, x_i
+  r'_[0-9a-zA-Z]', // Simple subscript: a_1, x_i
 );
 
 /// Check if content looks like LaTeX math.
@@ -32,8 +32,9 @@ bool _looksLikeMathEquation(String content) {
   if (!RegExp(r'[=<>≤≥≠]').hasMatch(content)) return false;
   // Must contain a variable letter followed by something math-ish
   // e.g. "x^2", "3x", "ax", or a LaTeX command
-  return RegExp(r'[a-zA-Z]\^|[0-9][a-zA-Z]|[a-zA-Z][0-9]|\\[a-zA-Z]')
-      .hasMatch(content);
+  return RegExp(
+    r'[a-zA-Z]\^|[0-9][a-zA-Z]|[a-zA-Z][0-9]|\\[a-zA-Z]',
+  ).hasMatch(content);
 }
 
 /// Preprocess message text to normalize math delimiters for rendering.
@@ -92,7 +93,7 @@ String _convertBracketBlockMath(String text) {
         trimmed.endsWith(']') &&
         !trimmed.startsWith('[[') && // Not a wiki-link
         !trimmed.startsWith('[^') && // Not a footnote
-        !trimmed.contains('](') &&   // Not a markdown link
+        !trimmed.contains('](') && // Not a markdown link
         trimmed.length > 4) {
       final content = trimmed.substring(1, trimmed.length - 1).trim();
 
@@ -126,27 +127,25 @@ String _convertBracketBlockMath(String text) {
 String _convertSpacedParenMath(String text) {
   // Match ( space content space ) — the spaced convention LLMs use
   // Content must not contain newlines and should not be too long (avoid prose)
-  return text.replaceAllMapped(
-    RegExp(r'\(\s+(.+?)\s+\)'),
-    (m) {
-      final content = m.group(1)!;
+  return text.replaceAllMapped(RegExp(r'\(\s+(.+?)\s+\)'), (m) {
+    final content = m.group(1)!;
 
-      // Skip if content is too long (likely prose, not math)
-      if (content.length > 200) return m.group(0)!;
+    // Skip if content is too long (likely prose, not math)
+    if (content.length > 200) return m.group(0)!;
 
-      // Skip if it looks like prose (contains common English words)
-      if (RegExp(r'\b(?:if|the|is|are|was|were|and|but|for|not|with|this|that|from|have|has)\b',
-              caseSensitive: false)
-          .hasMatch(content)) {
-        return m.group(0)!;
-      }
+    // Skip if it looks like prose (contains common English words)
+    if (RegExp(
+      r'\b(?:if|the|is|are|was|were|and|but|for|not|with|this|that|from|have|has)\b',
+      caseSensitive: false,
+    ).hasMatch(content)) {
+      return m.group(0)!;
+    }
 
-      // Convert if it has LaTeX commands OR math indicators
-      if (_looksLikeMath(content) || _looksLikeMathEquation(content)) {
-        return '\$$content\$';
-      }
+    // Convert if it has LaTeX commands OR math indicators
+    if (_looksLikeMath(content) || _looksLikeMathEquation(content)) {
+      return '\$$content\$';
+    }
 
-      return m.group(0)!; // Leave unchanged
-    },
-  );
+    return m.group(0)!; // Leave unchanged
+  });
 }
