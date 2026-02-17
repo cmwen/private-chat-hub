@@ -14,6 +14,7 @@ import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/on_device_llm_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
+import 'package:private_chat_hub/services/status_service.dart';
 import 'package:private_chat_hub/services/tool_executor_service.dart';
 import 'package:private_chat_hub/services/unified_model_service.dart';
 import 'package:uuid/uuid.dart';
@@ -88,6 +89,14 @@ class ChatService {
   void setOnDeviceLLMService(OnDeviceLLMService service) {
     _onDeviceLLMService = service;
     _log('On-device LLM service attached');
+    try {
+      // Provide quick UI feedback when on-device LLM becomes available
+      // ignore: avoid_print
+      print('[ChatService] notifying UI: on-device LLM attached');
+      // Use StatusService to show a transient notification
+      // Import is added at top when file is analyzed if missing
+      StatusService().showTransient('On-device LLM service attached');
+    } catch (_) {}
   }
 
   /// Get current inference mode

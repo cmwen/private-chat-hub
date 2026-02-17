@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
+import 'package:private_chat_hub/services/status_service.dart';
 
 /// Status of the Ollama connection.
 enum OllamaConnectivityStatus {
@@ -134,6 +135,28 @@ class ConnectivityService {
       debugPrint(
         '[ConnectivityService] Status changed: ${oldStatus.name} -> ${newStatus.name}',
       );
+
+      // Publish a persistent and transient user-facing status
+      try {
+        String? persistent;
+        String transient = 'Connection: ${newStatus.name}';
+        switch (newStatus) {
+          case OllamaConnectivityStatus.checking:
+            persistent = 'Checking connection...';
+            break;
+          case OllamaConnectivityStatus.connected:
+            persistent = null; // clear banner when connected
+            break;
+          case OllamaConnectivityStatus.disconnected:
+            persistent = 'Ollama server unreachable';
+            break;
+          case OllamaConnectivityStatus.offline:
+            persistent = 'No network connectivity';
+            break;
+        }
+        StatusService().setPersistent(persistent);
+        StatusService().showTransient(transient);
+      } catch (_) {}
 
       if (!_statusController.isClosed) {
         _statusController.add(newStatus);

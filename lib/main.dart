@@ -15,6 +15,8 @@ import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/inference_config_service.dart';
 import 'package:private_chat_hub/services/jina_search_service.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
+import 'package:private_chat_hub/services/status_service.dart';
+import 'package:private_chat_hub/widgets/status_banner.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/on_device_llm_service.dart';
 import 'package:private_chat_hub/services/project_service.dart';
@@ -88,10 +90,21 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.system;
+  StreamSubscription<String>? _statusTransientSub;
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
+      GlobalKey<ScaffoldMessengerState>();
 
   @override
   void initState() {
     super.initState();
+    // Listen for transient status messages and show as SnackBars.
+    // Use the GlobalKey so we never need a Scaffold ancestor in context.
+    _statusTransientSub?.cancel();
+    _statusTransientSub = StatusService().transientStream.listen((msg) {
+      _scaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(content: Text(msg)),
+      );
+    });
     _loadThemeMode();
   }
 
@@ -123,6 +136,12 @@ class _MyAppState extends State<MyApp> {
   }
 
   @override
+  void dispose() {
+    _statusTransientSub?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Private Chat Hub',
@@ -137,6 +156,7 @@ class _MyAppState extends State<MyApp> {
         ),
         useMaterial3: true,
       ),
+      scaffoldMessengerKey: _scaffoldMessengerKey,
       themeMode: _themeMode,
       home: HomeScreen(
         storageService: widget.storageService,
@@ -174,6 +194,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final ProjectService _projectService;
   InferenceConfigService? _inferenceConfigService;
   OnDeviceLLMService? _onDeviceLLMService;
+  late final StreamSubscription<String> _statusTransientSub;
 
   int _currentIndex = 0;
   Conversation? _selectedConversation;
@@ -186,9 +207,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Initialize tool executor with proper config from settings
     final toolConfig = widget.toolConfigService.getConfig();
-    print(
-      '[HomeScreen.initState] Tool config: enabled=${toolConfig.enabled}, webSearchEnabled=${toolConfig.webSearchEnabled}, hasJinaKey=${toolConfig.jinaApiKey != null && toolConfig.jinaApiKey!.isNotEmpty}',
-    );
+    final toolConfigMsg = '[HomeScreen.initState] Tool config: enabled=${toolConfig.enabled}, webSearchEnabled=${toolConfig.webSearchEnabled}, hasJinaKey=${toolConfig.jinaApiKey != null && toolConfig.jinaApiKey!.isNotEmpty}';
+    print(toolConfigMsg);
+    StatusService().showTransient(toolConfigMsg);
 
     final toolExecutor =
         toolConfig.jinaApiKey != null &&
@@ -201,9 +222,9 @@ class _HomeScreenState extends State<HomeScreen> {
           )
         : null;
 
-    print(
-      '[HomeScreen.initState] Tool executor created: ${toolExecutor != null}',
-    );
+    final executorMsg = '[HomeScreen.initState] Tool executor created: ${toolExecutor != null}';
+    print(executorMsg);
+    StatusService().showTransient(executorMsg);
 
     _chatService = ChatService(
       _ollamaManager,
@@ -252,16 +273,16 @@ class _HomeScreenState extends State<HomeScreen> {
         // Update chat service with on-device service
         _chatService.setOnDeviceLLMService(onDeviceLLMService);
 
-        print(
-          '[HomeScreen._initializeInferenceServices] On-device service initialized successfully',
-        );
+        final onDeviceMsg = '[HomeScreen._initializeInferenceServices] On-device service initialized successfully';
+        print(onDeviceMsg);
+        StatusService().showTransient(onDeviceMsg);
       } catch (e) {
-        print(
-          '[HomeScreen._initializeInferenceServices] WARNING: Failed to initialize on-device service: $e',
-        );
-        print(
-          '[HomeScreen._initializeInferenceServices] The on-device mode toggle will still be available, but on-device inference may not work.',
-        );
+        final warnMsg = '[HomeScreen._initializeInferenceServices] WARNING: Failed to initialize on-device service: $e';
+        print(warnMsg);
+        StatusService().showTransient(warnMsg);
+        final hintMsg = '[HomeScreen._initializeInferenceServices] The on-device mode toggle will still be available, but on-device inference may not work.';
+        print(hintMsg);
+        StatusService().setPersistent('On-device initialization failed — some features may be unavailable');
       }
     } catch (e) {
       print(
@@ -315,6 +336,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     // Clean up resources
+    _statusTransientSub.cancel();
     _chatService.dispose();
     super.dispose();
   }
@@ -360,9 +382,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Otherwise show the main navigation
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
+      body: Column(
+        mainAxisSize: MainAxisSize.max,
         children: [
+          const StatusBanner(),
+          Expanded(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: [
           ConversationListScreen(
             chatService: _chatService,
             connectionService: _connectionService,
@@ -392,6 +419,9 @@ class _HomeScreenState extends State<HomeScreen> {
             onDeviceLLMService: _onDeviceLLMService,
             onThemeModeChanged: widget.onThemeModeChanged,
             currentThemeMode: widget.currentThemeMode,
+          ),
+              ],
+            ),
           ),
         ],
       ),

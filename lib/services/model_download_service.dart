@@ -41,7 +41,7 @@ class ModelDownloadService {
       description: 'Google Gemma 3n E2B with vision support.',
       sizeBytes: 3109634048, // ~2.9 GB
       downloadUrl:
-          'https://huggingface.co/google/gemma-3n-E2B-it-litert-lm-preview/resolve/main/gemma-3n-E2B-it.litertlm',
+          'https://huggingface.co/google/gemma-3n-E2B-it-litert-lm/resolve/main/gemma-3n-E2B-it-int4.litertlm',
       capabilities: ['text', 'vision', 'audio', 'tools'],
       contextSize: 4096,
       quantization: '4-bit',
@@ -52,7 +52,7 @@ class ModelDownloadService {
       description: 'Google Gemma 3n E4B - largest on-device model with vision.',
       sizeBytes: 4440891392, // ~4.1 GB
       downloadUrl:
-          'https://huggingface.co/google/gemma-3n-E4B-it-litert-lm-preview/resolve/main/gemma-3n-E4B-it.litertlm',
+          'https://huggingface.co/google/gemma-3n-E4B-it-litert-lm/resolve/main/gemma-3n-E4B-it-int4.litertlm',
       capabilities: ['text', 'vision', 'audio', 'tools'],
       contextSize: 4096,
       quantization: '4-bit',
@@ -224,9 +224,11 @@ class ModelDownloadService {
       final response = await _client.send(request);
 
       if (response.statusCode == 401) {
+        _log('Unauthorized access to ${model.downloadUrl}');
         throw HuggingFaceAuthException(
-          'Authentication required. This model requires a Hugging Face token. '
-          'Get a free token at https://huggingface.co/settings/tokens and add it in Settings.',
+          'Authentication required. This model may require a valid Hugging Face token. '
+          'Get a free token at https://huggingface.co/settings/tokens and add it in Settings.\n'
+          'If you already set a token, ensure it is correct and has the necessary access scopes.',
         );
       }
 
@@ -239,7 +241,22 @@ class ModelDownloadService {
         );
       }
 
+      // Treat 404 as a potential authentication/authorization or incorrect URL issue.
+      if (response.statusCode == 404) {
+        _log('Not found (404) for ${model.downloadUrl}');
+        final repoUrl = 'https://huggingface.co/${_extractRepoFromUrl(model.downloadUrl)}';
+        throw HuggingFaceAuthException(
+          'Model file not found (HTTP 404) when accessing ${model.name}.\n'
+          'Possible causes:\n'
+          '- The model repository requires authentication or you need to accept a license.\n'
+          '- The download URL is incorrect or the file name changed on Hugging Face.\n\n'
+          'Check the repo page:\n$repoUrl\n\n'
+          'If you use a Hugging Face token, ensure it is valid. If you do not use a token, try setting one in Settings and accept the model license if required.',
+        );
+      }
+
       if (response.statusCode != 200 && response.statusCode != 206) {
+        _log('HTTP ${response.statusCode} when accessing ${model.downloadUrl}');
         throw Exception(
           'HTTP ${response.statusCode}: Failed to download model',
         );
