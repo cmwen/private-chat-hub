@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:private_chat_hub/models/message.dart';
 import 'package:private_chat_hub/services/inference_config_service.dart';
 import 'package:private_chat_hub/services/litert_platform_channel.dart';
@@ -95,12 +96,14 @@ class OnDeviceLLMService implements LLMService {
     String? systemPrompt,
     double temperature = 0.7,
     int? maxTokens,
+    List<Attachment>? attachments,
   }) async* {
     _log(
       'generateResponse called: modelId=$modelId, '
       'currentModelId=$_currentModelId, '
       'promptLength=${prompt.length}, '
-      'historyCount=${conversationHistory?.length ?? 0}',
+      'historyCount=${conversationHistory?.length ?? 0}, '
+      'imageCount=${attachments?.where((a) => a.isImage).length ?? 0}',
     );
 
     // Ensure the correct model is loaded
@@ -134,6 +137,12 @@ class OnDeviceLLMService implements LLMService {
       'repetitionPenalty=$effectiveRepetitionPenalty',
     );
 
+    // Encode image attachments as base64 strings for the platform channel.
+    final imageBase64List = attachments
+        ?.where((a) => a.isImage)
+        .map((a) => base64Encode(a.data))
+        .toList();
+
     try {
       // Use streaming generation for real-time response with all parameters
       var chunkCount = 0;
@@ -147,6 +156,7 @@ class OnDeviceLLMService implements LLMService {
             topK: effectiveTopK,
             topP: effectiveTopP,
             repetitionPenalty: effectiveRepetitionPenalty,
+            images: imageBase64List?.isNotEmpty == true ? imageBase64List : null,
           )
           .map((chunk) {
             chunkCount++;

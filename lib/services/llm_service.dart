@@ -118,6 +118,7 @@ abstract class LLMService {
     String? systemPrompt,
     double temperature,
     int? maxTokens,
+    List<Attachment>? attachments,
   });
 
   /// Check if the service is available and ready

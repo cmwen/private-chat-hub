@@ -11,6 +11,7 @@ import 'package:private_chat_hub/services/inference_config_service.dart';
 import 'package:private_chat_hub/services/network_discovery_service.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
+import 'package:private_chat_hub/services/status_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:private_chat_hub/services/tool_config_service.dart';
 import 'package:private_chat_hub/widgets/litert_model_settings_widget.dart';
@@ -51,6 +52,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   ToolConfig _toolConfig = const ToolConfig();
   String _appVersion = 'Loading...';
   bool _streamingEnabled = true;
+  bool _developerMode = false;
   int _timeout = OllamaConfigService.defaultTimeout;
   final OllamaConfigService _ollamaConfigService = OllamaConfigService();
   final NotificationService _notificationService = NotificationService();
@@ -65,6 +67,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadStreamingPreference();
     _loadTimeout();
     _loadNotificationMode();
+    _loadDeveloperMode();
+  }
+
+  Future<void> _loadDeveloperMode() async {
+    final enabled = await _ollamaConfigService.getDeveloperMode();
+    if (!mounted) return;
+    StatusService().developerMode = enabled;
+    setState(() {
+      _developerMode = enabled;
+    });
+  }
+
+  Future<void> _setDeveloperMode(bool enabled) async {
+    await _ollamaConfigService.setDeveloperMode(enabled);
+    StatusService().developerMode = enabled;
+    setState(() {
+      _developerMode = enabled;
+    });
   }
 
   Future<void> _loadNotificationMode() async {
@@ -403,6 +423,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     childrenPadding: EdgeInsets.zero,
                     children: [
+                      SwitchListTile(
+                        secondary: const Icon(Icons.developer_mode),
+                        title: const Text('Developer Mode'),
+                        subtitle: const Text(
+                          'Show debug log popups during startup and operation',
+                        ),
+                        value: _developerMode,
+                        onChanged: _setDeveloperMode,
+                      ),
                       ListTile(
                         leading: const Icon(Icons.schedule),
                         title: const Text('Request Timeout'),

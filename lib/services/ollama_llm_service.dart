@@ -90,6 +90,7 @@ class OllamaLLMService implements LLMService {
     String? systemPrompt,
     double temperature = 0.7,
     int? maxTokens,
+    List<Attachment>? attachments,
   }) async* {
     final client = _connectionManager.client;
     if (client == null) {

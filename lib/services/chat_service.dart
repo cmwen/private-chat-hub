@@ -117,6 +117,23 @@ class ChatService {
     _debugLog(message);
   }
 
+  /// Returns image [Attachment]s from the last user message in [conversation],
+  /// excluding the placeholder assistant message with [excludeId].
+  List<Attachment>? _lastUserMessageAttachments(
+    Conversation conversation,
+    String excludeId,
+  ) {
+    for (final message in conversation.messages.reversed) {
+      if (message.id == excludeId) continue;
+      if (message.role == MessageRole.user) {
+        final images =
+            message.attachments.where((a) => a.isImage).toList();
+        return images.isEmpty ? null : images;
+      }
+    }
+    return null;
+  }
+
   static void _debugLog(String message) {
     if (_debugLogging) {
       // ignore: avoid_print
@@ -938,6 +955,7 @@ class ChatService {
           systemPrompt: conversation.systemPrompt,
           temperature: conversation.parameters.temperature,
           maxTokens: conversation.parameters.maxTokens,
+          attachments: _lastUserMessageAttachments(conversation, assistantMessageId),
         )) {
           if (streamController.isClosed) break;
 

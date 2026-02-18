@@ -97,6 +97,7 @@ class LiteRTPlatformChannel {
   /// - [topP]: Nucleus sampling parameter (0.0-1.0, default 0.9)
   /// - [maxTokens]: Maximum tokens to generate
   /// - [repetitionPenalty]: Penalize repeated tokens (0.5-2.0, default 1.0)
+  /// - [images]: Optional list of base64-encoded images for vision models
   Stream<String> generateTextStream({
     required String prompt,
     double temperature = 0.7,
@@ -104,6 +105,7 @@ class LiteRTPlatformChannel {
     int topK = 40,
     double topP = 0.9,
     double repetitionPenalty = 1.0,
+    List<String>? images,
   }) {
     final controller = StreamController<String>();
     StreamSubscription? subscription;
@@ -120,7 +122,8 @@ class LiteRTPlatformChannel {
       _log(
         'Starting generateTextStream: promptLength=${prompt.length}, '
         'temperature=$temperature, maxTokens=$maxTokens, topK=$topK, '
-        'topP=$topP, repetitionPenalty=$repetitionPenalty',
+        'topP=$topP, repetitionPenalty=$repetitionPenalty, '
+        'imageCount=${images?.length ?? 0}',
       );
 
       // Listen for events first to avoid missing early tokens.
@@ -203,6 +206,7 @@ class LiteRTPlatformChannel {
             'topK': topK,
             'topP': topP,
             'repetitionPenalty': repetitionPenalty,
+            if (images != null && images.isNotEmpty) 'images': images,
           })
           .catchError((error) {
             _log('startGeneration invoke failed: $error');

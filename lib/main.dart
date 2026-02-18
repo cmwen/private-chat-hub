@@ -236,6 +236,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     _projectService = ProjectService(widget.storageService);
 
+    // Load developer mode preference and sync it to StatusService so all
+    // showTransient calls are gated correctly (including service-level ones).
+    _syncDeveloperMode();
+
     // Set up Ollama connection if one exists
     _setupConnection();
 
@@ -244,6 +248,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Check if app was opened from a notification
     _checkNotificationLaunch();
+  }
+
+  Future<void> _syncDeveloperMode() async {
+    final devMode = await OllamaConfigService().getDeveloperMode();
+    StatusService().developerMode = devMode;
   }
 
   Future<void> _initializeInferenceServices() async {

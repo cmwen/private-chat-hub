@@ -8,6 +8,7 @@ class OllamaConfigKeys {
   static const lastUsedModel = 'ollama_last_used_model';
   static const streamEnabled = 'ollama_stream_enabled';
   static const modelHistory = 'ollama_model_history';
+  static const developerMode = 'developer_mode_enabled';
 }
 
 /// Service for persisting Ollama configuration using SharedPreferences
@@ -96,6 +97,19 @@ class OllamaConfigService {
   Future<void> setStreamEnabled(bool enabled) async {
     final prefs = await _preferences;
     await prefs.setBool(OllamaConfigKeys.streamEnabled, enabled);
+  }
+
+  /// Get whether developer mode is enabled (shows debug log popups).
+  /// Disabled by default.
+  Future<bool> getDeveloperMode() async {
+    final prefs = await _preferences;
+    return prefs.getBool(OllamaConfigKeys.developerMode) ?? false;
+  }
+
+  /// Set whether developer mode is enabled.
+  Future<void> setDeveloperMode(bool enabled) async {
+    final prefs = await _preferences;
+    await prefs.setBool(OllamaConfigKeys.developerMode, enabled);
   }
 
   /// Get model history (recently used models)

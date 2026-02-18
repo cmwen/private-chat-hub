@@ -116,7 +116,12 @@ class Conversation {
 
   /// Gets the capabilities of the model used in this conversation.
   ModelCapabilities get modelCapabilities {
-    return ModelRegistry.getCapabilities(modelName) ??
+    // Strip 'local:' prefix before looking up in the registry so that
+    // on-device models (e.g. 'local:gemma-3n-e2b') resolve correctly.
+    final registryName = modelName.startsWith('local:')
+        ? modelName.substring('local:'.length)
+        : modelName;
+    return ModelRegistry.getCapabilities(registryName) ??
         const ModelCapabilities(
           supportsToolCalling: false,
           supportsVision: false,
