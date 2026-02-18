@@ -71,11 +71,19 @@ class ChatService {
     _connectivityService = ConnectivityService(_ollamaManager);
     _queueService = MessageQueueService(_storage);
 
-    // Listen for connectivity changes and process queue when online
+    // Listen for connectivity changes and process queue when online.
+    // A short stabilisation delay prevents firing into a half-open socket
+    // when the connection briefly flickers (connected → checking → connected).
     _connectivityService.statusStream.listen((status) {
       if (status == OllamaConnectivityStatus.connected && !_isProcessingQueue) {
-        _log('Connection restored, processing message queue');
-        processMessageQueue();
+        _log('Connection restored, waiting for connection to stabilise…');
+        Future.delayed(const Duration(seconds: 2), () {
+          // Re-check: the status may have changed during the delay.
+          if (_connectivityService.isOnline && !_isProcessingQueue) {
+            _log('Connection stable, processing message queue');
+            processMessageQueue();
+          }
+        });
       }
     });
   }
@@ -562,6 +570,11 @@ class ChatService {
     _isProcessingQueue = true;
     _log('Starting queue processing');
 
+    // Track which items we have already attempted in this session so we only
+    // apply a retry delay on a second (or later) attempt within the same run,
+    // not on the first attempt of a reconnected session.
+    final attemptedInThisSession = <String>{};
+
     try {
       while (true) {
         final queueItem = _queueService.getNextQueueItem();
@@ -585,14 +598,24 @@ class ChatService {
           continue;
         }
 
-        // Apply retry delay if needed
-        if (queueItem.retryCount > 0) {
+        // Only apply retry delay if we already attempted this item in this
+        // session (i.e. we are genuinely retrying, not just picking up a
+        // previously-failed item from storage on a fresh reconnect).
+        if (attemptedInThisSession.contains(queueItem.id)) {
           final delay = _queueService.getRetryDelay(queueItem.retryCount);
           _log(
             'Waiting ${delay.inSeconds}s before retry ${queueItem.retryCount}',
           );
           await Future.delayed(delay);
+
+          // Re-check connectivity after the delay.
+          if (!isOnline) {
+            _log('Lost connection during retry delay, stopping');
+            break;
+          }
         }
+
+        attemptedInThisSession.add(queueItem.id);
 
         // Try to send the message
         try {
@@ -608,6 +631,10 @@ class ChatService {
             _log('Lost connection during queue processing, stopping');
             break;
           }
+
+          // After any failure, pause briefly to let transient socket errors
+          // clear before attempting the next item.
+          await Future.delayed(const Duration(seconds: 2));
         }
       }
     } finally {
@@ -655,6 +682,14 @@ class ChatService {
       MessageStatus.sending,
     );
 
+    // Show foreground notification so the OS keeps the process alive if the
+    // user backgrounds the app while waiting for the response.
+    unawaited(
+      _notificationService.showStreamingNotification(
+        conversationTitle: conversation.title,
+      ),
+    );
+
     try {
       // Build message history (excluding the user message being sent and any assistant responses after it)
       final messageIndex = conversation.messages.indexWhere(
@@ -673,6 +708,13 @@ class ChatService {
         options: conversation.parameters.toOllamaOptions(),
       );
 
+      final content = response.message.content;
+      if (content.trim().isEmpty) {
+        throw OllamaException(
+          'The model returned an empty response — try sending the message again.',
+        );
+      }
+
       // Update user message status to sent
       await _updateMessageStatus(
         conversationId,
@@ -683,14 +725,20 @@ class ChatService {
       // Add assistant response
       final assistantMessage = Message.assistant(
         id: const Uuid().v4(),
-        text: response.message.content,
+        text: content,
         timestamp: DateTime.now(),
       );
       await addMessage(conversationId, assistantMessage);
 
+      await _showResponseCompleteNotification(
+        (await Future.value(getConversation(conversationId)))!,
+        content,
+      );
+
       _log('Successfully sent queued message: ${userMessage.id}');
     } catch (e) {
       _log('Error sending queued message: $e');
+      await _notificationService.cancelStreamingNotification();
       await _updateMessageStatus(
         conversationId,
         userMessage.id,
@@ -934,6 +982,13 @@ class ChatService {
     // Start on-device generation in background so stream subscribers
     // receive token updates in real time (when streaming is enabled).
     () async {
+      // Show a persistent notification so Android keeps the process alive if
+      // the user backgrounds the app while waiting for the AI response.
+      unawaited(
+        _notificationService.showStreamingNotification(
+          conversationTitle: conversation.title,
+        ),
+      );
       try {
         final buffer = StringBuffer();
         var chunkCount = 0;
@@ -1160,6 +1215,14 @@ class ChatService {
     String assistantMessageId,
     StreamController<Conversation> streamController,
   ) async {
+    // Show a persistent notification so Android keeps the process alive if
+    // the user backgrounds the app while waiting for the AI response.
+    unawaited(
+      _notificationService.showStreamingNotification(
+        conversationTitle: conversation.title,
+      ),
+    );
+
     final client = _ollamaManager.client;
     if (client == null) {
       _handleError(
@@ -1277,10 +1340,25 @@ class ChatService {
             onDone: () async {
               if (streamController.isClosed) return;
 
+              final finalText = buffer.toString();
+
+              // If the stream closed with an empty body, treat it as an error
+              // rather than silently saving a blank assistant message.
+              if (finalText.trim().isEmpty) {
+                _handleError(
+                  conversationId,
+                  conversation,
+                  assistantMessageId,
+                  streamController,
+                  'The model returned an empty response. The server may have closed the connection prematurely — try sending the message again.',
+                );
+                return;
+              }
+
               conversation = await _updateAssistantMessage(
                 conversation,
                 assistantMessageId,
-                buffer.toString(),
+                finalText,
                 isStreaming: false,
               );
 
@@ -1294,7 +1372,7 @@ class ChatService {
               // Show notification when response completes
               await _showResponseCompleteNotification(
                 conversation,
-                buffer.toString(),
+                finalText,
               );
             },
           );
@@ -1311,10 +1389,24 @@ class ChatService {
 
         if (streamController.isClosed) return;
 
+        final content = response.message.content;
+
+        // Treat an empty completion as an error so the user knows to retry.
+        if (content.trim().isEmpty) {
+          _handleError(
+            conversationId,
+            conversation,
+            assistantMessageId,
+            streamController,
+            'The model returned an empty response. The server may have closed the connection prematurely — try sending the message again.',
+          );
+          return;
+        }
+
         conversation = await _updateAssistantMessage(
           conversation,
           assistantMessageId,
-          response.message.content,
+          content,
           isStreaming: false,
         );
 
@@ -1328,7 +1420,7 @@ class ChatService {
         // Show notification when response completes
         await _showResponseCompleteNotification(
           conversation,
-          response.message.content,
+          content,
         );
       } catch (error) {
         _handleError(
@@ -1798,6 +1890,16 @@ class ChatService {
         continue;
       }
 
+      // Skip empty or stale streaming/cancelled messages — sending an empty
+      // assistant message to Ollama causes it to produce an empty response,
+      // and '[Generation cancelled]' is internal state that should not be
+      // part of the conversation history sent to the model.
+      if (msg.text.trim().isEmpty || msg.isStreaming) continue;
+      if (msg.role == MessageRole.assistant &&
+          msg.text == '[Generation cancelled]') {
+        continue;
+      }
+
       if (includeModel1Only &&
           msg.modelSource != ModelSource.user &&
           msg.modelSource != ModelSource.model1) {
@@ -1897,6 +1999,7 @@ class ChatService {
     }
 
     _cleanupStream(conversationId);
+    await _notificationService.cancelStreamingNotification();
     await streamController.close();
   }
 
@@ -1949,7 +2052,10 @@ class ChatService {
     String responseText,
   ) async {
     try {
-      // Only show notification if response has content
+      // Cancel the in-progress streaming notification first.
+      await _notificationService.cancelStreamingNotification();
+
+      // Only show completion notification if response has content
       if (responseText.trim().isEmpty) return;
 
       await _notificationService.showResponseCompleteNotification(

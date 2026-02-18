@@ -316,7 +316,16 @@ class OllamaClient {
       request.headers['Content-Type'] = 'application/json';
       request.body = json.encode(body);
 
-      final response = await _httpClient.send(request).timeout(timeout);
+      // Use a short connection-only timeout so we fail fast if the server is
+      // unreachable, but do NOT apply the timeout to the streaming phase —
+      // doing so would kill the socket mid-response when the user backgrounds
+      // the app or the model is slow to generate tokens.
+      const connectionTimeout = Duration(seconds: 15);
+      final response = await _httpClient.send(request).timeout(
+        connectionTimeout,
+        onTimeout: () =>
+            throw OllamaException('Connection timeout after 15s'),
+      );
 
       if (response.statusCode != 200) {
         final errorBody = await response.stream.bytesToString();
@@ -339,7 +348,7 @@ class OllamaClient {
         }
       }
     } on TimeoutException {
-      throw OllamaException('Request timeout after ${timeout.inSeconds}s');
+      throw OllamaException('Connection timeout after 15s');
     } catch (e) {
       if (e is OllamaException) rethrow;
       throw OllamaException('Streaming request failed: $e', originalError: e);

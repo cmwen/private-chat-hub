@@ -214,4 +214,62 @@ class NotificationService with WidgetsBindingObserver {
   Future<void> cancelAllNotifications() async {
     await _notifications.cancelAll();
   }
+
+  // Dedicated notification id for the active-streaming foreground notification.
+  static const int _streamingNotificationId = 9999;
+
+  /// Show a persistent foreground notification while an AI response is
+  /// streaming. This starts a real Android foreground service so the OS keeps
+  /// the process and its network connections alive when the app is backgrounded.
+  Future<void> showStreamingNotification({
+    required String conversationTitle,
+  }) async {
+    if (!_initialized) await initialize();
+
+    const androidDetails = AndroidNotificationDetails(
+      'ai_streaming',
+      'AI Streaming',
+      channelDescription: 'Keeps AI response streaming alive in the background',
+      importance: Importance.low,
+      priority: Priority.low,
+      ongoing: true,
+      autoCancel: false,
+      icon: '@mipmap/ic_launcher',
+      playSound: false,
+      enableVibration: false,
+      showWhen: false,
+    );
+
+    // startForegroundService() launches a real Android ForegroundService,
+    // which prevents the OS from killing the process (and its sockets) when
+    // the user switches to another app.
+    final androidPlugin = _notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (androidPlugin != null) {
+      await androidPlugin.startForegroundService(
+        _streamingNotificationId,
+        'AI is thinking…',
+        conversationTitle,
+        notificationDetails: androidDetails,
+        foregroundServiceTypes: <AndroidServiceForegroundType>{
+          AndroidServiceForegroundType.foregroundServiceTypeDataSync,
+        },
+      );
+    }
+  }
+
+  /// Stop the foreground service and dismiss its notification.
+  Future<void> cancelStreamingNotification() async {
+    final androidPlugin = _notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (androidPlugin != null) {
+      await androidPlugin.stopForegroundService();
+    } else {
+      await _notifications.cancel(_streamingNotificationId);
+    }
+  }
 }

@@ -12,7 +12,7 @@ class MessageQueueService {
   final StorageService _storage;
   static const String _queueKey = 'message_queue';
   static const int _maxQueueSize = 50;
-  static const List<int> _retryDelays = [0, 5, 15]; // seconds
+  static const List<int> _retryDelays = [3, 10, 30]; // seconds
 
   // Stream controller for queue updates
   final _queueUpdateController = StreamController<List<QueueItem>>.broadcast();
