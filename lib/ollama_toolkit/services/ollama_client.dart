@@ -321,11 +321,13 @@ class OllamaClient {
       // doing so would kill the socket mid-response when the user backgrounds
       // the app or the model is slow to generate tokens.
       const connectionTimeout = Duration(seconds: 15);
-      final response = await _httpClient.send(request).timeout(
-        connectionTimeout,
-        onTimeout: () =>
-            throw OllamaException('Connection timeout after 15s'),
-      );
+      final response = await _httpClient
+          .send(request)
+          .timeout(
+            connectionTimeout,
+            onTimeout: () =>
+                throw OllamaException('Connection timeout after 15s'),
+          );
 
       if (response.statusCode != 200) {
         final errorBody = await response.stream.bytesToString();

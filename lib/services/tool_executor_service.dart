@@ -372,7 +372,7 @@ class ToolExecutorService {
   ) async {
     final projectService = _projectService;
     final projectId = _currentProjectId;
-    
+
     if (projectService == null || projectId == null) {
       return const ToolResult(
         success: false,
@@ -409,7 +409,7 @@ class ToolExecutorService {
   ) async {
     final projectService = _projectService;
     final projectId = _currentProjectId;
-    
+
     if (projectService == null || projectId == null) {
       return const ToolResult(
         success: false,
@@ -447,7 +447,7 @@ class ToolExecutorService {
   ) async {
     final projectService = _projectService;
     final projectId = _currentProjectId;
-    
+
     if (projectService == null || projectId == null) {
       return const ToolResult(
         success: false,
@@ -507,11 +507,7 @@ class ToolExecutorService {
   String _stripHtml(String html) {
     // Remove script and style blocks (including their content)
     var text = html.replaceAll(
-      RegExp(
-        r'<script[^>]*>.*?</script>',
-        dotAll: true,
-        caseSensitive: false,
-      ),
+      RegExp(r'<script[^>]*>.*?</script>', dotAll: true, caseSensitive: false),
       '',
     );
     text = text.replaceAll(

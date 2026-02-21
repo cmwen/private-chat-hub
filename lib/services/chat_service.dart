@@ -134,8 +134,7 @@ class ChatService {
     for (final message in conversation.messages.reversed) {
       if (message.id == excludeId) continue;
       if (message.role == MessageRole.user) {
-        final images =
-            message.attachments.where((a) => a.isImage).toList();
+        final images = message.attachments.where((a) => a.isImage).toList();
         return images.isEmpty ? null : images;
       }
     }
@@ -1010,7 +1009,10 @@ class ChatService {
           systemPrompt: conversation.systemPrompt,
           temperature: conversation.parameters.temperature,
           maxTokens: conversation.parameters.maxTokens,
-          attachments: _lastUserMessageAttachments(conversation, assistantMessageId),
+          attachments: _lastUserMessageAttachments(
+            conversation,
+            assistantMessageId,
+          ),
         )) {
           if (streamController.isClosed) break;
 
@@ -1370,10 +1372,7 @@ class ChatService {
               _activeSubscriptions.remove(conversationId);
 
               // Show notification when response completes
-              await _showResponseCompleteNotification(
-                conversation,
-                finalText,
-              );
+              await _showResponseCompleteNotification(conversation, finalText);
             },
           );
 
@@ -1418,10 +1417,7 @@ class ChatService {
         _activeSubscriptions.remove(conversationId);
 
         // Show notification when response completes
-        await _showResponseCompleteNotification(
-          conversation,
-          content,
-        );
+        await _showResponseCompleteNotification(conversation, content);
       } catch (error) {
         _handleError(
           conversationId,

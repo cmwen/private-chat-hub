@@ -463,7 +463,8 @@ class AvailableTools {
       'properties': {
         'title': {
           'type': 'string',
-          'description': 'Short notification title (e.g., "Reminder" or "Task Complete")',
+          'description':
+              'Short notification title (e.g., "Reminder" or "Task Complete")',
         },
         'message': {
           'type': 'string',
@@ -481,10 +482,7 @@ class AvailableTools {
         'Read the current project\'s saved memory/instructions. '
         'Use this to recall information the user has stored for this project, '
         'such as context, preferences, or ongoing task notes.',
-    parameters: {
-      'type': 'object',
-      'properties': {},
-    },
+    parameters: {'type': 'object', 'properties': {}},
   );
 
   /// Update project memory tool definition.
@@ -527,25 +525,25 @@ class AvailableTools {
 
   /// All available tools.
   static List<Tool> get all => [
-        webSearch,
-        currentDateTime,
-        readUrl,
-        fetchUrl,
-        showNotification,
-        getProjectMemory,
-        updateProjectMemory,
-        renameProject,
-      ];
+    webSearch,
+    currentDateTime,
+    readUrl,
+    fetchUrl,
+    showNotification,
+    getProjectMemory,
+    updateProjectMemory,
+    renameProject,
+  ];
 
   /// Tools that require an API key.
   static List<Tool> get requiresApiKey => [webSearch, readUrl];
 
   /// Tools that require a project context.
   static List<Tool> get requiresProject => [
-        getProjectMemory,
-        updateProjectMemory,
-        renameProject,
-      ];
+    getProjectMemory,
+    updateProjectMemory,
+    renameProject,
+  ];
 
   /// Gets a tool by name.
   ///
