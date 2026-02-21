@@ -65,12 +65,22 @@ class OllamaAgent implements Agent {
 
         // Debug: log tools being sent
         print(
-          '[OllamaAgent] Iteration $iteration: Sending ${toolDefinitions?.length ?? 0} tools to model $model',
+          '[OllamaAgent] Iteration $iteration/$maxIterations: '
+          'Sending ${toolDefinitions?.length ?? 0} tools to model $model',
         );
-        if (toolDefinitions != null) {
+        if (toolDefinitions != null && toolDefinitions.isNotEmpty) {
           for (final tool in toolDefinitions) {
-            print('[OllamaAgent] Tool: ${tool.name}');
+            print(
+              '[OllamaAgent]   • ${tool.name}: '
+              '${tool.description.split(".").first}',
+            );
           }
+        } else {
+          print(
+            '[OllamaAgent]   (no tools — '
+            'modelSupportsTools=$modelSupportsTools, '
+            'tools.isEmpty=${tools.isEmpty})',
+          );
         }
 
         print('[OllamaAgent] About to call client.chat()...');

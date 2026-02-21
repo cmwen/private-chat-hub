@@ -26,8 +26,8 @@ import 'package:uuid/uuid.dart';
 class ChatService {
   final OllamaConnectionManager _ollamaManager;
   final StorageService _storage;
-  final ToolExecutorService? _toolExecutor;
-  final app_tools.ToolConfig? _toolConfig;
+  ToolExecutorService? _toolExecutor;
+  app_tools.ToolConfig? _toolConfig;
   final OllamaConfigService _configService = OllamaConfigService();
   final NotificationService _notificationService = NotificationService();
 
@@ -91,6 +91,19 @@ class ChatService {
   /// Set the inference configuration service (for hybrid mode)
   void setInferenceConfigService(InferenceConfigService service) {
     _inferenceConfigService = service;
+  }
+
+  /// Update the tool executor and config at runtime (e.g. when the user
+  /// changes tool settings while the app is running).
+  void updateToolConfig(
+    app_tools.ToolConfig config,
+    ToolExecutorService? executor,
+  ) {
+    _toolConfig = config;
+    _toolExecutor = executor;
+    _log(
+      'Tool config updated: enabled=${config.enabled}, executor=${executor != null}',
+    );
   }
 
   /// Set the on-device LLM service (for hybrid mode)
@@ -1344,16 +1357,52 @@ class ChatService {
 
               final finalText = buffer.toString();
 
-              // If the stream closed with an empty body, treat it as an error
-              // rather than silently saving a blank assistant message.
+              // If the stream closed with an empty body, retry once with
+              // non-streaming before surfacing an error to the user.
+              // This covers transient server-side connection drops.
               if (finalText.trim().isEmpty) {
-                _handleError(
-                  conversationId,
-                  conversation,
-                  assistantMessageId,
-                  streamController,
-                  'The model returned an empty response. The server may have closed the connection prematurely — try sending the message again.',
-                );
+                _log('Streaming returned empty – retrying with non-streaming fallback...');
+                try {
+                  final retryResponse = await client.chat(
+                    conversation.modelName,
+                    ollamaMessages,
+                    options: conversation.parameters.toOllamaOptions(),
+                  );
+                  final retryContent = retryResponse.message.content;
+                  if (retryContent.trim().isEmpty) {
+                    _handleError(
+                      conversationId,
+                      conversation,
+                      assistantMessageId,
+                      streamController,
+                      'The model returned an empty response after retry. The server may be under load — please try again.',
+                    );
+                    return;
+                  }
+                  conversation = await _updateAssistantMessage(
+                    conversation,
+                    assistantMessageId,
+                    retryContent,
+                    isStreaming: false,
+                  );
+                  if (!streamController.isClosed) {
+                    streamController.add(conversation);
+                    streamController.close();
+                  }
+                  _markGenerationCompleted(conversationId);
+                  await _showResponseCompleteNotification(
+                    conversation,
+                    retryContent,
+                  );
+                } catch (retryError) {
+                  _handleError(
+                    conversationId,
+                    conversation,
+                    assistantMessageId,
+                    streamController,
+                    'The model returned an empty response — try sending the message again.',
+                  );
+                }
                 return;
               }
 
@@ -1369,7 +1418,7 @@ class ChatService {
                 streamController.close();
               }
 
-              _activeSubscriptions.remove(conversationId);
+              _markGenerationCompleted(conversationId);
 
               // Show notification when response completes
               await _showResponseCompleteNotification(conversation, finalText);
@@ -1414,7 +1463,7 @@ class ChatService {
           streamController.close();
         }
 
-        _activeSubscriptions.remove(conversationId);
+        _markGenerationCompleted(conversationId);
 
         // Show notification when response completes
         await _showResponseCompleteNotification(conversation, content);
@@ -1459,12 +1508,19 @@ class ChatService {
     // Get available tools
     final executor = _toolExecutor!;
     // Set project context so project tools know which project to operate on
+    _log(
+      'Setting project context: projectId=${conversation.projectId} '
+      '(project tools only active when this is non-null)',
+    );
     executor.setCurrentProject(conversation.projectId);
     final tools = executor.getAvailableTools().map((tool) {
       return _OllamaToolWrapper(tool, executor);
     }).toList();
 
-    _log('Available tools: ${tools.map((t) => t.name).toList()}');
+    _log('Tools exposed to LLM (${tools.length}): ${tools.map((t) => t.name).toList()}');
+    for (final tool in tools) {
+      _log('  [tool] ${tool.name}');
+    }
 
     // Get the last user message as input
     final userMessages = conversation.messages
@@ -1577,6 +1633,21 @@ class ChatService {
 
       responseText.write(result.response);
       _log('Final response length: ${result.response.length}');
+
+      // Guard: if the agent returned success but no text, treat it as an error
+      // so the user sees a visible failure rather than a blank message.
+      if (responseText.toString().trim().isEmpty) {
+        _handleError(
+          conversationId,
+          conversation,
+          assistantMessageId,
+          streamController,
+          'The model did not produce a response. This can happen when the model '
+          'is unable to decide on a tool to call or is temporarily confused — '
+          'try sending the message again.',
+        );
+        return;
+      }
     } catch (e) {
       _log('Error during agent execution: $e');
       // Re-throw to use the error handling mechanism
@@ -1607,7 +1678,7 @@ class ChatService {
       streamController.close();
     }
 
-    _activeSubscriptions.remove(conversationId);
+    _markGenerationCompleted(conversationId);
 
     // Show notification when response completes
     await _showResponseCompleteNotification(
@@ -2045,6 +2116,16 @@ class ChatService {
     _activeStreams.remove(conversationId);
   }
 
+  /// Marks generation as completed successfully for a single-model flow.
+  ///
+  /// Unlike [_cleanupStream], this does not cancel subscriptions because it is
+  /// called from normal completion paths (including stream callbacks) where
+  /// cancellation is unnecessary and can race with close handlers.
+  void _markGenerationCompleted(String conversationId) {
+    _activeSubscriptions.remove(conversationId);
+    _activeStreams.remove(conversationId);
+  }
+
   /// Updates the status message of a specific message in the conversation
   Future<Conversation> _updateStatusMessage(
     Conversation conversation,
@@ -2086,6 +2167,8 @@ class ChatService {
         return '💾 Saving Project Memory';
       case 'rename_project':
         return '✏️ Renaming Project';
+      case 'update_project_description':
+        return '📝 Updating Description';
       default:
         return toolName;
     }
@@ -2489,6 +2572,8 @@ extension ChatServiceHelpers on ChatService {
         return '💾 Saving Project Memory';
       case 'rename_project':
         return '✏️ Renaming Project';
+      case 'update_project_description':
+        return '📝 Updating Description';
       default:
         return toolName;
     }

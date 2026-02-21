@@ -28,6 +28,7 @@ class SettingsScreen extends StatefulWidget {
   final dynamic onDeviceLLMService; // OnDeviceLLMService
   final Function(ThemeMode)? onThemeModeChanged;
   final ThemeMode? currentThemeMode;
+  final VoidCallback? onToolConfigChanged;
 
   const SettingsScreen({
     super.key,
@@ -40,6 +41,7 @@ class SettingsScreen extends StatefulWidget {
     this.onDeviceLLMService,
     this.onThemeModeChanged,
     this.currentThemeMode,
+    this.onToolConfigChanged,
   });
 
   @override
@@ -179,6 +181,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         _toolConfig = config;
       });
+      widget.onToolConfigChanged?.call();
     }
   }
 

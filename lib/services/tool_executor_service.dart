@@ -47,11 +47,19 @@ class ToolExecutorService {
     tools.add(AvailableTools.currentDateTime);
     tools.add(AvailableTools.fetchUrl);
     tools.add(AvailableTools.showNotification);
+    _debugLog('✔ Base tools added: get_current_datetime, fetch_url, show_notification');
 
     // Requires Jina API key
     if (config.webSearchAvailable) {
       tools.add(AvailableTools.webSearch);
       tools.add(AvailableTools.readUrl);
+      _debugLog('✔ Web search tools added (Jina key present)');
+    } else {
+      _debugLog(
+        '✗ Web search tools SKIPPED — '
+        'webSearchEnabled=${config.webSearchEnabled}, '
+        'hasJinaKey=${config.jinaApiKey != null && config.jinaApiKey!.isNotEmpty}',
+      );
     }
 
     // Project tools: only available when inside a project conversation
@@ -59,6 +67,21 @@ class ToolExecutorService {
       tools.add(AvailableTools.getProjectMemory);
       tools.add(AvailableTools.updateProjectMemory);
       tools.add(AvailableTools.renameProject);
+      tools.add(AvailableTools.updateProjectDescription);
+      _debugLog('✔ Project tools added — projectId=$_currentProjectId');
+    } else {
+      _debugLog(
+        '✗ Project tools SKIPPED — '
+        'projectService=${_projectService != null}, '
+        'currentProjectId=$_currentProjectId',
+      );
+    }
+
+    _debugLog(
+      '📋 Final tool list (${tools.length}): ${tools.map((t) => t.name).join(', ')}',
+    );
+    for (final tool in tools) {
+      _debugLog('  • ${tool.name}: ${tool.description.split(".").first}');
     }
 
     return tools;
@@ -152,6 +175,8 @@ class ToolExecutorService {
         return _handleUpdateProjectMemory(arguments);
       case 'rename_project':
         return _handleRenameProject(arguments);
+      case 'update_project_description':
+        return _handleUpdateProjectDescription(arguments);
       default:
         throw Exception('Unknown tool: $toolName');
     }
@@ -500,6 +525,47 @@ class ToolExecutorService {
       data: {'oldName': oldName, 'newName': newName.trim()},
       summary:
           'Project renamed from "$oldName" to "${newName.trim()}" successfully.',
+    );
+  }
+
+  /// Handles update_project_description tool calls.
+  Future<ToolResult> _handleUpdateProjectDescription(
+    Map<String, dynamic> arguments,
+  ) async {
+    final projectService = _projectService;
+    final projectId = _currentProjectId;
+
+    if (projectService == null || projectId == null) {
+      return const ToolResult(
+        success: false,
+        summary:
+            'No project context available. This tool only works within a project conversation.',
+      );
+    }
+
+    final newDescription = arguments['description'] as String?;
+    if (newDescription == null || newDescription.trim().isEmpty) {
+      return const ToolResult(
+        success: false,
+        summary: 'New project description is required.',
+      );
+    }
+
+    final project = projectService.getProject(projectId);
+    if (project == null) {
+      return const ToolResult(success: false, summary: 'Project not found.');
+    }
+
+    final updatedProject = project.copyWith(
+      description: newDescription.trim(),
+    );
+    await projectService.updateProject(updatedProject);
+
+    return ToolResult(
+      success: true,
+      data: {'description': newDescription.trim()},
+      summary:
+          'Project description updated to: "${newDescription.trim()}".',
     );
   }
 

@@ -315,7 +315,7 @@ class ToolConfig {
   final double ttsSpeed;
 
   const ToolConfig({
-    this.enabled = false,
+    this.enabled = true,
     this.webSearchEnabled = false,
     this.jinaApiKey,
     this.maxSearchResults = 5,
@@ -505,21 +505,39 @@ class AvailableTools {
     },
   );
 
-  /// Rename project tool definition.
+  /// Rename / update project title tool definition.
   static const Tool renameProject = Tool(
     name: 'rename_project',
     description:
-        'Rename the current project. Use this when the user asks to change '
-        'the project name.',
+        'Rename the current project — updates its title/name. '
+        'Use this when the user asks to change the project name or title.',
     parameters: {
       'type': 'object',
       'properties': {
         'name': {
           'type': 'string',
-          'description': 'The new name for the project',
+          'description': 'The new title/name for the project',
         },
       },
       'required': ['name'],
+    },
+  );
+
+  /// Update project description tool definition.
+  static const Tool updateProjectDescription = Tool(
+    name: 'update_project_description',
+    description:
+        'Update the current project\'s short description. '
+        'Use this when the user wants to set or change the project description or summary.',
+    parameters: {
+      'type': 'object',
+      'properties': {
+        'description': {
+          'type': 'string',
+          'description': 'The new description for the project',
+        },
+      },
+      'required': ['description'],
     },
   );
 
@@ -533,6 +551,7 @@ class AvailableTools {
     getProjectMemory,
     updateProjectMemory,
     renameProject,
+    updateProjectDescription,
   ];
 
   /// Tools that require an API key.
@@ -543,6 +562,7 @@ class AvailableTools {
     getProjectMemory,
     updateProjectMemory,
     renameProject,
+    updateProjectDescription,
   ];
 
   /// Gets a tool by name.

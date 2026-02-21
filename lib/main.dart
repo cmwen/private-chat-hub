@@ -256,6 +256,27 @@ class _HomeScreenState extends State<HomeScreen> {
     StatusService().developerMode = devMode;
   }
 
+  /// Called when the user changes tool settings in SettingsScreen.
+  /// Re-reads the persisted config and recreates the ToolExecutorService so
+  /// that ChatService immediately picks up the change without requiring a
+  /// restart.
+  void _onToolConfigChanged() {
+    final toolConfig = widget.toolConfigService.getConfig();
+    final toolExecutor = toolConfig.enabled
+        ? ToolExecutorService(
+            jinaService: toolConfig.webSearchAvailable
+                ? JinaSearchService(apiKey: toolConfig.jinaApiKey!)
+                : null,
+            config: toolConfig,
+            projectService: _projectService,
+          )
+        : null;
+    _chatService.updateToolConfig(toolConfig, toolExecutor);
+    print(
+      '[HomeScreen] Tool config refreshed: enabled=${toolConfig.enabled}, executor=${toolExecutor != null}',
+    );
+  }
+
   Future<void> _initializeInferenceServices() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -436,6 +457,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   onDeviceLLMService: _onDeviceLLMService,
                   onThemeModeChanged: widget.onThemeModeChanged,
                   currentThemeMode: widget.currentThemeMode,
+                  onToolConfigChanged: _onToolConfigChanged,
                 ),
               ],
             ),
