@@ -669,6 +669,8 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _conversation = updatedConversation;
         _messages = List.from(updatedConversation.messages);
+        _isLoading =
+            widget.chatService?.isGenerating(updatedConversation.id) ?? false;
       });
       _scrollToBottom();
       _handleTtsStreaming(updatedConversation);
@@ -1353,7 +1355,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    _conversation?.modelCapabilities.supportsTools == true
+                    (_conversation?.modelCapabilities.supportsTools == true &&
+                            _conversation?.toolCallingEnabled == true)
                         ? 'AI is thinking with tools...'
                         : 'AI is thinking...',
                     style: TextStyle(
@@ -1361,8 +1364,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       fontSize: 14,
                     ),
                   ),
-                  if (_conversation?.modelCapabilities.supportsTools ==
-                      true) ...[
+                  if (_conversation?.modelCapabilities.supportsTools == true &&
+                      _conversation?.toolCallingEnabled == true) ...[
                     const SizedBox(width: 8),
                     Icon(
                       Icons.build_circle,
@@ -1379,7 +1382,8 @@ class _ChatScreenState extends State<ChatScreen> {
             supportsVision:
                 _conversation?.modelCapabilities.supportsVision ?? false,
             supportsTools:
-                _conversation?.modelCapabilities.supportsTools ?? false,
+                (_conversation?.modelCapabilities.supportsTools ?? false) &&
+                (widget.toolConfig?.enabled ?? true),
             toolCallingEnabled: _conversation?.toolCallingEnabled ?? true,
             isLoading: _isLoading,
             onStopGeneration: _isLoading ? _stopGeneration : null,

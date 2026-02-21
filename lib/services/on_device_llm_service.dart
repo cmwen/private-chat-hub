@@ -156,7 +156,9 @@ class OnDeviceLLMService implements LLMService {
             topK: effectiveTopK,
             topP: effectiveTopP,
             repetitionPenalty: effectiveRepetitionPenalty,
-            images: imageBase64List?.isNotEmpty == true ? imageBase64List : null,
+            images: imageBase64List?.isNotEmpty == true
+                ? imageBase64List
+                : null,
           )
           .map((chunk) {
             chunkCount++;

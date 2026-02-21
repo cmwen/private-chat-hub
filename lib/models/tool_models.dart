@@ -315,7 +315,7 @@ class ToolConfig {
   final double ttsSpeed;
 
   const ToolConfig({
-    this.enabled = false,
+    this.enabled = true,
     this.webSearchEnabled = false,
     this.jinaApiKey,
     this.maxSearchResults = 5,
@@ -435,11 +435,135 @@ class AvailableTools {
     },
   );
 
+  /// Fetch URL content tool definition (basic HTTP, no API key required).
+  static const Tool fetchUrl = Tool(
+    name: 'fetch_url',
+    description:
+        'Fetch and read the content of a web page using a direct HTTP request. '
+        'Use this when you need to retrieve content from a URL the user provided. '
+        'Returns plain text extracted from the page. Does not require an API key.',
+    parameters: {
+      'type': 'object',
+      'properties': {
+        'url': {'type': 'string', 'description': 'The URL to fetch and read'},
+      },
+      'required': ['url'],
+    },
+  );
+
+  /// Show notification tool definition.
+  static const Tool showNotification = Tool(
+    name: 'show_notification',
+    description:
+        'Show a notification to the user to get their attention. '
+        'Use this when you need the user to notice something important, '
+        'such as a reminder, an alert, or a task completion notice.',
+    parameters: {
+      'type': 'object',
+      'properties': {
+        'title': {
+          'type': 'string',
+          'description':
+              'Short notification title (e.g., "Reminder" or "Task Complete")',
+        },
+        'message': {
+          'type': 'string',
+          'description': 'The notification message body to show the user',
+        },
+      },
+      'required': ['title', 'message'],
+    },
+  );
+
+  /// Get project memory tool definition.
+  static const Tool getProjectMemory = Tool(
+    name: 'get_project_memory',
+    description:
+        'Read the current project\'s saved memory/instructions. '
+        'Use this to recall information the user has stored for this project, '
+        'such as context, preferences, or ongoing task notes.',
+    parameters: {'type': 'object', 'properties': {}},
+  );
+
+  /// Update project memory tool definition.
+  static const Tool updateProjectMemory = Tool(
+    name: 'update_project_memory',
+    description:
+        'Save or update the project\'s memory/instructions. '
+        'Use this when the user asks you to remember something for this project, '
+        'update project notes, or store context for future conversations.',
+    parameters: {
+      'type': 'object',
+      'properties': {
+        'instructions': {
+          'type': 'string',
+          'description':
+              'The new instructions or memory content to save for this project',
+        },
+      },
+      'required': ['instructions'],
+    },
+  );
+
+  /// Rename / update project title tool definition.
+  static const Tool renameProject = Tool(
+    name: 'rename_project',
+    description:
+        'Rename the current project — updates its title/name. '
+        'Use this when the user asks to change the project name or title.',
+    parameters: {
+      'type': 'object',
+      'properties': {
+        'name': {
+          'type': 'string',
+          'description': 'The new title/name for the project',
+        },
+      },
+      'required': ['name'],
+    },
+  );
+
+  /// Update project description tool definition.
+  static const Tool updateProjectDescription = Tool(
+    name: 'update_project_description',
+    description:
+        'Update the current project\'s short description. '
+        'Use this when the user wants to set or change the project description or summary.',
+    parameters: {
+      'type': 'object',
+      'properties': {
+        'description': {
+          'type': 'string',
+          'description': 'The new description for the project',
+        },
+      },
+      'required': ['description'],
+    },
+  );
+
   /// All available tools.
-  static List<Tool> get all => [webSearch, currentDateTime, readUrl];
+  static List<Tool> get all => [
+    webSearch,
+    currentDateTime,
+    readUrl,
+    fetchUrl,
+    showNotification,
+    getProjectMemory,
+    updateProjectMemory,
+    renameProject,
+    updateProjectDescription,
+  ];
 
   /// Tools that require an API key.
   static List<Tool> get requiresApiKey => [webSearch, readUrl];
+
+  /// Tools that require a project context.
+  static List<Tool> get requiresProject => [
+    getProjectMemory,
+    updateProjectMemory,
+    renameProject,
+    updateProjectDescription,
+  ];
 
   /// Gets a tool by name.
   ///

@@ -26,8 +26,8 @@ import 'package:uuid/uuid.dart';
 class ChatService {
   final OllamaConnectionManager _ollamaManager;
   final StorageService _storage;
-  final ToolExecutorService? _toolExecutor;
-  final app_tools.ToolConfig? _toolConfig;
+  ToolExecutorService? _toolExecutor;
+  app_tools.ToolConfig? _toolConfig;
   final OllamaConfigService _configService = OllamaConfigService();
   final NotificationService _notificationService = NotificationService();
 
@@ -93,6 +93,19 @@ class ChatService {
     _inferenceConfigService = service;
   }
 
+  /// Update the tool executor and config at runtime (e.g. when the user
+  /// changes tool settings while the app is running).
+  void updateToolConfig(
+    app_tools.ToolConfig config,
+    ToolExecutorService? executor,
+  ) {
+    _toolConfig = config;
+    _toolExecutor = executor;
+    _log(
+      'Tool config updated: enabled=${config.enabled}, executor=${executor != null}',
+    );
+  }
+
   /// Set the on-device LLM service (for hybrid mode)
   void setOnDeviceLLMService(OnDeviceLLMService service) {
     _onDeviceLLMService = service;
@@ -134,8 +147,7 @@ class ChatService {
     for (final message in conversation.messages.reversed) {
       if (message.id == excludeId) continue;
       if (message.role == MessageRole.user) {
-        final images =
-            message.attachments.where((a) => a.isImage).toList();
+        final images = message.attachments.where((a) => a.isImage).toList();
         return images.isEmpty ? null : images;
       }
     }
@@ -1010,7 +1022,10 @@ class ChatService {
           systemPrompt: conversation.systemPrompt,
           temperature: conversation.parameters.temperature,
           maxTokens: conversation.parameters.maxTokens,
-          attachments: _lastUserMessageAttachments(conversation, assistantMessageId),
+          attachments: _lastUserMessageAttachments(
+            conversation,
+            assistantMessageId,
+          ),
         )) {
           if (streamController.isClosed) break;
 
@@ -1342,16 +1357,54 @@ class ChatService {
 
               final finalText = buffer.toString();
 
-              // If the stream closed with an empty body, treat it as an error
-              // rather than silently saving a blank assistant message.
+              // If the stream closed with an empty body, retry once with
+              // non-streaming before surfacing an error to the user.
+              // This covers transient server-side connection drops.
               if (finalText.trim().isEmpty) {
-                _handleError(
-                  conversationId,
-                  conversation,
-                  assistantMessageId,
-                  streamController,
-                  'The model returned an empty response. The server may have closed the connection prematurely — try sending the message again.',
+                _log(
+                  'Streaming returned empty – retrying with non-streaming fallback...',
                 );
+                try {
+                  final retryResponse = await client.chat(
+                    conversation.modelName,
+                    ollamaMessages,
+                    options: conversation.parameters.toOllamaOptions(),
+                  );
+                  final retryContent = retryResponse.message.content;
+                  if (retryContent.trim().isEmpty) {
+                    _handleError(
+                      conversationId,
+                      conversation,
+                      assistantMessageId,
+                      streamController,
+                      'The model returned an empty response after retry. The server may be under load — please try again.',
+                    );
+                    return;
+                  }
+                  conversation = await _updateAssistantMessage(
+                    conversation,
+                    assistantMessageId,
+                    retryContent,
+                    isStreaming: false,
+                  );
+                  if (!streamController.isClosed) {
+                    streamController.add(conversation);
+                    streamController.close();
+                  }
+                  _markGenerationCompleted(conversationId);
+                  await _showResponseCompleteNotification(
+                    conversation,
+                    retryContent,
+                  );
+                } catch (retryError) {
+                  _handleError(
+                    conversationId,
+                    conversation,
+                    assistantMessageId,
+                    streamController,
+                    'The model returned an empty response — try sending the message again.',
+                  );
+                }
                 return;
               }
 
@@ -1367,13 +1420,10 @@ class ChatService {
                 streamController.close();
               }
 
-              _activeSubscriptions.remove(conversationId);
+              _markGenerationCompleted(conversationId);
 
               // Show notification when response completes
-              await _showResponseCompleteNotification(
-                conversation,
-                finalText,
-              );
+              await _showResponseCompleteNotification(conversation, finalText);
             },
           );
 
@@ -1415,13 +1465,10 @@ class ChatService {
           streamController.close();
         }
 
-        _activeSubscriptions.remove(conversationId);
+        _markGenerationCompleted(conversationId);
 
         // Show notification when response completes
-        await _showResponseCompleteNotification(
-          conversation,
-          content,
-        );
+        await _showResponseCompleteNotification(conversation, content);
       } catch (error) {
         _handleError(
           conversationId,
@@ -1462,11 +1509,22 @@ class ChatService {
 
     // Get available tools
     final executor = _toolExecutor!;
+    // Set project context so project tools know which project to operate on
+    _log(
+      'Setting project context: projectId=${conversation.projectId} '
+      '(project tools only active when this is non-null)',
+    );
+    executor.setCurrentProject(conversation.projectId);
     final tools = executor.getAvailableTools().map((tool) {
       return _OllamaToolWrapper(tool, executor);
     }).toList();
 
-    _log('Available tools: ${tools.map((t) => t.name).toList()}');
+    _log(
+      'Tools exposed to LLM (${tools.length}): ${tools.map((t) => t.name).toList()}',
+    );
+    for (final tool in tools) {
+      _log('  [tool] ${tool.name}');
+    }
 
     // Get the last user message as input
     final userMessages = conversation.messages
@@ -1497,6 +1555,9 @@ class ChatService {
       final result = await agent.runWithTools(lastUserMessage.text, tools);
 
       _log('Agent completed with ${result.steps.length} steps');
+      StatusService().showTransient(
+        '[Agent] Completed: ${result.steps.where((s) => s.type == 'tool_call').length} tool calls',
+      );
 
       // Check if agent failed (e.g., max iterations reached)
       if (!result.success && result.error != null) {
@@ -1505,32 +1566,66 @@ class ChatService {
         throw Exception(result.error);
       }
 
-      // Collect tool calls from agent steps and update status
+      // Build a lookup of tool results: match each tool_call step with the
+      // nearest subsequent tool_result step with the same tool name so we can
+      // surface the result summary inside the ToolBadge detail view.
+      // Use Map<toolName, List<AgentStep>> for O(n) matching instead of O(n²).
+      final pendingByName = <String, List<AgentStep>>{};
+      final callResultPairs = <(AgentStep, String?)>[];
+      for (final step in result.steps) {
+        if (step.type == 'tool_call' && step.toolName != null) {
+          pendingByName.putIfAbsent(step.toolName!, () => []).add(step);
+        } else if (step.type == 'tool_result' && step.toolName != null) {
+          final pending = pendingByName[step.toolName!];
+          if (pending != null && pending.isNotEmpty) {
+            callResultPairs.add((pending.removeAt(0), step.content));
+          }
+        }
+      }
+      // Any call steps without a matching result step get null result
+      for (final steps in pendingByName.values) {
+        for (final step in steps) {
+          callResultPairs.add((step, null));
+        }
+      }
+
+      // Collect tool calls from paired steps and update status
+      for (final (callStep, resultContent) in callResultPairs) {
+        _log(
+          'Tool call: ${callStep.toolName}, result: ${resultContent != null ? '${resultContent.length} chars' : 'none'}',
+        );
+        StatusService().showTransient(
+          '[Agent] Tool used: ${callStep.toolName}',
+        );
+
+        // Update status message (shown during streaming while agent is working)
+        final toolDisplayName = _getToolDisplayName(callStep.toolName!);
+        conversation = await _updateStatusMessage(
+          conversation,
+          assistantMessageId,
+          '⚙️ Executing $toolDisplayName...',
+        );
+        if (!streamController.isClosed) {
+          streamController.add(conversation);
+        }
+
+        final toolCall = app_tools.ToolCall(
+          id: const Uuid().v4(),
+          toolName: callStep.toolName!,
+          arguments: callStep.toolArgs ?? {},
+          status: app_tools.ToolCallStatus.success,
+          result: resultContent != null
+              ? app_tools.ToolResult(success: true, summary: resultContent)
+              : null,
+          createdAt: callStep.timestamp,
+        );
+        toolCalls.add(toolCall);
+        _log('Added tool call: ${callStep.toolName}');
+      }
+
+      // Log all steps for debug visibility
       for (final step in result.steps) {
         _log('Step: type=${step.type}, tool=${step.toolName}');
-
-        // Update status for tool calls
-        if (step.type == 'tool_call' && step.toolName != null) {
-          final toolDisplayName = _getToolDisplayName(step.toolName!);
-          conversation = await _updateStatusMessage(
-            conversation,
-            assistantMessageId,
-            '⚙️ Executing $toolDisplayName...',
-          );
-          if (!streamController.isClosed) {
-            streamController.add(conversation);
-          }
-
-          final toolCall = app_tools.ToolCall(
-            id: const Uuid().v4(),
-            toolName: step.toolName!,
-            arguments: step.toolArgs ?? {},
-            status: app_tools.ToolCallStatus.success,
-            createdAt: step.timestamp,
-          );
-          toolCalls.add(toolCall);
-          _log('Added tool call: ${step.toolName}');
-        }
       }
 
       // Clear status message before final response
@@ -1542,6 +1637,21 @@ class ChatService {
 
       responseText.write(result.response);
       _log('Final response length: ${result.response.length}');
+
+      // Guard: if the agent returned success but no text, treat it as an error
+      // so the user sees a visible failure rather than a blank message.
+      if (responseText.toString().trim().isEmpty) {
+        _handleError(
+          conversationId,
+          conversation,
+          assistantMessageId,
+          streamController,
+          'The model did not produce a response. This can happen when the model '
+          'is unable to decide on a tool to call or is temporarily confused — '
+          'try sending the message again.',
+        );
+        return;
+      }
     } catch (e) {
       _log('Error during agent execution: $e');
       // Re-throw to use the error handling mechanism
@@ -1572,7 +1682,7 @@ class ChatService {
       streamController.close();
     }
 
-    _activeSubscriptions.remove(conversationId);
+    _markGenerationCompleted(conversationId);
 
     // Show notification when response completes
     await _showResponseCompleteNotification(
@@ -2010,6 +2120,16 @@ class ChatService {
     _activeStreams.remove(conversationId);
   }
 
+  /// Marks generation as completed successfully for a single-model flow.
+  ///
+  /// Unlike [_cleanupStream], this does not cancel subscriptions because it is
+  /// called from normal completion paths (including stream callbacks) where
+  /// cancellation is unnecessary and can race with close handlers.
+  void _markGenerationCompleted(String conversationId) {
+    _activeSubscriptions.remove(conversationId);
+    _activeStreams.remove(conversationId);
+  }
+
   /// Updates the status message of a specific message in the conversation
   Future<Conversation> _updateStatusMessage(
     Conversation conversation,
@@ -2039,8 +2159,20 @@ class ChatService {
         return '🔍 Web Search';
       case 'read_url':
         return '📖 Reading URL';
+      case 'fetch_url':
+        return '🌐 Fetching URL';
       case 'get_current_datetime':
         return '🕒 Getting Time';
+      case 'show_notification':
+        return '🔔 Sending Notification';
+      case 'get_project_memory':
+        return '🧠 Reading Project Memory';
+      case 'update_project_memory':
+        return '💾 Saving Project Memory';
+      case 'rename_project':
+        return '✏️ Renaming Project';
+      case 'update_project_description':
+        return '📝 Updating Description';
       default:
         return toolName;
     }
@@ -2432,8 +2564,20 @@ extension ChatServiceHelpers on ChatService {
         return '🔍 Web Search';
       case 'read_url':
         return '📖 Reading URL';
+      case 'fetch_url':
+        return '🌐 Fetching URL';
       case 'get_current_datetime':
         return '🕒 Getting Time';
+      case 'show_notification':
+        return '🔔 Sending Notification';
+      case 'get_project_memory':
+        return '🧠 Reading Project Memory';
+      case 'update_project_memory':
+        return '💾 Saving Project Memory';
+      case 'rename_project':
+        return '✏️ Renaming Project';
+      case 'update_project_description':
+        return '📝 Updating Description';
       default:
         return toolName;
     }

@@ -234,7 +234,7 @@ void main() {
   group('ToolConfig', () {
     test('should create with defaults', () {
       const config = ToolConfig();
-      expect(config.enabled, false);
+      expect(config.enabled, true);
       expect(config.webSearchEnabled, false);
       expect(config.webSearchAvailable, false);
     });
@@ -294,7 +294,38 @@ void main() {
     });
 
     test('should list all tools', () {
-      expect(AvailableTools.all.length, 3);
+      expect(AvailableTools.all.length, 9);
+    });
+
+    test('should have fetch url tool', () {
+      expect(AvailableTools.fetchUrl.name, 'fetch_url');
+    });
+
+    test('should have show notification tool', () {
+      expect(AvailableTools.showNotification.name, 'show_notification');
+    });
+
+    test('should have get project memory tool', () {
+      expect(AvailableTools.getProjectMemory.name, 'get_project_memory');
+    });
+
+    test('should have update project memory tool', () {
+      expect(AvailableTools.updateProjectMemory.name, 'update_project_memory');
+    });
+
+    test('should have rename project tool', () {
+      expect(AvailableTools.renameProject.name, 'rename_project');
+    });
+
+    test('should have update project description tool', () {
+      expect(
+        AvailableTools.updateProjectDescription.name,
+        'update_project_description',
+      );
+    });
+
+    test('should list project tools', () {
+      expect(AvailableTools.requiresProject.length, 4);
     });
 
     test('should get tool by name', () {

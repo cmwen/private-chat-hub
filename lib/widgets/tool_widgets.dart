@@ -86,6 +86,26 @@ class ToolBadge extends StatelessWidget {
         return (Icons.access_time, Colors.orange, 'Date/Time');
       case 'read_url':
         return (Icons.link, Colors.purple, 'Read URL');
+      case 'fetch_url':
+        return (Icons.public, Colors.teal, 'Fetch URL');
+      case 'show_notification':
+        return (
+          Icons.notifications_outlined,
+          Colors.amber.shade700,
+          'Notification',
+        );
+      case 'get_project_memory':
+        return (Icons.psychology_outlined, Colors.indigo, 'Project Memory');
+      case 'update_project_memory':
+        return (Icons.save_outlined, Colors.indigo, 'Save Memory');
+      case 'rename_project':
+        return (Icons.edit_outlined, Colors.deepPurple, 'Rename Project');
+      case 'update_project_description':
+        return (
+          Icons.description_outlined,
+          Colors.deepPurple,
+          'Update Description',
+        );
       default:
         return (Icons.extension, Colors.grey, toolCall.toolName);
     }

@@ -212,14 +212,16 @@ class _HomeScreenState extends State<HomeScreen> {
     print(toolConfigMsg);
     StatusService().showTransient(toolConfigMsg);
 
-    final toolExecutor =
-        toolConfig.jinaApiKey != null &&
-            toolConfig.jinaApiKey!.isNotEmpty &&
-            toolConfig.enabled &&
-            toolConfig.webSearchEnabled
+    // Initialize project service before creating tool executor
+    _projectService = ProjectService(widget.storageService);
+
+    final toolExecutor = toolConfig.enabled
         ? ToolExecutorService(
-            jinaService: JinaSearchService(apiKey: toolConfig.jinaApiKey!),
+            jinaService: toolConfig.webSearchAvailable
+                ? JinaSearchService(apiKey: toolConfig.jinaApiKey!)
+                : null,
             config: toolConfig,
+            projectService: _projectService,
           )
         : null;
 
@@ -234,7 +236,6 @@ class _HomeScreenState extends State<HomeScreen> {
       toolExecutor: toolExecutor,
       toolConfig: toolConfig,
     );
-    _projectService = ProjectService(widget.storageService);
 
     // Load developer mode preference and sync it to StatusService so all
     // showTransient calls are gated correctly (including service-level ones).
@@ -253,6 +254,27 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _syncDeveloperMode() async {
     final devMode = await OllamaConfigService().getDeveloperMode();
     StatusService().developerMode = devMode;
+  }
+
+  /// Called when the user changes tool settings in SettingsScreen.
+  /// Re-reads the persisted config and recreates the ToolExecutorService so
+  /// that ChatService immediately picks up the change without requiring a
+  /// restart.
+  void _onToolConfigChanged() {
+    final toolConfig = widget.toolConfigService.getConfig();
+    final toolExecutor = toolConfig.enabled
+        ? ToolExecutorService(
+            jinaService: toolConfig.webSearchAvailable
+                ? JinaSearchService(apiKey: toolConfig.jinaApiKey!)
+                : null,
+            config: toolConfig,
+            projectService: _projectService,
+          )
+        : null;
+    _chatService.updateToolConfig(toolConfig, toolExecutor);
+    print(
+      '[HomeScreen] Tool config refreshed: enabled=${toolConfig.enabled}, executor=${toolExecutor != null}',
+    );
   }
 
   Future<void> _initializeInferenceServices() async {
@@ -435,6 +457,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   onDeviceLLMService: _onDeviceLLMService,
                   onThemeModeChanged: widget.onThemeModeChanged,
                   currentThemeMode: widget.currentThemeMode,
+                  onToolConfigChanged: _onToolConfigChanged,
                 ),
               ],
             ),
