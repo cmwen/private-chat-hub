@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:math' show min;
 import 'package:http/http.dart' as http;
 import 'package:private_chat_hub/models/tool_models.dart';
 import 'package:private_chat_hub/services/jina_search_service.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/project_service.dart';
+import 'package:private_chat_hub/services/status_service.dart';
 import 'package:uuid/uuid.dart';
 
 /// Service for executing tool calls from AI models.
@@ -78,6 +80,8 @@ class ToolExecutorService {
     final startTime = DateTime.now();
     final toolCallId = const Uuid().v4();
 
+    _debugLog('▶ Calling tool: $toolName  args: $arguments');
+
     var toolCall = ToolCall(
       id: toolCallId,
       toolName: toolName,
@@ -95,6 +99,11 @@ class ToolExecutorService {
         result: result,
         executionTimeMs: executionTime,
       );
+
+      final preview = result.summary != null
+          ? result.summary!.substring(0, min(120, result.summary!.length))
+          : '(no summary)';
+      _debugLog('✅ Tool "$toolName" done in ${executionTime}ms: $preview');
     } catch (e) {
       final executionTime = DateTime.now().difference(startTime).inMilliseconds;
 
@@ -103,9 +112,22 @@ class ToolExecutorService {
         errorMessage: e.toString(),
         executionTimeMs: executionTime,
       );
+
+      _debugLog('❌ Tool "$toolName" failed in ${executionTime}ms: $e');
     }
 
     return toolCall;
+  }
+
+  /// Logs a debug message to the console and, when developer mode is active,
+  /// to the in-app UI via a SnackBar.
+  ///
+  /// [StatusService.showTransient] is a no-op when developer mode is off,
+  /// so no extra guard is needed here.
+  static void _debugLog(String message) {
+    // ignore: avoid_print
+    print('[ToolExecutor] $message');
+    StatusService().showTransient('[Tools] $message');
   }
 
   /// Dispatches a tool call to the appropriate handler.

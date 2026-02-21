@@ -1495,6 +1495,9 @@ class ChatService {
       final result = await agent.runWithTools(lastUserMessage.text, tools);
 
       _log('Agent completed with ${result.steps.length} steps');
+      StatusService().showTransient(
+        '[Agent] Completed: ${result.steps.where((s) => s.type == 'tool_call').length} tool calls',
+      );
 
       // Check if agent failed (e.g., max iterations reached)
       if (!result.success && result.error != null) {
@@ -1503,32 +1506,64 @@ class ChatService {
         throw Exception(result.error);
       }
 
-      // Collect tool calls from agent steps and update status
+      // Build a lookup of tool results: match each tool_call step with the
+      // nearest subsequent tool_result step with the same tool name so we can
+      // surface the result summary inside the ToolBadge detail view.
+      // Use Map<toolName, List<AgentStep>> for O(n) matching instead of O(n²).
+      final pendingByName = <String, List<AgentStep>>{};
+      final callResultPairs = <(AgentStep, String?)>[];
+      for (final step in result.steps) {
+        if (step.type == 'tool_call' && step.toolName != null) {
+          pendingByName.putIfAbsent(step.toolName!, () => []).add(step);
+        } else if (step.type == 'tool_result' && step.toolName != null) {
+          final pending = pendingByName[step.toolName!];
+          if (pending != null && pending.isNotEmpty) {
+            callResultPairs.add((pending.removeAt(0), step.content));
+          }
+        }
+      }
+      // Any call steps without a matching result step get null result
+      for (final steps in pendingByName.values) {
+        for (final step in steps) {
+          callResultPairs.add((step, null));
+        }
+      }
+
+      // Collect tool calls from paired steps and update status
+      for (final (callStep, resultContent) in callResultPairs) {
+        _log(
+          'Tool call: ${callStep.toolName}, result: ${resultContent != null ? '${resultContent.length} chars' : 'none'}',
+        );
+        StatusService().showTransient('[Agent] Tool used: ${callStep.toolName}');
+
+        // Update status message (shown during streaming while agent is working)
+        final toolDisplayName = _getToolDisplayName(callStep.toolName!);
+        conversation = await _updateStatusMessage(
+          conversation,
+          assistantMessageId,
+          '⚙️ Executing $toolDisplayName...',
+        );
+        if (!streamController.isClosed) {
+          streamController.add(conversation);
+        }
+
+        final toolCall = app_tools.ToolCall(
+          id: const Uuid().v4(),
+          toolName: callStep.toolName!,
+          arguments: callStep.toolArgs ?? {},
+          status: app_tools.ToolCallStatus.success,
+          result: resultContent != null
+              ? app_tools.ToolResult(success: true, summary: resultContent)
+              : null,
+          createdAt: callStep.timestamp,
+        );
+        toolCalls.add(toolCall);
+        _log('Added tool call: ${callStep.toolName}');
+      }
+
+      // Log all steps for debug visibility
       for (final step in result.steps) {
         _log('Step: type=${step.type}, tool=${step.toolName}');
-
-        // Update status for tool calls
-        if (step.type == 'tool_call' && step.toolName != null) {
-          final toolDisplayName = _getToolDisplayName(step.toolName!);
-          conversation = await _updateStatusMessage(
-            conversation,
-            assistantMessageId,
-            '⚙️ Executing $toolDisplayName...',
-          );
-          if (!streamController.isClosed) {
-            streamController.add(conversation);
-          }
-
-          final toolCall = app_tools.ToolCall(
-            id: const Uuid().v4(),
-            toolName: step.toolName!,
-            arguments: step.toolArgs ?? {},
-            status: app_tools.ToolCallStatus.success,
-            createdAt: step.timestamp,
-          );
-          toolCalls.add(toolCall);
-          _log('Added tool call: ${step.toolName}');
-        }
       }
 
       // Clear status message before final response
