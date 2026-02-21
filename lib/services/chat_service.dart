@@ -1361,7 +1361,9 @@ class ChatService {
               // non-streaming before surfacing an error to the user.
               // This covers transient server-side connection drops.
               if (finalText.trim().isEmpty) {
-                _log('Streaming returned empty – retrying with non-streaming fallback...');
+                _log(
+                  'Streaming returned empty – retrying with non-streaming fallback...',
+                );
                 try {
                   final retryResponse = await client.chat(
                     conversation.modelName,
@@ -1517,7 +1519,9 @@ class ChatService {
       return _OllamaToolWrapper(tool, executor);
     }).toList();
 
-    _log('Tools exposed to LLM (${tools.length}): ${tools.map((t) => t.name).toList()}');
+    _log(
+      'Tools exposed to LLM (${tools.length}): ${tools.map((t) => t.name).toList()}',
+    );
     for (final tool in tools) {
       _log('  [tool] ${tool.name}');
     }

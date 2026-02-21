@@ -101,7 +101,11 @@ class ToolBadge extends StatelessWidget {
       case 'rename_project':
         return (Icons.edit_outlined, Colors.deepPurple, 'Rename Project');
       case 'update_project_description':
-        return (Icons.description_outlined, Colors.deepPurple, 'Update Description');
+        return (
+          Icons.description_outlined,
+          Colors.deepPurple,
+          'Update Description',
+        );
       default:
         return (Icons.extension, Colors.grey, toolCall.toolName);
     }

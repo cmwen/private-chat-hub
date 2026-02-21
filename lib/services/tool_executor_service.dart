@@ -47,7 +47,9 @@ class ToolExecutorService {
     tools.add(AvailableTools.currentDateTime);
     tools.add(AvailableTools.fetchUrl);
     tools.add(AvailableTools.showNotification);
-    _debugLog('✔ Base tools added: get_current_datetime, fetch_url, show_notification');
+    _debugLog(
+      '✔ Base tools added: get_current_datetime, fetch_url, show_notification',
+    );
 
     // Requires Jina API key
     if (config.webSearchAvailable) {
@@ -556,16 +558,13 @@ class ToolExecutorService {
       return const ToolResult(success: false, summary: 'Project not found.');
     }
 
-    final updatedProject = project.copyWith(
-      description: newDescription.trim(),
-    );
+    final updatedProject = project.copyWith(description: newDescription.trim());
     await projectService.updateProject(updatedProject);
 
     return ToolResult(
       success: true,
       data: {'description': newDescription.trim()},
-      summary:
-          'Project description updated to: "${newDescription.trim()}".',
+      summary: 'Project description updated to: "${newDescription.trim()}".',
     );
   }
 
