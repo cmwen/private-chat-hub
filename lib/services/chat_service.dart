@@ -1534,7 +1534,9 @@ class ChatService {
         _log(
           'Tool call: ${callStep.toolName}, result: ${resultContent != null ? '${resultContent.length} chars' : 'none'}',
         );
-        StatusService().showTransient('[Agent] Tool used: ${callStep.toolName}');
+        StatusService().showTransient(
+          '[Agent] Tool used: ${callStep.toolName}',
+        );
 
         // Update status message (shown during streaming while agent is working)
         final toolDisplayName = _getToolDisplayName(callStep.toolName!);

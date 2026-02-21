@@ -89,7 +89,11 @@ class ToolBadge extends StatelessWidget {
       case 'fetch_url':
         return (Icons.public, Colors.teal, 'Fetch URL');
       case 'show_notification':
-        return (Icons.notifications_outlined, Colors.amber.shade700, 'Notification');
+        return (
+          Icons.notifications_outlined,
+          Colors.amber.shade700,
+          'Notification',
+        );
       case 'get_project_memory':
         return (Icons.psychology_outlined, Colors.indigo, 'Project Memory');
       case 'update_project_memory':
