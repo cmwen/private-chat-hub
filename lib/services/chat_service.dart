@@ -1462,6 +1462,8 @@ class ChatService {
 
     // Get available tools
     final executor = _toolExecutor!;
+    // Set project context so project tools know which project to operate on
+    executor.setCurrentProject(conversation.projectId);
     final tools = executor.getAvailableTools().map((tool) {
       return _OllamaToolWrapper(tool, executor);
     }).toList();
@@ -2039,8 +2041,18 @@ class ChatService {
         return '🔍 Web Search';
       case 'read_url':
         return '📖 Reading URL';
+      case 'fetch_url':
+        return '🌐 Fetching URL';
       case 'get_current_datetime':
         return '🕒 Getting Time';
+      case 'show_notification':
+        return '🔔 Sending Notification';
+      case 'get_project_memory':
+        return '🧠 Reading Project Memory';
+      case 'update_project_memory':
+        return '💾 Saving Project Memory';
+      case 'rename_project':
+        return '✏️ Renaming Project';
       default:
         return toolName;
     }
@@ -2432,8 +2444,18 @@ extension ChatServiceHelpers on ChatService {
         return '🔍 Web Search';
       case 'read_url':
         return '📖 Reading URL';
+      case 'fetch_url':
+        return '🌐 Fetching URL';
       case 'get_current_datetime':
         return '🕒 Getting Time';
+      case 'show_notification':
+        return '🔔 Sending Notification';
+      case 'get_project_memory':
+        return '🧠 Reading Project Memory';
+      case 'update_project_memory':
+        return '💾 Saving Project Memory';
+      case 'rename_project':
+        return '✏️ Renaming Project';
       default:
         return toolName;
     }

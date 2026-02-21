@@ -212,14 +212,16 @@ class _HomeScreenState extends State<HomeScreen> {
     print(toolConfigMsg);
     StatusService().showTransient(toolConfigMsg);
 
-    final toolExecutor =
-        toolConfig.jinaApiKey != null &&
-            toolConfig.jinaApiKey!.isNotEmpty &&
-            toolConfig.enabled &&
-            toolConfig.webSearchEnabled
+    // Initialize project service before creating tool executor
+    _projectService = ProjectService(widget.storageService);
+
+    final toolExecutor = toolConfig.enabled
         ? ToolExecutorService(
-            jinaService: JinaSearchService(apiKey: toolConfig.jinaApiKey!),
+            jinaService: toolConfig.webSearchAvailable
+                ? JinaSearchService(apiKey: toolConfig.jinaApiKey!)
+                : null,
             config: toolConfig,
+            projectService: _projectService,
           )
         : null;
 
@@ -234,7 +236,6 @@ class _HomeScreenState extends State<HomeScreen> {
       toolExecutor: toolExecutor,
       toolConfig: toolConfig,
     );
-    _projectService = ProjectService(widget.storageService);
 
     // Load developer mode preference and sync it to StatusService so all
     // showTransient calls are gated correctly (including service-level ones).

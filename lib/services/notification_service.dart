@@ -201,6 +201,44 @@ class NotificationService with WidgetsBindingObserver {
     );
   }
 
+  /// Show a custom notification triggered by the AI assistant.
+  ///
+  /// Used when the LLM calls the show_notification tool to alert the user.
+  Future<void> showCustomNotification({
+    required String title,
+    required String message,
+  }) async {
+    if (!_initialized) await initialize();
+
+    // Get or assign a notification id using the same counter
+    final notificationId = _nextNotificationId++;
+
+    // Truncate message if too long
+    final preview = message.length > _maxPreviewLength
+        ? '${message.substring(0, _maxPreviewLength)}...'
+        : message;
+
+    const androidDetails = AndroidNotificationDetails(
+      'llm_alerts',
+      'AI Alerts',
+      channelDescription: 'Notifications triggered by the AI assistant',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+      playSound: true,
+      enableVibration: true,
+    );
+
+    const notificationDetails = NotificationDetails(android: androidDetails);
+
+    await _notifications.show(
+      notificationId,
+      title,
+      preview,
+      notificationDetails,
+    );
+  }
+
   /// Cancel a specific notification.
   Future<void> cancelNotification(String conversationId) async {
     final notificationId = _conversationNotificationIds[conversationId];
