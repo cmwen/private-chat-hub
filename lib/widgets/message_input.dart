@@ -16,6 +16,7 @@ class MessageInput extends StatefulWidget {
   final OnSendMessageWithAttachments? onSendMessageWithAttachments;
   final bool enableAttachments;
   final bool supportsVision;
+  final bool supportsAudio;
   final bool supportsTools;
   final bool toolCallingEnabled;
   final bool isLoading;
@@ -28,6 +29,7 @@ class MessageInput extends StatefulWidget {
     this.onSendMessageWithAttachments,
     this.enableAttachments = true,
     this.supportsVision = true,
+    this.supportsAudio = false,
     this.supportsTools = false,
     this.toolCallingEnabled = true,
     this.isLoading = false,
@@ -117,6 +119,17 @@ class _MessageInputState extends State<MessageInput> {
   /// Maximum file size for text attachments (5 MB).
   static const int _maxTextFileSize = 5 * 1024 * 1024;
 
+  /// Supported audio file extensions for multimodal models.
+  static const List<String> _supportedAudioExtensions = [
+    'mp3',
+    'wav',
+    'm4a',
+    'aac',
+    'flac',
+    'ogg',
+    'webm',
+  ];
+
   Future<void> _showAttachmentOptions() async {
     showModalBottomSheet(
       context: context,
@@ -124,24 +137,36 @@ class _MessageInputState extends State<MessageInput> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Photo from Gallery'),
-              subtitle: const Text('For vision models'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _pickImageFromGallery();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Take Photo'),
-              subtitle: const Text('For vision models'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _takePhoto();
-              },
-            ),
+            if (widget.supportsVision)
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Photo from Gallery'),
+                subtitle: const Text('For vision models'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _pickImageFromGallery();
+                },
+              ),
+            if (widget.supportsVision)
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Take Photo'),
+                subtitle: const Text('For vision models'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _takePhoto();
+                },
+              ),
+            if (widget.supportsAudio)
+              ListTile(
+                leading: const Icon(Icons.audio_file),
+                title: const Text('Audio File'),
+                subtitle: const Text('For audio-capable models'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _pickAudioFile();
+                },
+              ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.insert_drive_file),
@@ -156,6 +181,29 @@ class _MessageInputState extends State<MessageInput> {
         ),
       ),
     );
+  }
+
+  Future<void> _pickAudioFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: _supportedAudioExtensions,
+        allowMultiple: true,
+        withData: true,
+      );
+
+      if (result != null) {
+        for (final file in result.files) {
+          await _addFileAttachment(file);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to pick audio: $e')));
+      }
+    }
   }
 
   Future<void> _pickFile() async {
@@ -275,6 +323,20 @@ class _MessageInputState extends State<MessageInput> {
         return 'text/x-rust';
       case 'sh':
         return 'text/x-shellscript';
+      case 'mp3':
+        return 'audio/mpeg';
+      case 'wav':
+        return 'audio/wav';
+      case 'm4a':
+        return 'audio/mp4';
+      case 'aac':
+        return 'audio/aac';
+      case 'flac':
+        return 'audio/flac';
+      case 'ogg':
+        return 'audio/ogg';
+      case 'webm':
+        return 'audio/webm';
       default:
         return 'text/plain';
     }
@@ -367,7 +429,7 @@ class _MessageInputState extends State<MessageInput> {
           mainAxisSize: MainAxisSize.min,
           children: [
             // Interactive capability chips
-            if (widget.supportsTools || widget.supportsVision)
+            if (widget.supportsTools || widget.supportsVision || widget.supportsAudio)
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -406,7 +468,8 @@ class _MessageInputState extends State<MessageInput> {
                               : colorScheme.onSurfaceVariant,
                         ),
                       ),
-                    if (widget.supportsTools && widget.supportsVision)
+                    if (widget.supportsTools &&
+                        (widget.supportsVision || widget.supportsAudio))
                       const SizedBox(width: 8),
                     if (widget.supportsVision)
                       Chip(
@@ -428,6 +491,28 @@ class _MessageInputState extends State<MessageInput> {
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
+                    if (widget.supportsVision && widget.supportsAudio)
+                      const SizedBox(width: 8),
+                    if (widget.supportsAudio)
+                      Chip(
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.mic,
+                              size: 14,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 4),
+                            const Text('Audio'),
+                          ],
+                        ),
+                        backgroundColor: colorScheme.surfaceContainerHighest,
+                        labelStyle: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -436,12 +521,17 @@ class _MessageInputState extends State<MessageInput> {
             // Input row
             Row(
               children: [
-                if (widget.enableAttachments && widget.supportsVision)
+                if (widget.enableAttachments &&
+                    (widget.supportsVision || widget.supportsAudio))
                   IconButton(
                     icon: const Icon(Icons.add_circle_outline),
                     color: colorScheme.primary,
                     onPressed: _showAttachmentOptions,
-                    tooltip: 'Attach image (vision required)',
+                    tooltip: widget.supportsVision && widget.supportsAudio
+                        ? 'Attach image/audio'
+                        : widget.supportsVision
+                        ? 'Attach image (vision required)'
+                        : 'Attach audio (audio model)',
                   ),
                 Expanded(
                   child: TextField(

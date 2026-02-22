@@ -1381,6 +1381,8 @@ class _ChatScreenState extends State<ChatScreen> {
             onSendMessageWithAttachments: _handleSendMessageWithAttachments,
             supportsVision:
                 _conversation?.modelCapabilities.supportsVision ?? false,
+            supportsAudio:
+              _conversation?.modelCapabilities.supportsAudio ?? false,
             supportsTools:
                 (_conversation?.modelCapabilities.supportsTools ?? false) &&
                 (widget.toolConfig?.enabled ?? true),

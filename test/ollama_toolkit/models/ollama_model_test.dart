@@ -124,6 +124,11 @@ void main() {
       expect(ModelRegistry.supportsVision('mistral'), false);
     });
 
+    test('checks if model supports audio', () {
+      expect(ModelRegistry.supportsAudio('llama3.2'), false);
+      expect(ModelRegistry.supportsAudio('mistral'), false);
+    });
+
     test('checks if model supports thinking', () {
       expect(ModelRegistry.supportsThinking('deepseek-v3'), true);
       expect(ModelRegistry.supportsThinking('llama3.2'), false);
@@ -135,6 +140,7 @@ void main() {
       final caps = ModelCapabilities(
         supportsToolCalling: true,
         supportsVision: true,
+        supportsAudio: true,
         supportsThinking: true,
         contextWindow: 256000,
         modelFamily: 'test',
@@ -143,6 +149,7 @@ void main() {
 
       expect(caps.supportsToolCalling, true);
       expect(caps.supportsVision, true);
+      expect(caps.supportsAudio, true);
       expect(caps.supportsThinking, true);
       expect(caps.contextWindow, 256000);
       expect(caps.aliases, hasLength(2));

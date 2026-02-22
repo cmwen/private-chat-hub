@@ -34,6 +34,12 @@ class CapabilityBadges extends StatelessWidget {
             label: 'Vision',
             color: isDark ? Colors.purple.shade200 : Colors.purple.shade700,
           ),
+        if (capabilities.supportsAudio)
+          _CapabilityChip(
+            icon: Icons.mic,
+            label: 'Audio',
+            color: isDark ? Colors.teal.shade200 : Colors.teal.shade700,
+          ),
         if (capabilities.contextWindow >= 100000)
           _CapabilityChip(
             icon: Icons.data_object,
@@ -274,6 +280,15 @@ class CapabilityInfoPanel extends StatelessWidget {
                         ? 'Analyze images and understand visual content. Attach images to your messages.'
                         : 'This model cannot process images. Try vision models like Llama 3.2 Vision, LLaVA, or Gemma 3.',
                     supported: capabilities.supportsVision,
+                  ),
+                  const SizedBox(height: 16),
+                  _CapabilityCard(
+                    icon: Icons.mic,
+                    title: 'Audio Support',
+                    description: capabilities.supportsAudio
+                        ? 'Accept audio inputs for multimodal interactions.'
+                        : 'This model cannot process audio inputs.',
+                    supported: capabilities.supportsAudio,
                   ),
                   if (capabilities.description != null &&
                       capabilities.description!.isNotEmpty) ...[

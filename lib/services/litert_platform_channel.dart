@@ -106,6 +106,7 @@ class LiteRTPlatformChannel {
     double topP = 0.9,
     double repetitionPenalty = 1.0,
     List<String>? images,
+    List<String>? audios,
   }) {
     final controller = StreamController<String>();
     StreamSubscription? subscription;
@@ -123,7 +124,8 @@ class LiteRTPlatformChannel {
         'Starting generateTextStream: promptLength=${prompt.length}, '
         'temperature=$temperature, maxTokens=$maxTokens, topK=$topK, '
         'topP=$topP, repetitionPenalty=$repetitionPenalty, '
-        'imageCount=${images?.length ?? 0}',
+        'imageCount=${images?.length ?? 0}, '
+        'audioCount=${audios?.length ?? 0}',
       );
 
       // Listen for events first to avoid missing early tokens.
@@ -207,6 +209,7 @@ class LiteRTPlatformChannel {
             'topP': topP,
             'repetitionPenalty': repetitionPenalty,
             if (images != null && images.isNotEmpty) 'images': images,
+            if (audios != null && audios.isNotEmpty) 'audios': audios,
           })
           .catchError((error) {
             _log('startGeneration invoke failed: $error');

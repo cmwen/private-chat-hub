@@ -1,4 +1,5 @@
 import 'package:private_chat_hub/models/conversation.dart';
+import 'package:private_chat_hub/models/model_capability_resolver.dart';
 import 'package:private_chat_hub/models/message.dart';
 import 'package:private_chat_hub/ollama_toolkit/models/ollama_model.dart';
 
@@ -44,26 +45,12 @@ class ComparisonConversation extends Conversation {
 
   /// Gets the capabilities of model1.
   ModelCapabilities get model1Capabilities {
-    return ModelRegistry.getCapabilities(model1Name) ??
-        const ModelCapabilities(
-          supportsToolCalling: false,
-          supportsVision: false,
-          supportsThinking: false,
-          contextWindow: 4096,
-          description: 'Unknown model',
-        );
+    return ModelCapabilityResolver.getCapabilitiesOrUnknown(model1Name);
   }
 
   /// Gets the capabilities of model2.
   ModelCapabilities get model2Capabilities {
-    return ModelRegistry.getCapabilities(model2Name) ??
-        const ModelCapabilities(
-          supportsToolCalling: false,
-          supportsVision: false,
-          supportsThinking: false,
-          contextWindow: 4096,
-          description: 'Unknown model',
-        );
+    return ModelCapabilityResolver.getCapabilitiesOrUnknown(model2Name);
   }
 
   /// Creates a ComparisonConversation from JSON map.

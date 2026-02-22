@@ -6,6 +6,9 @@ class ModelCapabilities {
   /// Whether the model supports vision (image inputs)
   final bool supportsVision;
 
+  /// Whether the model supports audio inputs
+  final bool supportsAudio;
+
   /// Whether the model supports explicit thinking/reasoning modes
   final bool supportsThinking;
 
@@ -27,6 +30,7 @@ class ModelCapabilities {
   const ModelCapabilities({
     required this.supportsToolCalling,
     required this.supportsVision,
+    this.supportsAudio = false,
     required this.supportsThinking,
     required this.contextWindow,
     this.modelFamily,
@@ -49,6 +53,7 @@ class ModelCapabilities {
     final features = <String>[];
     if (supportsToolCalling) features.add('🔧 tools');
     if (supportsVision) features.add('👁️ vision');
+    if (supportsAudio) features.add('🎤 audio');
     if (supportsThinking) features.add('🧠 thinking');
     return 'ModelCapabilities(${features.join(', ')}, ctx: ${contextWindow ~/ 1000}k)';
   }
@@ -386,10 +391,18 @@ class ModelRegistry {
   static ModelCapabilities? getCapabilities(String modelName) {
     // Normalize model name (remove tags like :8b, :latest)
     final normalizedName = _normalizeModelName(modelName);
+    final canonicalName = _canonicalizeName(normalizedName);
 
     // Direct lookup
     if (_registry.containsKey(normalizedName)) {
       return _registry[normalizedName];
+    }
+
+    // Canonical direct lookup (handles separators like '-' vs '.')
+    for (final entry in _registry.entries) {
+      if (_canonicalizeName(entry.key) == canonicalName) {
+        return entry.value;
+      }
     }
 
     // Check aliases
@@ -402,6 +415,9 @@ class ModelRegistry {
         if (_normalizeModelName(alias) == normalizedName) {
           return entry.value;
         }
+        if (_canonicalizeName(alias) == canonicalName) {
+          return entry.value;
+        }
       }
     }
 
@@ -412,6 +428,7 @@ class ModelRegistry {
   static List<String> findModelsByCapability({
     bool? supportsToolCalling,
     bool? supportsVision,
+    bool? supportsAudio,
     bool? supportsThinking,
     int? minContextWindow,
     String? modelFamily,
@@ -427,6 +444,9 @@ class ModelRegistry {
         matches = false;
       }
       if (supportsVision != null && caps.supportsVision != supportsVision) {
+        matches = false;
+      }
+      if (supportsAudio != null && caps.supportsAudio != supportsAudio) {
         matches = false;
       }
       if (supportsThinking != null &&
@@ -466,12 +486,24 @@ class ModelRegistry {
 
   /// Normalize model name by removing version tags
   static String _normalizeModelName(String modelName) {
-    // Remove everything after : (version tags)
-    final colonIndex = modelName.indexOf(':');
-    if (colonIndex != -1) {
-      return modelName.substring(0, colonIndex);
+    var normalized = modelName.trim().toLowerCase();
+    if (normalized.startsWith('local:')) {
+      normalized = normalized.substring('local:'.length);
     }
-    return modelName;
+
+    // Remove everything after : (version tags)
+    final colonIndex = normalized.indexOf(':');
+    if (colonIndex != -1) {
+      return normalized.substring(0, colonIndex);
+    }
+    return normalized;
+  }
+
+  static String _canonicalizeName(String modelName) {
+    return _normalizeModelName(modelName).replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
   }
 
   /// Check if a model supports tool calling
@@ -482,6 +514,11 @@ class ModelRegistry {
   /// Check if a model supports vision
   static bool supportsVision(String modelName) {
     return getCapabilities(modelName)?.supportsVision ?? false;
+  }
+
+  /// Check if a model supports audio
+  static bool supportsAudio(String modelName) {
+    return getCapabilities(modelName)?.supportsAudio ?? false;
   }
 
   /// Check if a model supports thinking mode

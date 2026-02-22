@@ -1,4 +1,5 @@
 import 'package:private_chat_hub/models/message.dart';
+import 'package:private_chat_hub/models/model_capability_resolver.dart';
 import 'package:private_chat_hub/ollama_toolkit/models/ollama_model.dart';
 
 /// Model parameters for controlling AI behavior.
@@ -116,19 +117,7 @@ class Conversation {
 
   /// Gets the capabilities of the model used in this conversation.
   ModelCapabilities get modelCapabilities {
-    // Strip 'local:' prefix before looking up in the registry so that
-    // on-device models (e.g. 'local:gemma-3n-e2b') resolve correctly.
-    final registryName = modelName.startsWith('local:')
-        ? modelName.substring('local:'.length)
-        : modelName;
-    return ModelRegistry.getCapabilities(registryName) ??
-        const ModelCapabilities(
-          supportsToolCalling: false,
-          supportsVision: false,
-          supportsThinking: false,
-          contextWindow: 4096,
-          description: 'Unknown model',
-        );
+    return ModelCapabilityResolver.getCapabilitiesOrUnknown(modelName);
   }
 
   /// Creates a Conversation from JSON map.

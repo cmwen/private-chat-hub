@@ -7,6 +7,7 @@ void main() {
       const capabilities = ModelCapabilities(
         supportsToolCalling: true,
         supportsVision: false,
+        supportsAudio: true,
         supportsThinking: false,
         contextWindow: 128000,
         modelFamily: 'llama',
@@ -15,6 +16,7 @@ void main() {
       expect(capabilities.supportsVision, false);
       expect(capabilities.supportsToolCalling, true);
       expect(capabilities.supportsTools, true); // Alias
+      expect(capabilities.supportsAudio, true);
       expect(capabilities.supportsThinking, false);
       expect(capabilities.contextWindow, 128000);
       expect(capabilities.contextLength, 128000); // Alias
@@ -63,6 +65,11 @@ void main() {
       expect(ModelRegistry.supportsVision('llama3.2'), true);
       expect(ModelRegistry.supportsVision('gemma3'), true);
       expect(ModelRegistry.supportsVision('llama3.3'), false);
+    });
+
+    test('should check audio support correctly', () {
+      expect(ModelRegistry.supportsAudio('llama3.2'), false);
+      expect(ModelRegistry.supportsAudio('gemma3'), false);
     });
 
     test('should check tool calling support correctly', () {
