@@ -34,7 +34,19 @@ class Attachment {
   });
 
   /// Whether this is an image attachment.
-  bool get isImage => mimeType.startsWith('image/');
+  bool get isImage {
+    if (mimeType.startsWith('image/')) return true;
+
+    final lowerName = name.toLowerCase();
+    return lowerName.endsWith('.jpg') ||
+        lowerName.endsWith('.jpeg') ||
+        lowerName.endsWith('.png') ||
+        lowerName.endsWith('.gif') ||
+        lowerName.endsWith('.webp') ||
+        lowerName.endsWith('.bmp') ||
+        lowerName.endsWith('.heic') ||
+        lowerName.endsWith('.heif');
+  }
 
   /// Whether this attachment is a text file.
   bool get isTextFile =>
