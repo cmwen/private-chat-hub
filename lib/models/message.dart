@@ -38,14 +38,17 @@ class Attachment {
     if (mimeType.startsWith('image/')) return true;
 
     final lowerName = name.toLowerCase();
-    return lowerName.endsWith('.jpg') ||
-        lowerName.endsWith('.jpeg') ||
-        lowerName.endsWith('.png') ||
-        lowerName.endsWith('.gif') ||
-        lowerName.endsWith('.webp') ||
-        lowerName.endsWith('.bmp') ||
-        lowerName.endsWith('.heic') ||
-        lowerName.endsWith('.heif');
+    const imageExtensions = <String>[
+      '.jpg',
+      '.jpeg',
+      '.png',
+      '.gif',
+      '.webp',
+      '.bmp',
+      '.heic',
+      '.heif',
+    ];
+    return imageExtensions.any(lowerName.endsWith);
   }
 
   /// Whether this attachment is a text file.
