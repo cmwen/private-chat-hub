@@ -429,7 +429,9 @@ class _MessageInputState extends State<MessageInput> {
           mainAxisSize: MainAxisSize.min,
           children: [
             // Interactive capability chips
-            if (widget.supportsTools || widget.supportsVision || widget.supportsAudio)
+            if (widget.supportsTools ||
+                widget.supportsVision ||
+                widget.supportsAudio)
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,

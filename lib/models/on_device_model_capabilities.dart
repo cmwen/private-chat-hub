@@ -26,11 +26,7 @@ class OnDeviceModelCapabilitiesRegistry {
       supportsThinking: false,
       contextWindow: 4096,
       modelFamily: 'gemma',
-      aliases: [
-        'gemma-3n',
-        'gemma-3n-e2b-it',
-        'gemma-3n-e2b-it-int4',
-      ],
+      aliases: ['gemma-3n', 'gemma-3n-e2b-it', 'gemma-3n-e2b-it-int4'],
       description: 'Gemma 3n E2B on-device multimodal model',
       useCases: ['on-device inference', 'vision', 'audio', 'tool calling'],
     ),
