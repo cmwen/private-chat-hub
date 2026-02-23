@@ -500,10 +500,7 @@ class ModelRegistry {
   }
 
   static String _canonicalizeName(String modelName) {
-    return _normalizeModelName(modelName).replaceAll(
-      RegExp(r'[^a-z0-9]'),
-      '',
-    );
+    return _normalizeModelName(modelName).replaceAll(RegExp(r'[^a-z0-9]'), '');
   }
 
   /// Check if a model supports tool calling
