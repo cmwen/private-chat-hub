@@ -143,9 +143,9 @@ class OnDeviceLLMService implements LLMService {
         .map((a) => base64Encode(a.data))
         .toList();
     final audioBase64List = attachments
-      ?.where((a) => a.mimeType.startsWith('audio/'))
-      .map((a) => base64Encode(a.data))
-      .toList();
+        ?.where((a) => a.mimeType.startsWith('audio/'))
+        .map((a) => base64Encode(a.data))
+        .toList();
 
     try {
       // Use streaming generation for real-time response with all parameters
@@ -164,8 +164,8 @@ class OnDeviceLLMService implements LLMService {
                 ? imageBase64List
                 : null,
             audios: audioBase64List?.isNotEmpty == true
-              ? audioBase64List
-              : null,
+                ? audioBase64List
+                : null,
           )
           .map((chunk) {
             chunkCount++;

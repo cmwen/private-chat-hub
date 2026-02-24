@@ -4,7 +4,9 @@ import 'package:private_chat_hub/models/model_capability_resolver.dart';
 void main() {
   group('ModelCapabilityResolver', () {
     test('resolves local on-device model capabilities', () {
-      final caps = ModelCapabilityResolver.getCapabilities('local:gemma-3n-e2b');
+      final caps = ModelCapabilityResolver.getCapabilities(
+        'local:gemma-3n-e2b',
+      );
 
       expect(caps, isNotNull);
       expect(caps!.supportsVision, true);
