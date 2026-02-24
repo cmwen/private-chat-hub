@@ -34,6 +34,19 @@ void main() {
       expect(attachment.isImage, false);
     });
 
+    test('should identify image by filename when MIME type is generic', () {
+      final data = Uint8List.fromList([1, 2, 3]);
+      final attachment = Attachment(
+        id: 'att-3',
+        name: 'camera_photo.jpg',
+        mimeType: 'application/octet-stream',
+        data: data,
+        size: data.length,
+      );
+
+      expect(attachment.isImage, true);
+    });
+
     test('should format size correctly', () {
       // Bytes
       final small = Attachment(
