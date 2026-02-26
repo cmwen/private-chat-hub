@@ -11,8 +11,10 @@ import 'package:private_chat_hub/services/inference_config_service.dart';
 import 'package:private_chat_hub/services/network_discovery_service.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
+import 'package:private_chat_hub/services/project_service.dart';
 import 'package:private_chat_hub/services/status_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
+import 'package:private_chat_hub/services/sync_service.dart';
 import 'package:private_chat_hub/services/tool_config_service.dart';
 import 'package:private_chat_hub/widgets/litert_model_settings_widget.dart';
 import 'package:private_chat_hub/widgets/tool_settings_widget.dart';
@@ -25,6 +27,7 @@ class SettingsScreen extends StatefulWidget {
   final ToolConfigService? toolConfigService;
   final InferenceConfigService? inferenceConfigService;
   final StorageService? storageService;
+  final ProjectService? projectService;
   final dynamic onDeviceLLMService; // OnDeviceLLMService
   final Function(ThemeMode)? onThemeModeChanged;
   final ThemeMode? currentThemeMode;
@@ -38,6 +41,7 @@ class SettingsScreen extends StatefulWidget {
     this.toolConfigService,
     this.inferenceConfigService,
     this.storageService,
+    this.projectService,
     this.onDeviceLLMService,
     this.onThemeModeChanged,
     this.currentThemeMode,
@@ -60,9 +64,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final NotificationService _notificationService = NotificationService();
   NotificationMode _notificationMode = NotificationMode.smart;
 
+  // ── LAN Sync state ─────────────────────────────────────────────
+  late final SyncService _syncService;
+  bool _syncEnabled = false;
+  String? _syncHost;
+  String? _syncPin;
+  DateTime? _lastSyncedAt;
+  bool _isSyncing = false;
+  bool _isDiscovering = false;
+  List<String> _discoveredHosts = [];
+
   @override
   void initState() {
     super.initState();
+    _syncService = SyncService();
     _loadConnections();
     _loadToolConfig();
     _loadAppVersion();
@@ -70,6 +85,180 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadTimeout();
     _loadNotificationMode();
     _loadDeveloperMode();
+    _loadSyncConfig();
+  }
+
+  Future<void> _loadSyncConfig() async {
+    await _syncService.init();
+    if (!mounted) return;
+    setState(() {
+      _syncEnabled = _syncService.isEnabled;
+      _syncHost = _syncService.savedHost;
+      _syncPin = _syncService.savedPin;
+      _lastSyncedAt = _syncService.lastSyncedAt;
+    });
+  }
+
+  Future<void> _saveSyncConfig({
+    String? host,
+    String? pin,
+    bool? enabled,
+  }) async {
+    await _syncService.saveConfig(host: host, pin: pin, enabled: enabled);
+    if (!mounted) return;
+    setState(() {
+      if (host != null) _syncHost = host;
+      if (pin != null) _syncPin = pin;
+      if (enabled != null) _syncEnabled = enabled;
+    });
+  }
+
+  Future<void> _discoverDesktop() async {
+    setState(() {
+      _isDiscovering = true;
+      _discoveredHosts = [];
+    });
+    await for (final host in _syncService.discoverDesktop()) {
+      if (!mounted) break;
+      setState(() => _discoveredHosts.add(host));
+    }
+    if (mounted) setState(() => _isDiscovering = false);
+  }
+
+  Future<void> _runSync() async {
+    final host = _syncHost;
+    if (host == null || host.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No sync host configured')),
+      );
+      return;
+    }
+    if (widget.chatService == null || widget.projectService == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Services not available for sync')),
+      );
+      return;
+    }
+    setState(() => _isSyncing = true);
+    final result = await _syncService.syncWith(
+      host,
+      pin: _syncPin,
+      chatService: widget.chatService!,
+      projectService: widget.projectService!,
+    );
+    if (!mounted) return;
+    setState(() {
+      _isSyncing = false;
+      _lastSyncedAt = _syncService.lastSyncedAt;
+    });
+    if (result.hasError) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sync failed: ${result.error}')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Sync complete — pulled ${result.pulled}, pushed ${result.pushed}',
+          ),
+        ),
+      );
+    }
+  }
+
+  void _showHostDialog() {
+    final controller = TextEditingController(text: _syncHost ?? '');
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Desktop Host'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'IP address or hostname',
+            hintText: '192.168.1.100',
+          ),
+          keyboardType: TextInputType.url,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              _saveSyncConfig(host: controller.text.trim());
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPinDialog() {
+    final controller = TextEditingController(text: _syncPin ?? '');
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sync PIN'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'PIN (leave blank if none)',
+          ),
+          obscureText: true,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              _saveSyncConfig(pin: controller.text.trim());
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDiscoveredHostsDialog() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Choose Desktop'),
+        content: _discoveredHosts.isEmpty
+            ? const Text('No sync servers found on the LAN.')
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: _discoveredHosts
+                    .map(
+                      (h) => ListTile(
+                        leading: const Icon(Icons.computer),
+                        title: Text(h),
+                        onTap: () {
+                          _saveSyncConfig(host: h);
+                          Navigator.pop(ctx);
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadDeveloperMode() async {
@@ -478,6 +667,89 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const Divider(height: 32),
 
+                // ── LAN Sync ───────────────────────────────────────
+                _SectionHeader(title: 'LAN Sync'),
+                SwitchListTile(
+                  secondary: const Icon(Icons.sync),
+                  title: const Text('Enable LAN Sync'),
+                  subtitle: _lastSyncedAt != null
+                      ? Text(
+                          'Last synced: ${_formatSyncTime(_lastSyncedAt!)}',
+                        )
+                      : const Text('Never synced'),
+                  value: _syncEnabled,
+                  onChanged: (v) => _saveSyncConfig(enabled: v),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.computer),
+                  title: const Text('Desktop Host'),
+                  subtitle: Text(
+                    _syncHost?.isNotEmpty == true
+                        ? _syncHost!
+                        : 'Not configured — tap to enter manually',
+                  ),
+                  trailing: const Icon(Icons.edit_outlined),
+                  onTap: _showHostDialog,
+                ),
+                ListTile(
+                  leading: const Icon(Icons.lock_outline),
+                  title: const Text('Sync PIN'),
+                  subtitle: Text(
+                    _syncPin?.isNotEmpty == true ? '••••••' : 'No PIN set',
+                  ),
+                  trailing: const Icon(Icons.edit_outlined),
+                  onTap: _showPinDialog,
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed:
+                              _isDiscovering ? null : () async {
+                            await _discoverDesktop();
+                            if (mounted) _showDiscoveredHostsDialog();
+                          },
+                          icon: _isDiscovering
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.search),
+                          label: Text(
+                            _isDiscovering ? 'Scanning…' : 'Discover Desktop',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _isSyncing ? null : _runSync,
+                          icon: _isSyncing
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.sync),
+                          label: Text(_isSyncing ? 'Syncing…' : 'Sync Now'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 32),
+
                 // ── About ──────────────────────────────────────────
                 ListTile(
                   leading: const Icon(Icons.info_outline),
@@ -514,6 +786,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       case NotificationMode.never:
         return 'Off';
     }
+  }
+
+  String _formatSyncTime(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
   }
 
   void _showNotificationModeDialog() {

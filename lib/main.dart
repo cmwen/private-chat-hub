@@ -454,6 +454,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   toolConfigService: widget.toolConfigService,
                   inferenceConfigService: _inferenceConfigService,
                   storageService: widget.storageService,
+                  projectService: _projectService,
                   onDeviceLLMService: _onDeviceLLMService,
                   onThemeModeChanged: widget.onThemeModeChanged,
                   currentThemeMode: widget.currentThemeMode,

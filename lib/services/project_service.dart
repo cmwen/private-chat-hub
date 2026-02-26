@@ -40,6 +40,18 @@ class ProjectService {
     await _storage.setString(_projectsKey, jsonString);
   }
 
+  /// Imports a project (inserts if not present, replaces if already exists).
+  Future<void> importProject(Project project) async {
+    final projects = getProjects();
+    final index = projects.indexWhere((p) => p.id == project.id);
+    if (index != -1) {
+      projects[index] = project;
+    } else {
+      projects.insert(0, project);
+    }
+    await _saveProjects(projects);
+  }
+
   /// Creates a new project.
   Future<Project> createProject({
     required String name,

@@ -293,6 +293,21 @@ class ChatService {
     }
   }
 
+  /// Imports a conversation (inserts if not present, replaces if already exists).
+  Future<void> importConversation(Conversation conversation) async {
+    final conversations = getConversations();
+    final index = conversations.indexWhere((c) => c.id == conversation.id);
+    if (index != -1) {
+      conversations[index] = conversation;
+    } else {
+      conversations.insert(0, conversation);
+    }
+    await _saveConversations(conversations);
+    if (!_conversationUpdatesController.isClosed) {
+      _conversationUpdatesController.add(conversation);
+    }
+  }
+
   /// Deletes a conversation.
   Future<void> deleteConversation(String id) async {
     final conversations = getConversations();
