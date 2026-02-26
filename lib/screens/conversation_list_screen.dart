@@ -7,6 +7,7 @@ import 'package:private_chat_hub/services/llm_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
 import 'package:private_chat_hub/services/unified_model_service.dart';
+import 'package:private_chat_hub/utils/markdown_utils.dart';
 import 'package:private_chat_hub/widgets/dual_model_selector.dart';
 import 'package:intl/intl.dart';
 
@@ -499,13 +500,13 @@ class _ConversationTile extends StatelessWidget {
           backgroundColor: Theme.of(context).colorScheme.primary,
           child: Text(
             conversation.title.isNotEmpty
-                ? conversation.title[0].toUpperCase()
+                ? stripMarkdown(conversation.title)[0].toUpperCase()
                 : 'C',
             style: const TextStyle(color: Colors.white),
           ),
         ),
         title: Text(
-          conversation.title,
+          stripMarkdown(conversation.title),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),

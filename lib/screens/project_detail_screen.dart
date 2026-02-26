@@ -9,6 +9,7 @@ import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
 import 'package:private_chat_hub/services/project_service.dart';
 import 'package:private_chat_hub/services/unified_model_service.dart';
+import 'package:private_chat_hub/utils/markdown_utils.dart';
 
 /// Screen showing project details and its conversations.
 class ProjectDetailScreen extends StatefulWidget {
@@ -554,13 +555,13 @@ class _ConversationTile extends StatelessWidget {
           backgroundColor: projectColor.withAlpha(60),
           child: Text(
             conversation.title.isNotEmpty
-                ? conversation.title[0].toUpperCase()
+                ? stripMarkdown(conversation.title)[0].toUpperCase()
                 : 'C',
             style: TextStyle(color: projectColor),
           ),
         ),
         title: Text(
-          conversation.title,
+          stripMarkdown(conversation.title),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
