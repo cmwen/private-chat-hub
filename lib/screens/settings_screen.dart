@@ -128,9 +128,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _runSync() async {
     final host = _syncHost;
     if (host == null || host.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No sync host configured')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No sync host configured')));
       return;
     }
     if (widget.chatService == null || widget.projectService == null) {
@@ -152,9 +152,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _lastSyncedAt = _syncService.lastSyncedAt;
     });
     if (result.hasError) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sync failed: ${result.error}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Sync failed: ${result.error}')));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -673,9 +673,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   secondary: const Icon(Icons.sync),
                   title: const Text('Enable LAN Sync'),
                   subtitle: _lastSyncedAt != null
-                      ? Text(
-                          'Last synced: ${_formatSyncTime(_lastSyncedAt!)}',
-                        )
+                      ? Text('Last synced: ${_formatSyncTime(_lastSyncedAt!)}')
                       : const Text('Never synced'),
                   value: _syncEnabled,
                   onChanged: (v) => _saveSyncConfig(enabled: v),
@@ -709,11 +707,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed:
-                              _isDiscovering ? null : () async {
-                            await _discoverDesktop();
-                            if (mounted) _showDiscoveredHostsDialog();
-                          },
+                          onPressed: _isDiscovering
+                              ? null
+                              : () async {
+                                  await _discoverDesktop();
+                                  if (mounted) _showDiscoveredHostsDialog();
+                                },
                           icon: _isDiscovering
                               ? const SizedBox(
                                   width: 16,
