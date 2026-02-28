@@ -1,0 +1,289 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                 PRIVATE CHAT HUB - LLM MODEL ARCHITECTURE                      ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           USER / CHAT UI                                    │
+│                          (Chat Screen, etc)                                 │
+└──────────────────────────┬──────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         CHAT SERVICE                                         │
+│                 (lib/services/chat_service.dart)                            │
+│                                                                              │
+│  • Coordinates message send/receive                                         │
+│  • Routes models to correct service                                         │
+│  • Manages conversation history                                             │
+│  • Switches between Ollama & On-Device                                      │
+└──────────────┬──────────────────────────────────────────────────┬───────────┘
+               │                                                  │
+        Model starts        Model starts with 'local:'
+        with any other      prefix
+        name or no prefix   
+               │                                                  │
+               ▼                                                  ▼
+     ┌─────────────────────┐                         ┌────────────────────────┐
+     │  OLLAMA LLM SERVICE │                         │ ON-DEVICE LLM SERVICE  │
+     │ (Remote Inference)  │                         │  (LiteRT-LM Local)     │
+     │                     │                         │                        │
+     │ • Ollama Client     │                         │ • Model Manager        │
+     │ • Streaming         │                         │ • Platform Channel     │
+     │ • Vision Support    │                         │ • Inference Config     │
+     └──────────┬──────────┘                         └─────────┬──────────────┘
+                │                                               │
+                ▼                                               ▼
+     ┌─────────────────────┐                         ┌────────────────────────┐
+     │  OLLAMA API CLIENT  │                         │  MODEL MANAGER         │
+     │                     │                         │                        │
+     │ HTTP Requests to:   │                         │ • Load/unload models   │
+     │ /api/chat           │                         │ • Backend selection    │
+     │ /api/generate       │                         │ • Auto-unload timer    │
+     │ /api/embeddings     │                         │ • State stream         │
+     │ /api/show           │                         │                        │
+     │ /api/tags           │                         │ Delegates to:          │
+     │ /api/pull           │                         │ • ModelDownloadService │
+     └──────────┬──────────┘                         │ • LiteRTPlatformCh.   │
+                │                                     └────────────────────────┘
+                ▼
+     ┌─────────────────────┐
+     │  OLLAMA SERVER      │
+     │  (localhost:11434)  │
+     │                     │
+     │ Runs Models:        │
+     │ • llama3.x          │
+     │ • qwen2.5           │
+     │ • deepseek          │
+     │ • mistral           │
+     │ • etc (65 total)    │
+     └─────────────────────┘
+
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                       MODEL REGISTRY ARCHITECTURE                         ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+                    ┌─────────────────────────────┐
+                    │ ModelCapabilityResolver     │
+                    │ (Single Entry Point)        │
+                    └──────────────┬──────────────┘
+                                   │
+                        Checks if model starts with 'local:'
+                                   │
+                 ┌─────────────────┴──────────────────┐
+                 │                                    │
+                 ▼                                    ▼
+     ┌──────────────────────────┐      ┌─────────────────────────────┐
+     │  ModelRegistry (Ollama)  │      │ OnDeviceModelCapabilities   │
+     │                          │      │      Registry               │
+     │ 65 Models:               │      │                             │
+     │                          │      │ 5 Models:                   │
+     │ • llama3.1, 3.2, 3.3     │      │ • gemma3-1b                 │
+     │ • qwen2.5, 2.5-coder     │      │ • gemma-3n-e2b              │
+     │ • qwen3, qwen3-vl        │      │ • gemma-3n-e4b              │
+     │ • deepseek-v3, -coder    │      │ • phi-4-mini                │
+     │ • mistral, mistral-large │      │ • qwen2.5-1.5b              │
+     │ • mixtral, codestral     │      │                             │
+     │ • pixtral, gemma2, phi3  │      │ ALL support:                │
+     │ • phi4, vicuna, alpaca   │      │ • Tool calling              │
+     │ • gpt4all, mpt-30b       │      │ • Partial multimodal        │
+     │ • gemma3, gpt-oss        │      │                             │
+     │ • mistral-nemo           │      │ Models linked to download   │
+     │ • ministral-3            │      │ service for installation    │
+     │                          │      │                             │
+     │ CAPABILITIES:            │      │ CAPABILITIES:               │
+     │ • supportsToolCalling    │      │ • supportsToolCalling       │
+     │ • supportsVision         │      │ • supportsVision            │
+     │ • supportsAudio          │      │ • supportsAudio             │
+     │ • supportsThinking       │      │ • supportsThinking          │
+     │ • contextWindow          │      │ • contextWindow             │
+     │ • modelFamily            │      │ • modelFamily               │
+     │ • aliases                │      │ • aliases                   │
+     │ • description            │      │ • description               │
+     │ • useCases               │      │ • useCases                  │
+     └──────────────────────────┘      └─────────────────────────────┘
+
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                    MODEL LOOKUP FLOW (with Examples)                      ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+SCENARIO 1: User selects 'qwen2.5:7b'
+─────────────────────────────────────
+
+  Input: 'qwen2.5:7b'
+         ▼
+  ModelCapabilityResolver.getCapabilities('qwen2.5:7b')
+         ▼
+  Starts with 'local:' ? NO
+         ▼
+  ModelRegistry.getCapabilities('qwen2.5:7b')
+         ▼
+  Normalize: 'qwen2.5' (removes ':7b')
+         ▼
+  Direct lookup in registry...
+         ▼
+  FOUND! Returns ModelCapabilities(
+    supportsToolCalling: true,
+    supportsVision: false,
+    contextWindow: 128000,
+    modelFamily: 'qwen',
+    ...
+  )
+
+
+SCENARIO 2: User selects 'local:gemma3-1b'
+──────────────────────────────────────────
+
+  Input: 'local:gemma3-1b'
+         ▼
+  ModelCapabilityResolver.getCapabilities('local:gemma3-1b')
+         ▼
+  Starts with 'local:' ? YES
+         ▼
+  OnDeviceModelCapabilitiesRegistry.getCapabilities('local:gemma3-1b')
+         ▼
+  Remove 'local:' prefix, normalize: 'gemma3-1b'
+         ▼
+  Direct lookup in registry...
+         ▼
+  FOUND! Returns ModelCapabilities(
+    supportsToolCalling: true,
+    supportsVision: false,
+    contextWindow: 4096,
+    modelFamily: 'gemma',
+    ...
+  )
+
+
+SCENARIO 3: User selects unknown model 'foobar'
+───────────────────────────────────────────────
+
+  Input: 'foobar'
+         ▼
+  ModelCapabilityResolver.getCapabilities('foobar')
+         ▼
+  Starts with 'local:' ? NO
+         ▼
+  ModelRegistry.getCapabilities('foobar')
+         ▼
+  Normalize: 'foobar'
+         ▼
+  Try direct lookup... NOT FOUND
+  Try canonical lookup... NOT FOUND
+  Try alias matching... NOT FOUND
+         ▼
+  Return null
+         ▼
+  ModelCapabilityResolver returns DEFAULT:
+  ModelCapabilities(
+    supportsToolCalling: false,
+    supportsVision: false,
+    supportsAudio: false,
+    supportsThinking: false,
+    contextWindow: 4096,
+  )
+
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                        CONFIGURATION PERSISTENCE                          ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+SharedPreferences Storage:
+┌──────────────────────────────────────────────────────────────────────────┐
+
+OLLAMA CONFIGURATION:
+  'ollama_base_url' → 'http://localhost:11434'
+  'ollama_timeout' → '120'
+  'ollama_default_model' → 'qwen2.5:7b'
+  'ollama_last_used_model' → 'llama3.2'
+  'ollama_stream_enabled' → 'true'
+  'ollama_model_history' → JSON array of models
+
+ON-DEVICE CONFIGURATION:
+  'litert_preferred_backend' → 'gpu' (or 'cpu', 'npu')
+  'litert_auto_unload' → 'true'
+  'litert_last_model' → 'gemma3-1b'
+
+INFERENCE CONFIGURATION:
+  'inference_mode' → 'remote' (or 'onDevice')
+  'inference_temperature' → '0.7'
+  'inference_max_tokens' → '512'
+  'inference_top_k' → '40'
+  'inference_top_p' → '0.9'
+  'inference_repetition_penalty' → '1.0'
+
+└──────────────────────────────────────────────────────────────────────────┘
+
+Each setting is:
+  ✓ Persisted to device storage
+  ✓ Survives app restart
+  ✓ Can be updated at runtime
+
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                  CAPABILITY-BASED UI ADJUSTMENT                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+Based on ModelCapabilities, Chat UI shows/hides:
+
+supportsVision = true
+  ▶ Show "Attach Image" button
+  ▶ Enable image picker
+
+supportsAudio = true
+  ▶ Show "Attach Audio" button
+  ▶ Enable audio recorder
+
+supportsToolCalling = true
+  ▶ Show "Enable Tools" toggle
+  ▶ Show available tools list
+  ▶ Enable tool execution
+
+supportsThinking = true
+  ▶ Show "Thinking Mode" toggle
+  ▶ Display reasoning tokens
+
+contextWindow value
+  ▶ Show context usage percentage
+  ▶ Warn when approaching limit
+
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                    ADDING NEW PROVIDERS (PATTERN)                         ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+To add provider like OpenAI, Anthropic, or LM Studio:
+
+1. CREATE MODEL REGISTRY
+   File: lib/providers/[provider]_models.dart
+   Class: [Provider]ModelRegistry
+   
+2. CREATE LLM SERVICE
+   File: lib/services/[provider]_llm_service.dart
+   Class: [Provider]LLMService implements LLMService
+   
+3. CREATE API CLIENT
+   File: lib/[provider]/services/[provider]_client.dart
+   Class: [Provider]Client
+   
+4. UPDATE MODEL RESOLVER
+   File: lib/models/model_capability_resolver.dart
+   Add: if (_is[Provider]Model(modelName)) { ... }
+   
+5. UPDATE CHAT SERVICE
+   File: lib/services/chat_service.dart
+   Add: if (model.startsWith('[provider]:')) { ... }
+
+
+EXAMPLE: OpenAI Provider Setup
+──────────────────────────────
+
+'openai:gpt-4' ──┐
+                 ├──> ModelCapabilityResolver ──> OpenAIModelRegistry
+'openai:o1'  ───┤
+                 │
+'ollama:llama' ─┼──> ModelCapabilityResolver ──> ModelRegistry (Ollama)
+                 │
+'local:gemma' ──┘──> ModelCapabilityResolver ──> OnDeviceCapRegistry
+

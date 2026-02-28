@@ -132,6 +132,30 @@ class ModelRegistry {
       description: 'Qwen 2.5 specialized for coding tasks',
       useCases: ['code generation', 'code completion', 'debugging'],
     ),
+    'qwen3.5': ModelCapabilities(
+      supportsToolCalling: true,
+      supportsVision: true,
+      supportsThinking: true,
+      contextWindow: 256000,
+      modelFamily: 'qwen',
+      aliases: [
+        'qwen3.5:27b',
+        'qwen3.5:35b',
+        'qwen3.5:122b',
+        'qwen3.5:cloud',
+        'qwen3.5:397b-cloud',
+      ],
+      description:
+          'Alibaba\'s Qwen 3.5 - multimodal with vision, tools, and reasoning',
+      useCases: [
+        'multimodal',
+        'vision',
+        'tool calling',
+        'reasoning',
+        'coding',
+        'agents',
+      ],
+    ),
 
     // DeepSeek series
     'deepseek-v3': ModelCapabilities(
