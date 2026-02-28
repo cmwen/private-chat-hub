@@ -81,7 +81,7 @@ class NotificationService with WidgetsBindingObserver {
     const initSettings = InitializationSettings(android: androidSettings);
 
     await _notifications.initialize(
-      initSettings,
+      settings: initSettings,
       onDidReceiveNotificationResponse: _onNotificationTapped,
     );
 
@@ -193,10 +193,10 @@ class NotificationService with WidgetsBindingObserver {
     const notificationDetails = NotificationDetails(android: androidDetails);
 
     await _notifications.show(
-      notificationId,
-      conversationTitle,
-      preview,
-      notificationDetails,
+      id: notificationId,
+      title: conversationTitle,
+      body: preview,
+      notificationDetails: notificationDetails,
       payload: conversationId,
     );
   }
@@ -232,10 +232,10 @@ class NotificationService with WidgetsBindingObserver {
     const notificationDetails = NotificationDetails(android: androidDetails);
 
     await _notifications.show(
-      notificationId,
-      title,
-      preview,
-      notificationDetails,
+      id: notificationId,
+      title: title,
+      body: preview,
+      notificationDetails: notificationDetails,
     );
   }
 
@@ -243,7 +243,7 @@ class NotificationService with WidgetsBindingObserver {
   Future<void> cancelNotification(String conversationId) async {
     final notificationId = _conversationNotificationIds[conversationId];
     if (notificationId != null) {
-      await _notifications.cancel(notificationId);
+      await _notifications.cancel(id: notificationId);
       _conversationNotificationIds.remove(conversationId);
     }
   }
@@ -287,9 +287,9 @@ class NotificationService with WidgetsBindingObserver {
         >();
     if (androidPlugin != null) {
       await androidPlugin.startForegroundService(
-        _streamingNotificationId,
-        'AI is thinking…',
-        conversationTitle,
+        id: _streamingNotificationId,
+        title: 'AI is thinking…',
+        body: conversationTitle,
         notificationDetails: androidDetails,
         foregroundServiceTypes: <AndroidServiceForegroundType>{
           AndroidServiceForegroundType.foregroundServiceTypeDataSync,
@@ -307,7 +307,7 @@ class NotificationService with WidgetsBindingObserver {
     if (androidPlugin != null) {
       await androidPlugin.stopForegroundService();
     } else {
-      await _notifications.cancel(_streamingNotificationId);
+      await _notifications.cancel(id: _streamingNotificationId);
     }
   }
 }

@@ -127,8 +127,7 @@ class SyncService {
   Future<String?> _checkSyncServer(String host) async {
     try {
       final uri = Uri.parse('http://$host:$syncPort/api/sync/status');
-      final response =
-          await _client.get(uri).timeout(_connectTimeout);
+      final response = await _client.get(uri).timeout(_connectTimeout);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         if (data.containsKey('serverName')) return host;
@@ -149,7 +148,8 @@ class SyncService {
         if (data.containsKey('serverName')) {
           return SyncServerStatus(
             serverName: data['serverName'] as String,
-            conversationCount: (data['conversationCount'] as num?)?.toInt() ?? 0,
+            conversationCount:
+                (data['conversationCount'] as num?)?.toInt() ?? 0,
             projectCount: (data['projectCount'] as num?)?.toInt() ?? 0,
             hasPin: data['hasPin'] as bool? ?? false,
           );
@@ -195,22 +195,21 @@ class SyncService {
           .timeout(_syncTimeout);
 
       if (pullResponse.statusCode == 200) {
-        final pullData =
-            jsonDecode(pullResponse.body) as Map<String, dynamic>;
+        final pullData = jsonDecode(pullResponse.body) as Map<String, dynamic>;
 
-        final receivedConvs = (pullData['conversations'] as List<dynamic>? ?? [])
-            .map((c) => _conversationFromDesktop(c as Map<String, dynamic>))
-            .toList();
+        final receivedConvs =
+            (pullData['conversations'] as List<dynamic>? ?? [])
+                .map((c) => _conversationFromDesktop(c as Map<String, dynamic>))
+                .toList();
 
         for (final conv in receivedConvs) {
           await _mergeConversation(conv, chatService);
           pulled++;
         }
 
-        final receivedProjects =
-            (pullData['projects'] as List<dynamic>? ?? [])
-                .map((p) => _projectFromDesktop(p as Map<String, dynamic>))
-                .toList();
+        final receivedProjects = (pullData['projects'] as List<dynamic>? ?? [])
+            .map((p) => _projectFromDesktop(p as Map<String, dynamic>))
+            .toList();
 
         for (final proj in receivedProjects) {
           await _mergeProject(proj, projectService);
@@ -226,17 +225,18 @@ class SyncService {
             Uri.parse('$baseUrl/api/sync/push'),
             headers: headers,
             body: jsonEncode({
-              'conversations':
-                  localConversations.map(_conversationToDesktop).toList(),
+              'conversations': localConversations
+                  .map(_conversationToDesktop)
+                  .toList(),
               'projects': localProjects.map(_projectToDesktop).toList(),
             }),
           )
           .timeout(_syncTimeout);
 
       if (pushResponse.statusCode == 200) {
-        final pushData =
-            jsonDecode(pushResponse.body) as Map<String, dynamic>;
-        pushed = ((pushData['mergedConversations'] as num?)?.toInt() ?? 0) +
+        final pushData = jsonDecode(pushResponse.body) as Map<String, dynamic>;
+        pushed =
+            ((pushData['mergedConversations'] as num?)?.toInt() ?? 0) +
             ((pushData['mergedProjects'] as num?)?.toInt() ?? 0);
       }
 
