@@ -19,6 +19,9 @@ import 'package:private_chat_hub/services/status_service.dart';
 import 'package:private_chat_hub/widgets/status_banner.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/on_device_llm_service.dart';
+import 'package:private_chat_hub/services/opencode_connection_manager.dart';
+import 'package:private_chat_hub/services/opencode_llm_service.dart';
+import 'package:private_chat_hub/services/opencode_model_visibility_service.dart';
 import 'package:private_chat_hub/services/project_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:private_chat_hub/services/tool_config_service.dart';
@@ -194,6 +197,9 @@ class _HomeScreenState extends State<HomeScreen> {
   late final ProjectService _projectService;
   InferenceConfigService? _inferenceConfigService;
   OnDeviceLLMService? _onDeviceLLMService;
+  OpenCodeConnectionManager? _openCodeConnectionManager;
+  OpenCodeLLMService? _openCodeLLMService;
+  OpenCodeModelVisibilityService? _openCodeVisibilityService;
   late final StreamSubscription<String> _statusTransientSub;
 
   int _currentIndex = 0;
@@ -322,6 +328,39 @@ class _HomeScreenState extends State<HomeScreen> {
           'On-device initialization failed — some features may be unavailable',
         );
       }
+
+      // Initialize OpenCode service
+      try {
+        final openCodeConnectionManager = OpenCodeConnectionManager();
+        final savedConnection =
+            await openCodeConnectionManager.loadConnection();
+
+        if (savedConnection != null) {
+          await openCodeConnectionManager.setConnection(savedConnection);
+        }
+
+        final visibilityService =
+            OpenCodeModelVisibilityService(prefs);
+        final openCodeLLMService =
+            OpenCodeLLMService(openCodeConnectionManager);
+
+        if (!mounted) return;
+        setState(() {
+          _openCodeConnectionManager = openCodeConnectionManager;
+          _openCodeLLMService = openCodeLLMService;
+          _openCodeVisibilityService = visibilityService;
+        });
+
+        _chatService.setOpenCodeLLMService(openCodeLLMService);
+
+        print(
+          '[HomeScreen._initializeInferenceServices] OpenCode service initialized',
+        );
+      } catch (e) {
+        print(
+          '[HomeScreen._initializeInferenceServices] WARNING: Failed to initialize OpenCode service: $e',
+        );
+      }
     } catch (e) {
       print(
         '[HomeScreen._initializeInferenceServices] ERROR: Failed to initialize inference services: $e',
@@ -446,6 +485,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ollamaManager: _ollamaManager,
                   connectionService: _connectionService,
                   onDeviceLLMService: _onDeviceLLMService,
+                  openCodeLLMService: _openCodeLLMService,
+                  openCodeVisibilityService: _openCodeVisibilityService,
                 ),
                 SettingsScreen(
                   connectionService: _connectionService,
@@ -456,6 +497,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   storageService: widget.storageService,
                   projectService: _projectService,
                   onDeviceLLMService: _onDeviceLLMService,
+                  openCodeConnectionManager: _openCodeConnectionManager,
+                  openCodeLLMService: _openCodeLLMService,
+                  openCodeVisibilityService: _openCodeVisibilityService,
                   onThemeModeChanged: widget.onThemeModeChanged,
                   currentThemeMode: widget.currentThemeMode,
                   onToolConfigChanged: _onToolConfigChanged,

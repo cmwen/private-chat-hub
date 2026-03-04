@@ -13,6 +13,7 @@ import 'package:private_chat_hub/services/message_queue_service.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/on_device_llm_service.dart';
+import 'package:private_chat_hub/services/opencode_llm_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:private_chat_hub/services/status_service.dart';
 import 'package:private_chat_hub/services/tool_executor_service.dart';
@@ -34,6 +35,7 @@ class ChatService {
   // Hybrid inference mode support
   InferenceConfigService? _inferenceConfigService;
   OnDeviceLLMService? _onDeviceLLMService;
+  OpenCodeLLMService? _openCodeLLMService;
 
   // Conversation update stream (for UI sync)
   final StreamController<Conversation> _conversationUpdatesController =
@@ -119,6 +121,16 @@ class ChatService {
       StatusService().showTransient('On-device LLM service attached');
     } catch (_) {}
   }
+
+  /// Set the OpenCode LLM service
+  void setOpenCodeLLMService(OpenCodeLLMService service) {
+    _openCodeLLMService = service;
+    _log('OpenCode LLM service attached');
+    StatusService().showTransient('OpenCode LLM service attached');
+  }
+
+  /// Get the OpenCode LLM service
+  OpenCodeLLMService? get openCodeLLMService => _openCodeLLMService;
 
   /// Get current inference mode
   InferenceMode get currentInferenceMode {
@@ -828,11 +840,18 @@ class ChatService {
       initialConversation.modelName,
     );
 
+    // Check if model is an OpenCode model (has opencode: prefix)
+    final isOpenCodeModel = UnifiedModelService.isOpenCodeModel(
+      initialConversation.modelName,
+    );
+
     _log(
       'Routing decision: model=${initialConversation.modelName}, '
       'isLocalModel=$isLocalModel, '
+      'isOpenCodeModel=$isOpenCodeModel, '
       'inferenceMode=$currentInferenceMode, '
       'onDeviceServiceReady=${_onDeviceLLMService != null}, '
+      'openCodeServiceReady=${_openCodeLLMService != null}, '
       'isOnline=$isOnline',
     );
 
@@ -849,6 +868,18 @@ class ChatService {
     if (isLocalModel && _onDeviceLLMService != null) {
       _log('Using on-device inference (local model selected)');
       yield* _sendMessageOnDevice(conversationId, text);
+      return;
+    }
+
+    // Route to OpenCode if OpenCode model is selected
+    if (isOpenCodeModel) {
+      if (_openCodeLLMService == null) {
+        throw Exception(
+          'OpenCode service is not configured. Please set up an OpenCode connection in Settings.',
+        );
+      }
+      _log('Using OpenCode inference (opencode model selected)');
+      yield* _sendMessageOpenCode(conversationId, text);
       return;
     }
 
@@ -906,6 +937,125 @@ class ChatService {
     // Yield updates from the stream
     await for (final updatedConversation in streamController.stream) {
       yield updatedConversation;
+    }
+  }
+
+  /// Sends a message using OpenCode cloud inference
+  Stream<Conversation> _sendMessageOpenCode(
+    String conversationId,
+    String text, {
+    bool addUserMessage = true,
+  }) async* {
+    final initialConversation = getConversation(conversationId);
+    if (initialConversation == null) {
+      throw Exception('Conversation not found');
+    }
+
+    if (_openCodeLLMService == null) {
+      throw Exception('OpenCode service not configured');
+    }
+
+    final isAvailable = await _openCodeLLMService!.isAvailable();
+    if (!isAvailable) {
+      throw Exception(
+        'OpenCode server is not reachable. Check your connection settings.',
+      );
+    }
+
+    final modelId = initialConversation.modelName;
+    _log('OpenCode inference: model=$modelId');
+
+    // Add user message
+    final userMessage = Message(
+      id: const Uuid().v4(),
+      text: text,
+      isMe: true,
+      role: MessageRole.user,
+      timestamp: DateTime.now(),
+    );
+
+    var conversation = initialConversation;
+    if (addUserMessage) {
+      conversation = conversation.copyWith(
+        messages: [...conversation.messages, userMessage],
+        updatedAt: DateTime.now(),
+      );
+      await updateConversation(conversation);
+      yield conversation;
+    }
+
+    // Create assistant message placeholder
+    final assistantMessageId = const Uuid().v4();
+    final assistantMessage = Message(
+      id: assistantMessageId,
+      text: '',
+      isMe: false,
+      role: MessageRole.assistant,
+      timestamp: DateTime.now(),
+    );
+
+    conversation = conversation.copyWith(
+      messages: [...conversation.messages, assistantMessage],
+      updatedAt: DateTime.now(),
+    );
+    await updateConversation(conversation);
+    yield conversation;
+
+    // Stream response from OpenCode
+    final buffer = StringBuffer();
+    try {
+      await for (final token in _openCodeLLMService!.generateResponse(
+        prompt: text,
+        modelId: modelId,
+        conversationHistory: conversation.messages
+            .where(
+              (m) =>
+                  m.id != assistantMessageId &&
+                  m.role != MessageRole.system,
+            )
+            .toList(),
+        systemPrompt: conversation.systemPrompt,
+      )) {
+        buffer.write(token);
+        final updatedMessage = assistantMessage.copyWith(
+          text: buffer.toString(),
+        );
+
+        final messages = conversation.messages
+            .map((m) => m.id == assistantMessageId ? updatedMessage : m)
+            .toList();
+
+        conversation = conversation.copyWith(
+          messages: messages,
+          updatedAt: DateTime.now(),
+        );
+
+        _conversationUpdatesController.add(conversation);
+        yield conversation;
+      }
+
+      // Final save
+      await updateConversation(conversation);
+      _log('OpenCode response complete: ${buffer.length} chars');
+    } catch (e) {
+      _log('OpenCode generation error: $e');
+
+      final errorMessage = assistantMessage.copyWith(
+        text: buffer.isEmpty
+            ? 'Error: $e'
+            : '${buffer.toString()}\n\n[Error: $e]',
+      );
+
+      final messages = conversation.messages
+          .map((m) => m.id == assistantMessageId ? errorMessage : m)
+          .toList();
+
+      conversation = conversation.copyWith(
+        messages: messages,
+        updatedAt: DateTime.now(),
+      );
+      await updateConversation(conversation);
+      yield conversation;
     }
   }
 
@@ -1141,9 +1291,13 @@ class ChatService {
     final isLocalModel = UnifiedModelService.isLocalModel(
       initialConversation.modelName,
     );
+    final isOpenCodeModel = UnifiedModelService.isOpenCodeModel(
+      initialConversation.modelName,
+    );
     _log(
       'sendMessageWithContext routing: model=${initialConversation.modelName}, '
       'isLocalModel=$isLocalModel, '
+      'isOpenCodeModel=$isOpenCodeModel, '
       'inferenceMode=$currentInferenceMode, '
       'onDeviceServiceReady=${_onDeviceLLMService != null}, '
       'isOnline=$isOnline',
@@ -1170,6 +1324,24 @@ class ChatService {
         'Routing sendMessageWithContext to on-device inference (local model selected)',
       );
       yield* _sendMessageOnDevice(
+        conversationId,
+        lastUserText(conversation),
+        addUserMessage: false,
+      );
+      return;
+    }
+
+    // Route to OpenCode if OpenCode model is selected
+    if (isOpenCodeModel) {
+      if (_openCodeLLMService == null) {
+        throw Exception(
+          'OpenCode service is not configured. Please set up an OpenCode connection in Settings.',
+        );
+      }
+      _log(
+        'Routing sendMessageWithContext to OpenCode inference',
+      );
+      yield* _sendMessageOpenCode(
         conversationId,
         lastUserText(conversation),
         addUserMessage: false,
@@ -2294,6 +2466,7 @@ class ChatService {
 
     // Dispose on-device LLM service if present
     _onDeviceLLMService?.dispose();
+    _openCodeLLMService?.dispose();
     _inferenceConfigService?.dispose();
   }
 

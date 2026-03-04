@@ -51,6 +51,17 @@ class InferenceModeSelector extends StatelessWidget {
           isSelected: currentMode == InferenceMode.onDevice,
           badge: 'Preview',
         ),
+        const SizedBox(height: 8),
+        _buildModeCard(
+          context,
+          mode: InferenceMode.openCode,
+          icon: Icons.hub_outlined,
+          selectedIcon: Icons.hub,
+          title: 'OpenCode',
+          subtitle: 'Cloud models via OpenCode server',
+          features: ['Claude, GPT, Gemini', 'Many providers', 'Server gateway'],
+          isSelected: currentMode == InferenceMode.openCode,
+        ),
       ],
     );
   }

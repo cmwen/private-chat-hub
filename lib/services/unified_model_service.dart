@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
 import 'package:private_chat_hub/services/llm_service.dart';
 import 'package:private_chat_hub/services/on_device_llm_service.dart';
+import 'package:private_chat_hub/services/opencode_llm_service.dart';
+import 'package:private_chat_hub/services/opencode_model_visibility_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Service that provides a unified list of available models from both
@@ -12,15 +14,25 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// SharedPreferences so they remain visible when Ollama goes offline.
 class UnifiedModelService {
   final OnDeviceLLMService? _onDeviceLLMService;
+  final OpenCodeLLMService? _openCodeLLMService;
+  final OpenCodeModelVisibilityService? _visibilityService;
 
   /// SharedPreferences key for cached remote model list.
   static const String _cachedRemoteModelsKey = 'cached_remote_models';
 
-  UnifiedModelService({OnDeviceLLMService? onDeviceLLMService})
-    : _onDeviceLLMService = onDeviceLLMService;
+  UnifiedModelService({
+    OnDeviceLLMService? onDeviceLLMService,
+    OpenCodeLLMService? openCodeLLMService,
+    OpenCodeModelVisibilityService? visibilityService,
+  }) : _onDeviceLLMService = onDeviceLLMService,
+       _openCodeLLMService = openCodeLLMService,
+       _visibilityService = visibilityService;
 
   /// Prefix for local model names to avoid conflicts with Ollama models
   static const String localModelPrefix = 'local:';
+
+  /// Prefix for OpenCode model names
+  static const String openCodeModelPrefix = 'opencode:';
 
   /// Get a unified list of models from both Ollama and on-device sources
   Future<List<ModelInfo>> getUnifiedModelList(
@@ -68,6 +80,25 @@ class UnifiedModelService {
       }
     }
 
+    // Add OpenCode models (cloud)
+    if (_openCodeLLMService != null) {
+      try {
+        final openCodeModels =
+            await _openCodeLLMService.getAvailableModels();
+
+        for (final model in openCodeModels) {
+          // Filter by visibility if service is available
+          if (_visibilityService != null &&
+              !_visibilityService.isModelVisible(model.id)) {
+            continue;
+          }
+          unifiedList.add(model);
+        }
+      } catch (e) {
+        print('[UnifiedModelService] Failed to get OpenCode models: $e');
+      }
+    }
+
     return unifiedList;
   }
 
@@ -93,6 +124,11 @@ class UnifiedModelService {
     return modelName.startsWith(localModelPrefix);
   }
 
+  /// Check if a model name is an OpenCode model
+  static bool isOpenCodeModel(String modelName) {
+    return modelName.startsWith(openCodeModelPrefix);
+  }
+
   /// Get the actual model ID without the local prefix
   static String getLocalModelId(String modelName) {
     if (isLocalModel(modelName)) {
@@ -105,6 +141,10 @@ class UnifiedModelService {
   static String getDisplayName(String modelName) {
     if (isLocalModel(modelName)) {
       return getLocalModelId(modelName);
+    }
+    if (isOpenCodeModel(modelName)) {
+      // Show provider/model without the opencode: prefix
+      return modelName.substring(openCodeModelPrefix.length);
     }
     return modelName;
   }

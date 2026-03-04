@@ -18,6 +18,7 @@ class InferenceConfigService {
   static const String _autoUnloadTimeoutKey = 'litert_auto_unload_timeout';
   static const String _lastRemoteModelKey = 'last_remote_model';
   static const String _lastOnDeviceModelKey = 'last_on_device_model';
+  static const String _lastOpenCodeModelKey = 'last_opencode_model';
 
   // LiteLM Model Parameters
   static const String _temperatureKey = 'litert_temperature';
@@ -43,6 +44,9 @@ class InferenceConfigService {
     final modeString = _prefs.getString(_inferenceModeKey);
     if (modeString == 'onDevice') {
       return InferenceMode.onDevice;
+    }
+    if (modeString == 'openCode') {
+      return InferenceMode.openCode;
     }
     return InferenceMode.remote; // Default to remote (Ollama)
   }
@@ -230,19 +234,37 @@ class InferenceConfigService {
     await _prefs.setString(_lastOnDeviceModelKey, modelId);
   }
 
+  /// Get last used OpenCode model
+  String? get lastOpenCodeModel {
+    return _prefs.getString(_lastOpenCodeModelKey);
+  }
+
+  /// Set last used OpenCode model
+  Future<void> setLastOpenCodeModel(String modelId) async {
+    await _prefs.setString(_lastOpenCodeModelKey, modelId);
+  }
+
   /// Get the last used model for the current inference mode
   String? get lastModel {
-    return inferenceMode == InferenceMode.remote
-        ? lastRemoteModel
-        : lastOnDeviceModel;
+    switch (inferenceMode) {
+      case InferenceMode.remote:
+        return lastRemoteModel;
+      case InferenceMode.onDevice:
+        return lastOnDeviceModel;
+      case InferenceMode.openCode:
+        return lastOpenCodeModel;
+    }
   }
 
   /// Set the last used model for the current inference mode
   Future<void> setLastModel(String modelId) async {
-    if (inferenceMode == InferenceMode.remote) {
-      await setLastRemoteModel(modelId);
-    } else {
-      await setLastOnDeviceModel(modelId);
+    switch (inferenceMode) {
+      case InferenceMode.remote:
+        await setLastRemoteModel(modelId);
+      case InferenceMode.onDevice:
+        await setLastOnDeviceModel(modelId);
+      case InferenceMode.openCode:
+        await setLastOpenCodeModel(modelId);
     }
   }
 
@@ -261,6 +283,8 @@ class InferenceConfigService {
         return 'Remote (Ollama Server)';
       case InferenceMode.onDevice:
         return 'On-Device (LiteRT)';
+      case InferenceMode.openCode:
+        return 'OpenCode (Cloud APIs)';
     }
   }
 
@@ -271,6 +295,8 @@ class InferenceConfigService {
         return 'Remote';
       case InferenceMode.onDevice:
         return 'On-Device';
+      case InferenceMode.openCode:
+        return 'OpenCode';
     }
   }
 
@@ -288,6 +314,8 @@ extension InferenceModeExtension on InferenceMode {
         return 'Remote (Ollama)';
       case InferenceMode.onDevice:
         return 'On-Device (LiteRT)';
+      case InferenceMode.openCode:
+        return 'OpenCode (Cloud)';
     }
   }
 
@@ -297,6 +325,8 @@ extension InferenceModeExtension on InferenceMode {
         return 'Run models on your Ollama server. More models available, unlimited size.';
       case InferenceMode.onDevice:
         return 'Run models directly on your device. Fully private, works offline.';
+      case InferenceMode.openCode:
+        return 'Access cloud models via OpenCode server. Claude, GPT, Gemini and more.';
     }
   }
 
@@ -306,6 +336,8 @@ extension InferenceModeExtension on InferenceMode {
         return 'cloud';
       case InferenceMode.onDevice:
         return 'phone_android';
+      case InferenceMode.openCode:
+        return 'hub';
     }
   }
 }

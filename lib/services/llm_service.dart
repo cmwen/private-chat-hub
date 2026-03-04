@@ -8,6 +8,9 @@ enum InferenceMode {
 
   /// On-device inference via LiteRT-LM
   onDevice,
+
+  /// Cloud inference via OpenCode server
+  openCode,
 }
 
 /// Information about an available model

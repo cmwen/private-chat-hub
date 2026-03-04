@@ -11,6 +11,10 @@ import 'package:private_chat_hub/services/inference_config_service.dart';
 import 'package:private_chat_hub/services/network_discovery_service.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
+import 'package:private_chat_hub/models/opencode_connection.dart';
+import 'package:private_chat_hub/services/opencode_connection_manager.dart';
+import 'package:private_chat_hub/services/opencode_llm_service.dart';
+import 'package:private_chat_hub/services/opencode_model_visibility_service.dart';
 import 'package:private_chat_hub/services/project_service.dart';
 import 'package:private_chat_hub/services/status_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
@@ -29,6 +33,9 @@ class SettingsScreen extends StatefulWidget {
   final StorageService? storageService;
   final ProjectService? projectService;
   final dynamic onDeviceLLMService; // OnDeviceLLMService
+  final OpenCodeConnectionManager? openCodeConnectionManager;
+  final OpenCodeLLMService? openCodeLLMService;
+  final OpenCodeModelVisibilityService? openCodeVisibilityService;
   final Function(ThemeMode)? onThemeModeChanged;
   final ThemeMode? currentThemeMode;
   final VoidCallback? onToolConfigChanged;
@@ -43,6 +50,9 @@ class SettingsScreen extends StatefulWidget {
     this.storageService,
     this.projectService,
     this.onDeviceLLMService,
+    this.openCodeConnectionManager,
+    this.openCodeLLMService,
+    this.openCodeVisibilityService,
     this.onThemeModeChanged,
     this.currentThemeMode,
     this.onToolConfigChanged,
@@ -527,6 +537,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       label: const Text('Add Connection'),
                     ),
                   ),
+                const Divider(height: 32),
+
+                // ── OpenCode Connection ─────────────────────────────
+                _SectionHeader(title: 'OpenCode Connection'),
+                _OpenCodeConnectionCard(
+                  connectionManager: widget.openCodeConnectionManager,
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'Connect to an OpenCode server to access cloud models '
+                    '(Claude, GPT, Gemini, etc.) through a single gateway.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
                 const Divider(height: 32),
 
                 // ── On-Device Models ───────────────────────────────
@@ -1734,6 +1763,269 @@ class _HuggingFaceTokenBannerState extends State<_HuggingFaceTokenBanner> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Card for managing OpenCode server connection in Settings.
+class _OpenCodeConnectionCard extends StatefulWidget {
+  final OpenCodeConnectionManager? connectionManager;
+
+  const _OpenCodeConnectionCard({this.connectionManager});
+
+  @override
+  State<_OpenCodeConnectionCard> createState() =>
+      _OpenCodeConnectionCardState();
+}
+
+class _OpenCodeConnectionCardState extends State<_OpenCodeConnectionCard> {
+  final _hostController = TextEditingController(text: '127.0.0.1');
+  final _portController = TextEditingController(text: '4096');
+  final _usernameController = TextEditingController(text: 'opencode');
+  final _passwordController = TextEditingController();
+  bool _useHttps = false;
+  bool _isTesting = false;
+  String? _testResult;
+  bool _isConnected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingConnection();
+  }
+
+  Future<void> _loadExistingConnection() async {
+    final manager = widget.connectionManager;
+    if (manager == null) return;
+
+    final conn = await manager.loadConnection();
+    if (conn != null && mounted) {
+      setState(() {
+        _hostController.text = conn.host;
+        _portController.text = conn.port.toString();
+        _useHttps = conn.useHttps;
+        _usernameController.text = conn.username ?? 'opencode';
+        _passwordController.text = conn.password ?? '';
+        _isConnected = manager.isConnected;
+      });
+    }
+  }
+
+  Future<void> _testAndSave() async {
+    final manager = widget.connectionManager;
+    if (manager == null) return;
+
+    setState(() {
+      _isTesting = true;
+      _testResult = null;
+    });
+
+    final connection = _buildConnection();
+    final result = await manager.testConnectionConfig(connection);
+
+    if (!mounted) return;
+
+    if (result.healthy) {
+      await manager.saveConnection(connection);
+      await manager.setConnection(connection);
+      setState(() {
+        _isTesting = false;
+        _isConnected = true;
+        _testResult = 'Connected! '
+            '${result.version != null ? "v${result.version}" : ""} '
+            '${result.modelCount != null ? "· ${result.modelCount} models" : ""}';
+      });
+    } else {
+      setState(() {
+        _isTesting = false;
+        _isConnected = false;
+        _testResult = 'Connection failed. Check host and port.';
+      });
+    }
+  }
+
+  Future<void> _disconnect() async {
+    final manager = widget.connectionManager;
+    if (manager == null) return;
+
+    await manager.removeConnection();
+    if (mounted) {
+      setState(() {
+        _isConnected = false;
+        _testResult = null;
+      });
+    }
+  }
+
+  OpenCodeConnection _buildConnection() {
+    return OpenCodeConnection(
+      id: 'default',
+      name: 'OpenCode Server',
+      host: _hostController.text.trim(),
+      port: int.tryParse(_portController.text.trim()) ?? 4096,
+      useHttps: _useHttps,
+      username: _usernameController.text.trim().isNotEmpty
+          ? _usernameController.text.trim()
+          : null,
+      password: _passwordController.text.isNotEmpty
+          ? _passwordController.text
+          : null,
+      isDefault: true,
+      createdAt: DateTime.now(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _hostController.dispose();
+    _portController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.hub,
+                  color: _isConnected ? Colors.green : colorScheme.outline,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'OpenCode Server',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: _isConnected ? Colors.green : null,
+                  ),
+                ),
+                const Spacer(),
+                if (_isConnected)
+                  Chip(
+                    label: const Text('Connected'),
+                    backgroundColor: Colors.green.withValues(alpha: 0.1),
+                    side: const BorderSide(color: Colors.green),
+                    labelStyle: const TextStyle(
+                      color: Colors.green,
+                      fontSize: 12,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: TextField(
+                    controller: _hostController,
+                    decoration: const InputDecoration(
+                      labelText: 'Host',
+                      hintText: '127.0.0.1',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _portController,
+                    decoration: const InputDecoration(
+                      labelText: 'Port',
+                      hintText: '4096',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: const Text('Use HTTPS', style: TextStyle(fontSize: 14)),
+              value: _useHttps,
+              onChanged: (v) => setState(() => _useHttps = v),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _usernameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Username (optional)',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _passwordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Password (optional)',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_testResult != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  _testResult!,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _isConnected ? Colors.green : colorScheme.error,
+                  ),
+                ),
+              ),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _isTesting ? null : _testAndSave,
+                    icon: _isTesting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.check, size: 18),
+                    label: Text(_isTesting ? 'Testing...' : 'Test & Save'),
+                  ),
+                ),
+                if (_isConnected) ...[
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: _disconnect,
+                    child: const Text('Disconnect'),
+                  ),
+                ],
+              ],
+            ),
+          ],
         ),
       ),
     );

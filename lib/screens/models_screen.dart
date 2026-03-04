@@ -5,6 +5,8 @@ import 'package:private_chat_hub/services/llm_service.dart';
 import 'package:private_chat_hub/services/on_device_llm_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
+import 'package:private_chat_hub/services/opencode_llm_service.dart';
+import 'package:private_chat_hub/services/opencode_model_visibility_service.dart';
 import 'package:private_chat_hub/services/unified_model_service.dart';
 
 /// Screen for managing Ollama models.
@@ -12,12 +14,16 @@ class ModelsScreen extends StatefulWidget {
   final OllamaConnectionManager ollamaManager;
   final ConnectionService connectionService;
   final OnDeviceLLMService? onDeviceLLMService;
+  final OpenCodeLLMService? openCodeLLMService;
+  final OpenCodeModelVisibilityService? openCodeVisibilityService;
 
   const ModelsScreen({
     super.key,
     required this.ollamaManager,
     required this.connectionService,
     this.onDeviceLLMService,
+    this.openCodeLLMService,
+    this.openCodeVisibilityService,
   });
 
   @override
@@ -27,6 +33,7 @@ class ModelsScreen extends StatefulWidget {
 class _ModelsScreenState extends State<ModelsScreen> {
   List<OllamaModelInfo> _models = [];
   List<ModelInfo> _localModels = [];
+  List<ModelInfo> _openCodeModels = [];
   bool _isLoading = true;
   String? _error;
   String? _selectedModel;
@@ -48,6 +55,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
     String? remoteError;
     var remoteModels = <OllamaModelInfo>[];
     var localModels = <ModelInfo>[];
+    var openCodeModels = <ModelInfo>[];
 
     final connection = widget.connectionService.getDefaultConnection();
     if (connection != null) {
@@ -62,29 +70,41 @@ class _ModelsScreenState extends State<ModelsScreen> {
     try {
       final unifiedService = UnifiedModelService(
         onDeviceLLMService: widget.onDeviceLLMService,
+        openCodeLLMService: widget.openCodeLLMService,
+        visibilityService: widget.openCodeVisibilityService,
       );
       final unifiedModels = await unifiedService.getUnifiedModelList([]);
       localModels = unifiedModels.where((model) => model.isLocal).toList();
+      openCodeModels = unifiedModels
+          .where((model) => UnifiedModelService.isOpenCodeModel(model.id))
+          .toList();
     } catch (_) {
       localModels = [];
+      openCodeModels = [];
     }
 
-    final hasAnyModel = remoteModels.isNotEmpty || localModels.isNotEmpty;
+    final hasAnyModel = remoteModels.isNotEmpty ||
+        localModels.isNotEmpty ||
+        openCodeModels.isNotEmpty;
     final selectedStillExists =
         _selectedModel != null &&
         (remoteModels.any((model) => model.name == _selectedModel) ||
-            localModels.any((model) => model.id == _selectedModel));
+            localModels.any((model) => model.id == _selectedModel) ||
+            openCodeModels.any((model) => model.id == _selectedModel));
 
     if ((!selectedStillExists || _selectedModel == null) && hasAnyModel) {
       _selectedModel = remoteModels.isNotEmpty
           ? remoteModels.first.name
-          : localModels.first.id;
+          : localModels.isNotEmpty
+              ? localModels.first.id
+              : openCodeModels.first.id;
       await widget.connectionService.setSelectedModel(_selectedModel!);
     }
 
     setState(() {
       _models = remoteModels;
       _localModels = localModels;
+      _openCodeModels = openCodeModels;
       _error = !hasAnyModel && remoteError != null ? remoteError : null;
       _isLoading = false;
     });
@@ -294,7 +314,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
       );
     }
 
-    if (_models.isEmpty && _localModels.isEmpty) {
+    if (_models.isEmpty && _localModels.isEmpty && _openCodeModels.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -418,6 +438,43 @@ class _ModelsScreenState extends State<ModelsScreen> {
                       onTap: () => _showModelDetails(model),
                       onSelect: () => _selectModel(model),
                       onDelete: () => _deleteModel(model),
+                    );
+                  }),
+                ],
+                if (_openCodeModels.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Row(
+                      children: [
+                        Icon(Icons.hub, size: 16,
+                            color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'OpenCode Models',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${_openCodeModels.length} visible',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  ..._openCodeModels.map((model) {
+                    final isSelected = model.id == _selectedModel;
+                    return _OpenCodeModelCard(
+                      model: model,
+                      isSelected: isSelected,
+                      onSelect: () {
+                        setState(() {
+                          _selectedModel = model.id;
+                        });
+                        widget.connectionService.setSelectedModel(model.id);
+                      },
                     );
                   }),
                 ],
@@ -1078,5 +1135,175 @@ class _DetailRow extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Card widget for OpenCode models in the models list.
+class _OpenCodeModelCard extends StatelessWidget {
+  final ModelInfo model;
+  final bool isSelected;
+  final VoidCallback onSelect;
+
+  const _OpenCodeModelCard({
+    required this.model,
+    required this.isSelected,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    // Extract provider from model ID: opencode:provider/model
+    final parts = model.id.split(':');
+    final providerModel = parts.length > 1 ? parts[1] : model.id;
+    final providerParts = providerModel.split('/');
+    final providerName =
+        providerParts.isNotEmpty ? providerParts[0] : 'unknown';
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      elevation: isSelected ? 2 : 0,
+      color: isSelected
+          ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+          : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: isSelected
+            ? BorderSide(color: colorScheme.primary, width: 2)
+            : BorderSide(color: colorScheme.outlineVariant),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onSelect,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              // Provider badge
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _getProviderColor(providerName).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: Text(
+                    _getProviderAbbrev(providerName),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: _getProviderColor(providerName),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      model.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      model.description,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (model.capabilities.length > 1) ...[
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 4,
+                        children: model.capabilities
+                            .where((c) => c != 'text')
+                            .map((cap) {
+                          final capInfo = _capabilityInfo(cap);
+                          return _SmallCapabilityChip(
+                            icon: capInfo.$1,
+                            label: cap,
+                            color: capInfo.$2,
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (isSelected)
+                Icon(Icons.check_circle, color: colorScheme.primary, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _getProviderColor(String provider) {
+    switch (provider.toLowerCase()) {
+      case 'anthropic':
+        return const Color(0xFFD97706);
+      case 'openai':
+        return const Color(0xFF10A37F);
+      case 'google':
+        return const Color(0xFF4285F4);
+      case 'mistral':
+        return const Color(0xFFFF7000);
+      case 'xai':
+        return const Color(0xFF1DA1F2);
+      case 'deepseek':
+        return const Color(0xFF6366F1);
+      case 'groq':
+        return const Color(0xFFE53E3E);
+      default:
+        return const Color(0xFF6B7280);
+    }
+  }
+
+  String _getProviderAbbrev(String provider) {
+    switch (provider.toLowerCase()) {
+      case 'anthropic':
+        return 'A';
+      case 'openai':
+        return 'AI';
+      case 'google':
+        return 'G';
+      case 'mistral':
+        return 'M';
+      case 'xai':
+        return 'X';
+      case 'deepseek':
+        return 'DS';
+      case 'groq':
+        return 'GQ';
+      default:
+        return provider.substring(0, 1).toUpperCase();
+    }
+  }
+}
+
+(IconData, Color) _capabilityInfo(String capability) {
+  switch (capability) {
+    case 'vision':
+      return (Icons.image, const Color(0xFF4285F4));
+    case 'tools':
+      return (Icons.build, const Color(0xFF10A37F));
+    case 'reasoning':
+      return (Icons.psychology, const Color(0xFFD97706));
+    case 'attachment':
+      return (Icons.attach_file, const Color(0xFF6366F1));
+    default:
+      return (Icons.star, const Color(0xFF6B7280));
   }
 }
