@@ -107,12 +107,9 @@ void main() {
       applyProviderFilter: false,
     );
 
-    expect(
-      models.map((m) => m.id).toSet(),
-      {
-        'opencode:copilot/gpt-4o',
-        'opencode:anthropic/claude-3-5-sonnet',
-      },
-    );
+    expect(models.map((m) => m.id).toSet(), {
+      'opencode:copilot/gpt-4o',
+      'opencode:anthropic/claude-3-5-sonnet',
+    });
   });
 }

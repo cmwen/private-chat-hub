@@ -16,17 +16,11 @@ void main() {
         isTrue,
       );
       expect(UnifiedModelService.isLocalModel('llama3.2:latest'), isFalse);
-      expect(
-        UnifiedModelService.isOpenCodeModel('llama3.2:latest'),
-        isFalse,
-      );
+      expect(UnifiedModelService.isOpenCodeModel('llama3.2:latest'), isFalse);
     });
 
     test('normalizes display names by source', () {
-      expect(
-        UnifiedModelService.getDisplayName('local:gemma-3n'),
-        'gemma-3n',
-      );
+      expect(UnifiedModelService.getDisplayName('local:gemma-3n'), 'gemma-3n');
       expect(
         UnifiedModelService.getDisplayName('opencode:openai/gpt-4o'),
         'openai/gpt-4o',

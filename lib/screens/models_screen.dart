@@ -77,10 +77,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
             .getDownloadedModels();
         localModels = downloaded
             .map(
-              (model) => model.copyWith(
-                id: 'local:${model.id}',
-                isLocal: true,
-              ),
+              (model) => model.copyWith(id: 'local:${model.id}', isLocal: true),
             )
             .toList();
       } catch (_) {
@@ -97,7 +94,8 @@ class _ModelsScreenState extends State<ModelsScreen> {
       }
     }
 
-    final hasAnyModel = remoteModels.isNotEmpty ||
+    final hasAnyModel =
+        remoteModels.isNotEmpty ||
         localModels.isNotEmpty ||
         openCodeModels.isNotEmpty;
     final selectedStillExists =
@@ -110,8 +108,8 @@ class _ModelsScreenState extends State<ModelsScreen> {
       _selectedModel = remoteModels.isNotEmpty
           ? remoteModels.first.name
           : localModels.isNotEmpty
-              ? localModels.first.id
-              : openCodeModels.first.id;
+          ? localModels.first.id
+          : openCodeModels.first.id;
       await widget.connectionService.setSelectedModel(_selectedModel!);
     }
 
@@ -149,11 +147,12 @@ class _ModelsScreenState extends State<ModelsScreen> {
   }
 
   List<String> _availableOpenCodeProviders() {
-    final providers = _openCodeModels
-        .map((model) => _openCodeProviderForModel(model.id))
-        .toSet()
-        .toList()
-      ..sort();
+    final providers =
+        _openCodeModels
+            .map((model) => _openCodeProviderForModel(model.id))
+            .toSet()
+            .toList()
+          ..sort();
     return providers;
   }
 
@@ -161,7 +160,8 @@ class _ModelsScreenState extends State<ModelsScreen> {
     final query = _openCodeSearch.trim().toLowerCase();
     return _openCodeModels.where((model) {
       final provider = _openCodeProviderForModel(model.id);
-      if (_openCodeProviderFilter != null && provider != _openCodeProviderFilter) {
+      if (_openCodeProviderFilter != null &&
+          provider != _openCodeProviderFilter) {
         return false;
       }
 
@@ -559,111 +559,115 @@ class _ModelsScreenState extends State<ModelsScreen> {
                   }),
                 ],
                 if (_openCodeModels.isNotEmpty) ...[
-                  Builder(builder: (context) {
-                    final providers = _availableOpenCodeProviders();
-                    final filtered = _filteredOpenCodeModels();
-                    final visibleCount = _openCodeModels
-                        .where((model) => _isModelVisibleInApp(model.id))
-                        .length;
+                  Builder(
+                    builder: (context) {
+                      final providers = _availableOpenCodeProviders();
+                      final filtered = _filteredOpenCodeModels();
+                      final visibleCount = _openCodeModels
+                          .where((model) => _isModelVisibleInApp(model.id))
+                          .length;
 
-                    if (_openCodeProviderFilter != null &&
-                        !providers.contains(_openCodeProviderFilter)) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) {
-                          setState(() => _openCodeProviderFilter = null);
-                        }
-                      });
-                    }
+                      if (_openCodeProviderFilter != null &&
+                          !providers.contains(_openCodeProviderFilter)) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) {
+                            setState(() => _openCodeProviderFilter = null);
+                          }
+                        });
+                      }
 
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                    child: Row(
-                      children: [
-                        Icon(Icons.hub, size: 16,
-                            color: Theme.of(context).colorScheme.primary),
-                        const SizedBox(width: 6),
-                        const Text(
-                          'OpenCode Models',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          '$visibleCount/${_openCodeModels.length} enabled',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  decoration: const InputDecoration(
-                                    isDense: true,
-                                    hintText: 'Filter OpenCode models',
-                                    prefixIcon: Icon(Icons.search),
-                                  ),
-                                  onChanged: (value) => setState(
-                                    () => _openCodeSearch = value,
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.hub,
+                                  size: 16,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                const SizedBox(width: 6),
+                                const Text(
+                                  'OpenCode Models',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              DropdownButton<String?>(
-                                value: _openCodeProviderFilter,
-                                hint: const Text('Provider'),
-                                items: [
-                                  const DropdownMenuItem<String?>(
-                                    value: null,
-                                    child: Text('All providers'),
-                                  ),
-                                  ...providers.map(
-                                    (provider) => DropdownMenuItem<String?>(
-                                      value: provider,
-                                      child: Text(provider),
-                                    ),
-                                  ),
-                                ],
-                                onChanged: (value) {
-                                  setState(
-                                    () => _openCodeProviderFilter = value,
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                  ...filtered.map((model) {
-                    final isSelected = model.id == _selectedModel;
-                    final isVisible = _isModelVisibleInApp(model.id);
-                    return _OpenCodeModelCard(
-                      model: model,
-                      isSelected: isSelected,
-                      isVisibleInApp: isVisible,
-                      onSelect: () => _selectOpenCodeModel(model),
-                      onToggleVisibility: (value) =>
-                          _setModelVisibility(model.id, value),
-                    );
-                  }),
-                        if (filtered.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                            child: Text(
-                              'No OpenCode models match this filter.',
-                              style: Theme.of(context).textTheme.bodySmall,
+                                const Spacer(),
+                                Text(
+                                  '$visibleCount/${_openCodeModels.length} enabled',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
                             ),
                           ),
-                      ],
-                    );
-                  }),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                      hintText: 'Filter OpenCode models',
+                                      prefixIcon: Icon(Icons.search),
+                                    ),
+                                    onChanged: (value) =>
+                                        setState(() => _openCodeSearch = value),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                DropdownButton<String?>(
+                                  value: _openCodeProviderFilter,
+                                  hint: const Text('Provider'),
+                                  items: [
+                                    const DropdownMenuItem<String?>(
+                                      value: null,
+                                      child: Text('All providers'),
+                                    ),
+                                    ...providers.map(
+                                      (provider) => DropdownMenuItem<String?>(
+                                        value: provider,
+                                        child: Text(provider),
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: (value) {
+                                    setState(
+                                      () => _openCodeProviderFilter = value,
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          ...filtered.map((model) {
+                            final isSelected = model.id == _selectedModel;
+                            final isVisible = _isModelVisibleInApp(model.id);
+                            return _OpenCodeModelCard(
+                              model: model,
+                              isSelected: isSelected,
+                              isVisibleInApp: isVisible,
+                              onSelect: () => _selectOpenCodeModel(model),
+                              onToggleVisibility: (value) =>
+                                  _setModelVisibility(model.id, value),
+                            );
+                          }),
+                          if (filtered.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                              child: Text(
+                                'No OpenCode models match this filter.',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
                 ],
               ],
             ),
@@ -1394,8 +1398,9 @@ class _OpenCodeModelCard extends StatelessWidget {
     final parts = model.id.split(':');
     final providerModel = parts.length > 1 ? parts[1] : model.id;
     final providerParts = providerModel.split('/');
-    final providerName =
-        providerParts.isNotEmpty ? providerParts[0] : 'unknown';
+    final providerName = providerParts.isNotEmpty
+        ? providerParts[0]
+        : 'unknown';
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -1421,7 +1426,9 @@ class _OpenCodeModelCard extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: _getProviderColor(providerName).withValues(alpha: 0.15),
+                  color: _getProviderColor(
+                    providerName,
+                  ).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Center(
@@ -1477,13 +1484,14 @@ class _OpenCodeModelCard extends StatelessWidget {
                         children: model.capabilities
                             .where((c) => c != 'text')
                             .map((cap) {
-                          final capInfo = _capabilityInfo(cap);
-                          return _SmallCapabilityChip(
-                            icon: capInfo.$1,
-                            label: cap,
-                            color: capInfo.$2,
-                          );
-                        }).toList(),
+                              final capInfo = _capabilityInfo(cap);
+                              return _SmallCapabilityChip(
+                                icon: capInfo.$1,
+                                label: cap,
+                                color: capInfo.$2,
+                              );
+                            })
+                            .toList(),
                       ),
                     ],
                   ],

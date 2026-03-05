@@ -101,11 +101,12 @@ class OpenCodeModelDef {
       limit: json['limit'] != null
           ? OpenCodeModelLimit.fromJson(json['limit'] as Map<String, dynamic>)
           : null,
-      inputModalities: (json['modalities'] as Map<String, dynamic>?)?['input']
+      inputModalities:
+          (json['modalities'] as Map<String, dynamic>?)?['input']
               ?.cast<String>() ??
           const ['text'],
-      outputModalities: (json['modalities']
-                  as Map<String, dynamic>?)?['output']
+      outputModalities:
+          (json['modalities'] as Map<String, dynamic>?)?['output']
               ?.cast<String>() ??
           const ['text'],
       experimental: json['experimental'] as bool? ?? false,
@@ -142,11 +143,7 @@ class OpenCodeProvider {
   final String? name;
   final Map<String, OpenCodeModelDef> models;
 
-  const OpenCodeProvider({
-    required this.id,
-    this.name,
-    this.models = const {},
-  });
+  const OpenCodeProvider({required this.id, this.name, this.models = const {}});
 
   factory OpenCodeProvider.fromJson(String id, Map<String, dynamic> json) {
     final modelsJson = json['models'] as Map<String, dynamic>? ?? {};
@@ -204,9 +201,8 @@ class OpenCodeProviderResponse {
       }
     }
 
-    final connectedList = (json['connected'] as List<dynamic>?)
-            ?.cast<String>() ??
-        [];
+    final connectedList =
+        (json['connected'] as List<dynamic>?)?.cast<String>() ?? [];
 
     return OpenCodeProviderResponse(
       providers: providers,

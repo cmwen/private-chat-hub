@@ -1848,7 +1848,8 @@ class _OpenCodeConnectionCardState extends State<_OpenCodeConnectionCard> {
       setState(() {
         _isTesting = false;
         _isConnected = true;
-        _testResult = 'Connected! '
+        _testResult =
+            'Connected! '
             '${result.version != null ? "v${result.version}" : ""} '
             '${result.modelCount != null ? "· ${result.modelCount} models" : ""}';
       });
