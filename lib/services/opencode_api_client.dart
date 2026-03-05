@@ -82,6 +82,7 @@ class OpenCodeApiClient {
       throw OpenCodeApiException(
         'Failed to fetch providers',
         response.statusCode,
+        response.body,
       );
     }
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -97,6 +98,7 @@ class OpenCodeApiClient {
       throw OpenCodeApiException(
         'Failed to create session',
         response.statusCode,
+        response.body,
       );
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -114,7 +116,7 @@ class OpenCodeApiClient {
 
     final body = <String, dynamic>{'parts': parts};
     if (providerModelId != null) {
-      body['model'] = providerModelId;
+      body['model'] = buildModelSelection(providerModelId);
     }
 
     final response = await _post(
@@ -126,6 +128,7 @@ class OpenCodeApiClient {
       throw OpenCodeApiException(
         'Failed to send message',
         response.statusCode,
+        response.body,
       );
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -143,7 +146,7 @@ class OpenCodeApiClient {
 
     final body = <String, dynamic>{'parts': parts};
     if (providerModelId != null) {
-      body['model'] = providerModelId;
+      body['model'] = buildModelSelection(providerModelId);
     }
 
     final response = await _post(
@@ -154,6 +157,7 @@ class OpenCodeApiClient {
       throw OpenCodeApiException(
         'Failed to send async message',
         response.statusCode,
+        response.body,
       );
     }
   }
@@ -171,6 +175,7 @@ class OpenCodeApiClient {
       throw OpenCodeApiException(
         'Failed to delete session',
         response.statusCode,
+        response.body,
       );
     }
   }
@@ -282,6 +287,18 @@ class OpenCodeApiClient {
     }
   }
 
+  /// Build OpenCode `model` payload from `provider/model` or raw model IDs.
+  static Map<String, dynamic> buildModelSelection(String providerModelId) {
+    final slashIndex = providerModelId.indexOf('/');
+    if (slashIndex > 0 && slashIndex < providerModelId.length - 1) {
+      return {
+        'providerID': providerModelId.substring(0, slashIndex),
+        'modelID': providerModelId.substring(slashIndex + 1),
+      };
+    }
+    return {'modelID': providerModelId};
+  }
+
   /// Dispose of resources.
   void dispose() {
     _httpClient?.close();
@@ -306,9 +323,16 @@ class OpenCodeSSEEvent {
 class OpenCodeApiException implements Exception {
   final String message;
   final int statusCode;
+  final String? responseBody;
 
-  const OpenCodeApiException(this.message, this.statusCode);
+  const OpenCodeApiException(this.message, this.statusCode, [this.responseBody]);
 
   @override
-  String toString() => 'OpenCodeApiException($statusCode): $message';
+  String toString() {
+    final buffer = StringBuffer('OpenCodeApiException($statusCode): $message');
+    if (responseBody != null && responseBody!.trim().isNotEmpty) {
+      buffer..write(' - ')..write(responseBody!.trim());
+    }
+    return buffer.toString();
+  }
 }

@@ -1,13 +1,15 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Manages which OpenCode models are visible in the model selector.
+/// Manages which models are visible in app-wide model selectors.
 ///
-/// Since OpenCode can expose 100+ models from many providers, users need
-/// to curate which ones appear in the chat model selector.
+/// The service name is retained for backwards compatibility, but it now
+/// applies to all model IDs (Ollama, on-device, and OpenCode) and also stores
+/// OpenCode provider-level visibility filters.
 class OpenCodeModelVisibilityService {
   final SharedPreferences _prefs;
 
   static const String _visibleModelsKey = 'opencode_visible_models';
+  static const String _visibleProvidersKey = 'opencode_visible_providers';
   static const String _initializedKey = 'opencode_visibility_initialized';
 
   OpenCodeModelVisibilityService(this._prefs);
@@ -22,9 +24,18 @@ class OpenCodeModelVisibilityService {
   }
 
   /// Get the set of visible model IDs.
-  /// Returns null if not yet initialized (show default/recommended).
+  /// Returns null if not yet initialized (show all by default).
   Set<String>? getVisibleModelIds() {
     final json = _prefs.getStringList(_visibleModelsKey);
+    if (json == null) return null;
+    return json.toSet();
+  }
+
+  /// Get the set of visible OpenCode provider IDs.
+  ///
+  /// Returns null when no explicit filter has been configured yet.
+  Set<String>? getVisibleProviderIds() {
+    final json = _prefs.getStringList(_visibleProvidersKey);
     if (json == null) return null;
     return json.toSet();
   }
@@ -32,6 +43,14 @@ class OpenCodeModelVisibilityService {
   /// Set the visible model IDs.
   Future<void> setVisibleModelIds(Set<String> modelIds) async {
     await _prefs.setStringList(_visibleModelsKey, modelIds.toList());
+    if (!isInitialized) {
+      await markInitialized();
+    }
+  }
+
+  /// Set the visible OpenCode provider IDs.
+  Future<void> setVisibleProviderIds(Set<String> providerIds) async {
+    await _prefs.setStringList(_visibleProvidersKey, providerIds.toList());
     if (!isInitialized) {
       await markInitialized();
     }
@@ -48,14 +67,44 @@ class OpenCodeModelVisibilityService {
     await setVisibleModelIds(current);
   }
 
+  /// Toggle a single OpenCode provider's visibility.
+  Future<void> toggleProvider(String providerId) async {
+    final current = getVisibleProviderIds() ?? {};
+    if (current.contains(providerId)) {
+      current.remove(providerId);
+    } else {
+      current.add(providerId);
+    }
+    await setVisibleProviderIds(current);
+  }
+
   /// Check if a specific model is visible.
   bool isModelVisible(String modelId) {
     final visible = getVisibleModelIds();
     if (visible == null) {
-      // Not initialized — use recommended defaults
-      return _isRecommendedModel(modelId);
+      // Not initialized — show all model sources by default.
+      return true;
     }
     return visible.contains(modelId);
+  }
+
+  /// Check if an OpenCode provider is visible.
+  ///
+  /// If no explicit provider filters are configured yet, this defaults to
+  /// connected providers when available, otherwise all providers.
+  bool isProviderVisible(
+    String providerId, {
+    Set<String>? connectedProviders,
+  }) {
+    final visible = getVisibleProviderIds();
+    if (visible != null) {
+      return visible.contains(providerId);
+    }
+
+    if (connectedProviders != null && connectedProviders.isNotEmpty) {
+      return connectedProviders.contains(providerId);
+    }
+    return true;
   }
 
   /// Show all models.

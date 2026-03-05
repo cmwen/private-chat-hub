@@ -42,6 +42,11 @@ class UnifiedModelService {
 
     // Add Ollama models (remote)
     for (final OllamaModelInfo ollamaModel in ollamaModels) {
+      if (_visibilityService != null &&
+          !_visibilityService.isModelVisible(ollamaModel.name)) {
+        continue;
+      }
+
       unifiedList.add(
         ModelInfo(
           id: ollamaModel.name,
@@ -62,9 +67,15 @@ class UnifiedModelService {
             .getDownloadedModels();
 
         for (final localModel in localModels) {
+          final modelId = '$localModelPrefix${localModel.id}';
+          if (_visibilityService != null &&
+              !_visibilityService.isModelVisible(modelId)) {
+            continue;
+          }
+
           unifiedList.add(
             ModelInfo(
-              id: '$localModelPrefix${localModel.id}',
+              id: modelId,
               name: localModel.name,
               description: localModel.description,
               sizeBytes: localModel.sizeBytes,
@@ -83,8 +94,7 @@ class UnifiedModelService {
     // Add OpenCode models (cloud)
     if (_openCodeLLMService != null) {
       try {
-        final openCodeModels =
-            await _openCodeLLMService.getAvailableModels();
+        final openCodeModels = await _openCodeLLMService.getAvailableModels();
 
         for (final model in openCodeModels) {
           // Filter by visibility if service is available

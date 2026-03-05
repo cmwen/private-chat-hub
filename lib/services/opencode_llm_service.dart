@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:private_chat_hub/models/message.dart';
+import 'package:private_chat_hub/models/github_copilot_models.dart';
 import 'package:private_chat_hub/models/opencode_models.dart';
 import 'package:private_chat_hub/services/llm_service.dart';
 import 'package:private_chat_hub/services/opencode_connection_manager.dart';
+import 'package:private_chat_hub/services/opencode_model_visibility_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// LLM service implementation for OpenCode server.
@@ -12,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// (Anthropic, OpenAI, Google, etc.) through the OpenCode API.
 class OpenCodeLLMService implements LLMService {
   final OpenCodeConnectionManager _connectionManager;
+  final OpenCodeModelVisibilityService? _visibilityService;
 
   String? _currentModelId;
 
@@ -23,7 +26,10 @@ class OpenCodeLLMService implements LLMService {
 
   static const String _sessionMapKey = 'opencode_session_map';
 
-  OpenCodeLLMService(this._connectionManager) {
+  OpenCodeLLMService(
+    this._connectionManager, {
+    OpenCodeModelVisibilityService? visibilityService,
+  }) : _visibilityService = visibilityService {
     _loadSessionMap();
   }
 
@@ -40,26 +46,29 @@ class OpenCodeLLMService implements LLMService {
 
   @override
   Future<List<ModelInfo>> getAvailableModels() async {
-    try {
-      final providers = await _connectionManager.client.getProviders();
-      _cachedProviders = providers;
-      return _convertToModelInfoList(providers);
-    } catch (e) {
-      _log('Failed to get OpenCode models: $e');
+    return getAvailableModelsForSelection();
+  }
+
+  /// Get available models with optional provider filtering.
+  ///
+  /// When [applyProviderFilter] is true, models are limited to configured
+  /// providers (or connected providers by default).
+  Future<List<ModelInfo>> getAvailableModelsForSelection({
+    bool applyProviderFilter = true,
+  }) async {
+    final providers = await _fetchProviders();
+    if (providers == null) {
       return [];
     }
+    return _convertToModelInfoList(
+      providers,
+      applyProviderFilter: applyProviderFilter,
+    );
   }
 
   /// Get the raw provider response (for UI that needs provider grouping).
   Future<OpenCodeProviderResponse?> getProviders() async {
-    try {
-      final providers = await _connectionManager.client.getProviders();
-      _cachedProviders = providers;
-      return providers;
-    } catch (e) {
-      _log('Failed to get providers: $e');
-      return _cachedProviders;
-    }
+    return _fetchProviders();
   }
 
   /// Get cached providers without making an API call.
@@ -198,28 +207,83 @@ class OpenCodeLLMService implements LLMService {
 
   /// Convert provider response to list of ModelInfo for unified service.
   List<ModelInfo> _convertToModelInfoList(
-    OpenCodeProviderResponse providers,
-  ) {
+    OpenCodeProviderResponse providers, {
+    required bool applyProviderFilter,
+  }) {
     final models = <ModelInfo>[];
+    final visibleProviders = applyProviderFilter
+        ? _resolveVisibleProviderIds(providers)
+        : null;
+
     for (final entry in providers.allModels) {
       final model = entry.model;
       final providerId = entry.providerId;
+
+      if (visibleProviders != null &&
+          !_containsProviderId(visibleProviders, providerId)) {
+        continue;
+      }
+
       final modelId = 'opencode:$providerId/${model.modelKey}';
+
+      final capabilities = isGitHubCopilotProviderId(providerId)
+          ? enhanceGitHubCopilotCapabilities(model.capabilities)
+          : List<String>.from(model.capabilities);
 
       models.add(
         ModelInfo(
           id: modelId,
           name: model.displayName,
-          description: '${_getProviderDisplayName(providerId)} · '
+          description:
+              '${_getProviderDisplayName(providerId)} · '
               '${model.limit?.contextDisplay ?? 'Unknown'} context',
           sizeBytes: 0,
           isDownloaded: true,
-          capabilities: model.capabilities,
+          capabilities: capabilities,
           isLocal: false,
         ),
       );
     }
     return models;
+  }
+
+  Future<OpenCodeProviderResponse?> _fetchProviders({
+    bool allowCache = true,
+  }) async {
+    try {
+      final providers = await _connectionManager.client.getProviders();
+      _cachedProviders = providers;
+      return providers;
+    } catch (e) {
+      _log('Failed to reach OpenCode providers: $e');
+      if (allowCache && _cachedProviders != null) {
+        _log('Using cached OpenCode provider metadata');
+        return _cachedProviders;
+      }
+      return null;
+    }
+  }
+
+  Set<String>? _resolveVisibleProviderIds(OpenCodeProviderResponse providers) {
+    final connected = providers.connected.map((e) => e.toLowerCase()).toSet();
+
+    // If user configured provider visibility, use that as source of truth.
+    final explicitVisible = _visibilityService?.getVisibleProviderIds();
+    if (explicitVisible != null) {
+      return explicitVisible.map((e) => e.toLowerCase()).toSet();
+    }
+
+    // Otherwise default to only connected providers (if provided by API).
+    if (connected.isNotEmpty) {
+      return connected;
+    }
+
+    // No filter available, allow all.
+    return null;
+  }
+
+  bool _containsProviderId(Set<String> providerIds, String providerId) {
+    return providerIds.contains(providerId.toLowerCase());
   }
 
   /// Get human-readable provider name.
@@ -244,6 +308,8 @@ class OpenCodeLLMService implements LLMService {
       case 'azure':
         return 'Azure';
       case 'copilot':
+      case 'github-copilot':
+      case 'github-copilot-models':
         return 'GitHub Copilot';
       default:
         return providerId;
@@ -256,35 +322,17 @@ class OpenCodeLLMService implements LLMService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final json = prefs.getString(_sessionMapKey);
-      if (json != null) {
-        final map = Map<String, dynamic>.from(
-          (await Future.value(json)).isEmpty
-              ? {}
-              : Map<String, dynamic>.from(
-                  (json.isNotEmpty)
-                      ? (Map<String, dynamic>.from(
-                          _tryDecodeJson(json) ?? {},
-                        ))
-                      : {},
-                ),
-        );
-        for (final entry in map.entries) {
-          if (entry.value is String) {
-            _sessionMap[entry.key] = entry.value as String;
-          }
+      if (json == null || json.isEmpty) return;
+
+      final decoded = jsonDecode(json);
+      if (decoded is! Map<String, dynamic>) return;
+
+      for (final entry in decoded.entries) {
+        if (entry.value is String) {
+          _sessionMap[entry.key] = entry.value as String;
         }
       }
     } catch (_) {}
-  }
-
-  Map<String, dynamic>? _tryDecodeJson(String json) {
-    try {
-      final decoded =
-          const JsonDecoder().convert(json) as Map<String, dynamic>?;
-      return decoded;
-    } catch (_) {
-      return null;
-    }
   }
 
   Future<void> _saveSessionMap() async {

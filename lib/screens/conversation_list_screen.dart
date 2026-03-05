@@ -5,6 +5,8 @@ import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/llm_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
+import 'package:private_chat_hub/services/opencode_llm_service.dart';
+import 'package:private_chat_hub/services/opencode_model_visibility_service.dart';
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
 import 'package:private_chat_hub/services/unified_model_service.dart';
 import 'package:private_chat_hub/utils/markdown_utils.dart';
@@ -16,6 +18,8 @@ class ConversationListScreen extends StatefulWidget {
   final ChatService chatService;
   final ConnectionService connectionService;
   final OllamaConnectionManager ollamaManager;
+  final OpenCodeLLMService? openCodeLLMService;
+  final OpenCodeModelVisibilityService? openCodeVisibilityService;
   final Function(Conversation) onConversationSelected;
   final VoidCallback onNewConversation;
 
@@ -24,6 +28,8 @@ class ConversationListScreen extends StatefulWidget {
     required this.chatService,
     required this.connectionService,
     required this.ollamaManager,
+    this.openCodeLLMService,
+    this.openCodeVisibilityService,
     required this.onConversationSelected,
     required this.onNewConversation,
   });
@@ -39,6 +45,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   String? _selectedModel;
   bool _isLoading = true;
   bool _isLoadingModels = false;
+  final ValueNotifier<List<ModelInfo>> _modelNotifier = ValueNotifier([]);
   bool _localModelRefreshScheduled = false;
   bool _isOllamaOnline = true;
 
@@ -80,6 +87,8 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
 
     final unifiedModelService = UnifiedModelService(
       onDeviceLLMService: widget.chatService.onDeviceLLMService,
+      openCodeLLMService: widget.openCodeLLMService,
+      visibilityService: widget.openCodeVisibilityService,
     );
 
     try {
@@ -104,6 +113,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
 
       // Get unified model list (Ollama + local models)
       _allModels = await unifiedModelService.getUnifiedModelList(_ollamaModels);
+      _publishAvailableModels();
 
       // Cache the remote models for offline fallback
       await UnifiedModelService.cacheRemoteModels(_allModels);
@@ -126,27 +136,41 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
 
       try {
         final cachedRemote = await UnifiedModelService.getCachedRemoteModels();
-        final localModels = await unifiedModelService.getUnifiedModelList([]);
-        _allModels = [...cachedRemote, ...localModels];
+        final nonOllamaModels = await unifiedModelService.getUnifiedModelList(
+          [],
+        );
 
-        // Preserve the selected model if it exists in the combined list
-        // (including cached remote models). Only change selection when the
-        // current selection doesn't appear at all.
-        final selectedStillExists =
-            _selectedModel != null &&
-            _allModels.any((model) => model.id == _selectedModel);
-
-        if ((!selectedStillExists || _selectedModel == null) &&
-            _allModels.isNotEmpty) {
-          _selectedModel = _allModels.first.id;
-          await widget.connectionService.setSelectedModel(_selectedModel!);
-        }
+        // Keep insertion order while de-duplicating by ID. Live models should
+        // override stale cached copies when both are present.
+        final mergedById = <String, ModelInfo>{
+          for (final model in cachedRemote) model.id: model,
+          for (final model in nonOllamaModels) model.id: model,
+        };
+        _allModels = mergedById.values.toList();
       } catch (localError) {
         _allModels = [];
+      }
+      _publishAvailableModels();
+
+      // Preserve the selected model if it exists in the combined list
+      // (including cached remote models). Only change selection when the
+      // current selection doesn't appear at all.
+      final selectedStillExists =
+          _selectedModel != null &&
+          _allModels.any((model) => model.id == _selectedModel);
+
+      if ((!selectedStillExists || _selectedModel == null) &&
+          _allModels.isNotEmpty) {
+        _selectedModel = _allModels.first.id;
+        await widget.connectionService.setSelectedModel(_selectedModel!);
       }
     }
 
     if (mounted) setState(() => _isLoadingModels = false);
+  }
+
+  void _publishAvailableModels() {
+    _modelNotifier.value = List.unmodifiable(_allModels);
   }
 
   Future<void> _createNewConversation() async {
@@ -259,24 +283,33 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     );
   }
 
+  @override
+  void dispose() {
+    _modelNotifier.dispose();
+    super.dispose();
+  }
+
   void _showModelSelector() {
     showModalBottomSheet(
       context: context,
-      builder: (sheetContext) => _ModelSelectorSheet(
-        models: _allModels,
-        selectedModel: _selectedModel,
-        isOllamaOnline: _isOllamaOnline,
-        onModelSelected: (model) async {
-          await widget.connectionService.setSelectedModel(model.id);
-          if (!mounted) return;
-          setState(() => _selectedModel = model.id);
-          if (sheetContext.mounted) Navigator.pop(sheetContext);
-        },
-        isLoading: _isLoadingModels,
-        onRefresh: () async {
-          await _loadModels();
-          if (mounted) setState(() {});
-        },
+      builder: (sheetContext) => ValueListenableBuilder<List<ModelInfo>>(
+        valueListenable: _modelNotifier,
+        builder: (context, models, child) => _ModelSelectorSheet(
+          models: models,
+          selectedModel: _selectedModel,
+          isOllamaOnline: _isOllamaOnline,
+          onModelSelected: (model) async {
+            await widget.connectionService.setSelectedModel(model.id);
+            if (!mounted) return;
+            setState(() => _selectedModel = model.id);
+            if (sheetContext.mounted) Navigator.pop(sheetContext);
+          },
+          isLoading: _isLoadingModels,
+          onRefresh: () async {
+            await _loadModels();
+            if (mounted) setState(() {});
+          },
+        ),
       ),
     );
   }
@@ -648,6 +681,7 @@ class _ModelSelectorSheet extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final model = models[index];
                   final isSelected = model.id == selectedModel;
+                  final iconData = _iconForModel(model);
 
                   return ListTile(
                     leading: CircleAvatar(
@@ -657,7 +691,7 @@ class _ModelSelectorSheet extends StatelessWidget {
                               context,
                             ).colorScheme.surfaceContainerHighest,
                       child: Icon(
-                        model.isLocal ? Icons.phone_android : Icons.cloud,
+                        iconData,
                         color: isSelected
                             ? Colors.white
                             : Theme.of(context).colorScheme.onSurfaceVariant,
@@ -785,6 +819,12 @@ class _ModelSelectorSheet extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  IconData _iconForModel(ModelInfo model) {
+    if (model.isLocal) return Icons.phone_android;
+    if (UnifiedModelService.isOpenCodeModel(model.id)) return Icons.public;
+    return Icons.cloud;
   }
 }
 

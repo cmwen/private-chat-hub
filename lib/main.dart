@@ -341,8 +341,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
         final visibilityService =
             OpenCodeModelVisibilityService(prefs);
-        final openCodeLLMService =
-            OpenCodeLLMService(openCodeConnectionManager);
+        final openCodeLLMService = OpenCodeLLMService(
+          openCodeConnectionManager,
+          visibilityService: visibilityService,
+        );
 
         if (!mounted) return;
         setState(() {
@@ -471,6 +473,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   chatService: _chatService,
                   connectionService: _connectionService,
                   ollamaManager: _ollamaManager,
+                  openCodeLLMService: _openCodeLLMService,
+                  openCodeVisibilityService: _openCodeVisibilityService,
                   onConversationSelected: _onConversationSelected,
                   onNewConversation: () {},
                 ),
@@ -479,6 +483,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   chatService: _chatService,
                   connectionService: _connectionService,
                   ollamaManager: _ollamaManager,
+                  openCodeLLMService: _openCodeLLMService,
+                  openCodeVisibilityService: _openCodeVisibilityService,
                   onConversationSelected: _onConversationSelected,
                 ),
                 ModelsScreen(

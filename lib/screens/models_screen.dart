@@ -7,9 +7,8 @@ import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
 import 'package:private_chat_hub/services/opencode_llm_service.dart';
 import 'package:private_chat_hub/services/opencode_model_visibility_service.dart';
-import 'package:private_chat_hub/services/unified_model_service.dart';
 
-/// Screen for managing Ollama models.
+/// Screen for managing model availability and selection across all sources.
 class ModelsScreen extends StatefulWidget {
   final OllamaConnectionManager ollamaManager;
   final ConnectionService connectionService;
@@ -37,6 +36,9 @@ class _ModelsScreenState extends State<ModelsScreen> {
   bool _isLoading = true;
   String? _error;
   String? _selectedModel;
+  Set<String>? _visibleModelIds;
+  String _openCodeSearch = '';
+  String? _openCodeProviderFilter;
   final Map<String, _DownloadProgress> _downloadProgress = {};
 
   @override
@@ -67,20 +69,32 @@ class _ModelsScreenState extends State<ModelsScreen> {
       }
     }
 
-    try {
-      final unifiedService = UnifiedModelService(
-        onDeviceLLMService: widget.onDeviceLLMService,
-        openCodeLLMService: widget.openCodeLLMService,
-        visibilityService: widget.openCodeVisibilityService,
-      );
-      final unifiedModels = await unifiedService.getUnifiedModelList([]);
-      localModels = unifiedModels.where((model) => model.isLocal).toList();
-      openCodeModels = unifiedModels
-          .where((model) => UnifiedModelService.isOpenCodeModel(model.id))
-          .toList();
-    } catch (_) {
-      localModels = [];
-      openCodeModels = [];
+    // Models view is a management surface, so it must show all available
+    // models, not only currently-visible ones.
+    if (widget.onDeviceLLMService != null) {
+      try {
+        final downloaded = await widget.onDeviceLLMService!.modelManager
+            .getDownloadedModels();
+        localModels = downloaded
+            .map(
+              (model) => model.copyWith(
+                id: 'local:${model.id}',
+                isLocal: true,
+              ),
+            )
+            .toList();
+      } catch (_) {
+        localModels = [];
+      }
+    }
+
+    if (widget.openCodeLLMService != null) {
+      try {
+        openCodeModels = await widget.openCodeLLMService!
+            .getAvailableModelsForSelection(applyProviderFilter: false);
+      } catch (_) {
+        openCodeModels = [];
+      }
     }
 
     final hasAnyModel = remoteModels.isNotEmpty ||
@@ -105,9 +119,87 @@ class _ModelsScreenState extends State<ModelsScreen> {
       _models = remoteModels;
       _localModels = localModels;
       _openCodeModels = openCodeModels;
+      _visibleModelIds = widget.openCodeVisibilityService?.getVisibleModelIds();
       _error = !hasAnyModel && remoteError != null ? remoteError : null;
       _isLoading = false;
     });
+  }
+
+  Set<String> _allModelIds() {
+    return {
+      ..._models.map((m) => m.name),
+      ..._localModels.map((m) => m.id),
+      ..._openCodeModels.map((m) => m.id),
+    };
+  }
+
+  bool _isModelVisibleInApp(String modelId) {
+    final visible = _visibleModelIds;
+    if (visible == null) return true;
+    return visible.contains(modelId);
+  }
+
+  String _openCodeProviderForModel(String modelId) {
+    final providerModel = modelId.startsWith('opencode:')
+        ? modelId.substring('opencode:'.length)
+        : modelId;
+    final slashIndex = providerModel.indexOf('/');
+    if (slashIndex <= 0) return 'unknown';
+    return providerModel.substring(0, slashIndex);
+  }
+
+  List<String> _availableOpenCodeProviders() {
+    final providers = _openCodeModels
+        .map((model) => _openCodeProviderForModel(model.id))
+        .toSet()
+        .toList()
+      ..sort();
+    return providers;
+  }
+
+  List<ModelInfo> _filteredOpenCodeModels() {
+    final query = _openCodeSearch.trim().toLowerCase();
+    return _openCodeModels.where((model) {
+      final provider = _openCodeProviderForModel(model.id);
+      if (_openCodeProviderFilter != null && provider != _openCodeProviderFilter) {
+        return false;
+      }
+
+      if (query.isEmpty) return true;
+
+      final text = '${model.name} ${model.description} ${model.id}'
+          .toLowerCase();
+      return text.contains(query);
+    }).toList();
+  }
+
+  Future<void> _setModelVisibility(String modelId, bool visible) async {
+    final service = widget.openCodeVisibilityService;
+    if (service == null) return;
+
+    if (!visible && modelId == _selectedModel) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot hide the active model. Select another first.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final allIds = _allModelIds();
+    final nextVisible = (_visibleModelIds ?? allIds).toSet();
+
+    if (visible) {
+      nextVisible.add(modelId);
+    } else {
+      nextVisible.remove(modelId);
+    }
+
+    await service.setVisibleModelIds(nextVisible);
+    if (!mounted) return;
+    setState(() => _visibleModelIds = nextVisible);
   }
 
   Future<void> _deleteModel(OllamaModelInfo model) async {
@@ -156,23 +248,25 @@ class _ModelsScreenState extends State<ModelsScreen> {
   }
 
   Future<void> _selectModel(OllamaModelInfo model) async {
-    await widget.connectionService.setSelectedModel(model.name);
-    setState(() => _selectedModel = model.name);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${model.name} selected as active model')),
-      );
-    }
+    await _setActiveModel(model.name, model.name);
   }
 
   Future<void> _selectLocalModel(ModelInfo model) async {
-    await widget.connectionService.setSelectedModel(model.id);
-    setState(() => _selectedModel = model.id);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${model.name} selected as active model')),
-      );
-    }
+    await _setActiveModel(model.id, model.name);
+  }
+
+  Future<void> _selectOpenCodeModel(ModelInfo model) async {
+    await _setActiveModel(model.id, model.name);
+  }
+
+  Future<void> _setActiveModel(String modelId, String displayName) async {
+    await widget.connectionService.setSelectedModel(modelId);
+    if (!mounted) return;
+
+    setState(() => _selectedModel = modelId);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$displayName selected as active model')),
+    );
   }
 
   void _showPullModelDialog() {
@@ -412,10 +506,14 @@ class _ModelsScreenState extends State<ModelsScreen> {
                   ),
                   ..._localModels.map((model) {
                     final isSelected = model.id == _selectedModel;
+                    final isVisible = _isModelVisibleInApp(model.id);
                     return _LocalModelCard(
                       model: model,
                       isSelected: isSelected,
+                      isVisibleInApp: isVisible,
                       onSelect: () => _selectLocalModel(model),
+                      onToggleVisibility: (value) =>
+                          _setModelVisibility(model.id, value),
                     );
                   }),
                 ],
@@ -432,16 +530,39 @@ class _ModelsScreenState extends State<ModelsScreen> {
                   ),
                   ..._models.map((model) {
                     final isSelected = model.name == _selectedModel;
+                    final isVisible = _isModelVisibleInApp(model.name);
                     return _ModelCard(
                       model: model,
                       isSelected: isSelected,
+                      isVisibleInApp: isVisible,
                       onTap: () => _showModelDetails(model),
                       onSelect: () => _selectModel(model),
                       onDelete: () => _deleteModel(model),
+                      onToggleVisibility: (value) =>
+                          _setModelVisibility(model.name, value),
                     );
                   }),
                 ],
                 if (_openCodeModels.isNotEmpty) ...[
+                  Builder(builder: (context) {
+                    final providers = _availableOpenCodeProviders();
+                    final filtered = _filteredOpenCodeModels();
+                    final visibleCount = _openCodeModels
+                        .where((model) => _isModelVisibleInApp(model.id))
+                        .length;
+
+                    if (_openCodeProviderFilter != null &&
+                        !providers.contains(_openCodeProviderFilter)) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) {
+                          setState(() => _openCodeProviderFilter = null);
+                        }
+                      });
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                     child: Row(
@@ -458,23 +579,74 @@ class _ModelsScreenState extends State<ModelsScreen> {
                         ),
                         const Spacer(),
                         Text(
-                          '${_openCodeModels.length} visible',
+                          '$visibleCount/${_openCodeModels.length} enabled',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
                     ),
                   ),
-                  ..._openCodeModels.map((model) {
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    hintText: 'Filter OpenCode models',
+                                    prefixIcon: Icon(Icons.search),
+                                  ),
+                                  onChanged: (value) => setState(
+                                    () => _openCodeSearch = value,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              DropdownButton<String?>(
+                                value: _openCodeProviderFilter,
+                                hint: const Text('Provider'),
+                                items: [
+                                  const DropdownMenuItem<String?>(
+                                    value: null,
+                                    child: Text('All providers'),
+                                  ),
+                                  ...providers.map(
+                                    (provider) => DropdownMenuItem<String?>(
+                                      value: provider,
+                                      child: Text(provider),
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  setState(
+                                    () => _openCodeProviderFilter = value,
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                  ...filtered.map((model) {
                     final isSelected = model.id == _selectedModel;
+                    final isVisible = _isModelVisibleInApp(model.id);
                     return _OpenCodeModelCard(
                       model: model,
                       isSelected: isSelected,
-                      onSelect: () {
-                        setState(() {
-                          _selectedModel = model.id;
-                        });
-                        widget.connectionService.setSelectedModel(model.id);
-                      },
+                      isVisibleInApp: isVisible,
+                      onSelect: () => _selectOpenCodeModel(model),
+                      onToggleVisibility: (value) =>
+                          _setModelVisibility(model.id, value),
+                    );
+                  }),
+                        if (filtered.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                            child: Text(
+                              'No OpenCode models match this filter.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                      ],
                     );
                   }),
                 ],
@@ -497,12 +669,16 @@ class _DownloadProgress {
 class _LocalModelCard extends StatelessWidget {
   final ModelInfo model;
   final bool isSelected;
+  final bool isVisibleInApp;
   final VoidCallback onSelect;
+  final ValueChanged<bool> onToggleVisibility;
 
   const _LocalModelCard({
     required this.model,
     required this.isSelected,
+    required this.isVisibleInApp,
     required this.onSelect,
+    required this.onToggleVisibility,
   });
 
   @override
@@ -521,11 +697,20 @@ class _LocalModelCard extends StatelessWidget {
             color: isSelected ? Colors.white : colorScheme.onSurfaceVariant,
           ),
         ),
-        title: Text(model.name),
-        subtitle: Text(model.sizeString),
-        trailing: isSelected
-            ? const Icon(Icons.check_circle, color: Colors.green)
-            : TextButton(onPressed: onSelect, child: const Text('Set Active')),
+        title: Row(
+          children: [
+            Expanded(child: Text(model.name)),
+            if (isSelected)
+              const Icon(Icons.check_circle, color: Colors.green, size: 18),
+          ],
+        ),
+        subtitle: Text(
+          isVisibleInApp ? model.sizeString : '${model.sizeString} • Hidden',
+        ),
+        trailing: Switch.adaptive(
+          value: isVisibleInApp,
+          onChanged: onToggleVisibility,
+        ),
         onTap: onSelect,
       ),
     );
@@ -535,16 +720,20 @@ class _LocalModelCard extends StatelessWidget {
 class _ModelCard extends StatelessWidget {
   final OllamaModelInfo model;
   final bool isSelected;
+  final bool isVisibleInApp;
   final VoidCallback onTap;
   final VoidCallback onSelect;
   final VoidCallback onDelete;
+  final ValueChanged<bool> onToggleVisibility;
 
   const _ModelCard({
     required this.model,
     required this.isSelected,
+    required this.isVisibleInApp,
     required this.onTap,
     required this.onSelect,
     required this.onDelete,
+    required this.onToggleVisibility,
   });
 
   @override
@@ -607,6 +796,26 @@ class _ModelCard extends StatelessWidget {
                               ),
                             ),
                           ),
+                        if (!isVisibleInApp)
+                          Container(
+                            margin: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'Hidden',
+                              style: TextStyle(
+                                color: colorScheme.onSurfaceVariant,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -647,37 +856,46 @@ class _ModelCard extends StatelessWidget {
                   ],
                 ),
               ),
-              PopupMenuButton<String>(
-                onSelected: (value) {
-                  switch (value) {
-                    case 'select':
-                      onSelect();
-                      break;
-                    case 'delete':
-                      onDelete();
-                      break;
-                  }
-                },
-                itemBuilder: (context) => [
-                  if (!isSelected)
-                    const PopupMenuItem(
-                      value: 'select',
-                      child: ListTile(
-                        leading: Icon(Icons.check_circle),
-                        title: Text('Set as Active'),
-                        contentPadding: EdgeInsets.zero,
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Switch.adaptive(
+                    value: isVisibleInApp,
+                    onChanged: onToggleVisibility,
+                  ),
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      switch (value) {
+                        case 'select':
+                          onSelect();
+                          break;
+                        case 'delete':
+                          onDelete();
+                          break;
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      if (!isSelected)
+                        const PopupMenuItem(
+                          value: 'select',
+                          child: ListTile(
+                            leading: Icon(Icons.check_circle),
+                            title: Text('Set as Active'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: ListTile(
+                          leading: Icon(Icons.delete, color: Colors.red),
+                          title: Text(
+                            'Delete',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ),
-                    ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: ListTile(
-                      leading: Icon(Icons.delete, color: Colors.red),
-                      title: Text(
-                        'Delete',
-                        style: TextStyle(color: Colors.red),
-                      ),
-                      contentPadding: EdgeInsets.zero,
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -1142,12 +1360,16 @@ class _DetailRow extends StatelessWidget {
 class _OpenCodeModelCard extends StatelessWidget {
   final ModelInfo model;
   final bool isSelected;
+  final bool isVisibleInApp;
   final VoidCallback onSelect;
+  final ValueChanged<bool> onToggleVisibility;
 
   const _OpenCodeModelCard({
     required this.model,
     required this.isSelected,
+    required this.isVisibleInApp,
     required this.onSelect,
+    required this.onToggleVisibility,
   });
 
   @override
@@ -1222,6 +1444,17 @@ class _OpenCodeModelCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (!isVisibleInApp)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          'Hidden in app selectors',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
                     if (model.capabilities.length > 1) ...[
                       const SizedBox(height: 4),
                       Wrap(
@@ -1241,8 +1474,21 @@ class _OpenCodeModelCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (isSelected)
-                Icon(Icons.check_circle, color: colorScheme.primary, size: 20),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isSelected)
+                    Icon(
+                      Icons.check_circle,
+                      color: colorScheme.primary,
+                      size: 20,
+                    ),
+                  Switch.adaptive(
+                    value: isVisibleInApp,
+                    onChanged: onToggleVisibility,
+                  ),
+                ],
+              ),
             ],
           ),
         ),
