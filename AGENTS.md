@@ -1,8 +1,8 @@
 # Agent Configuration and Instructions
 
-This document provides guidance for AI agents and automated tools working with this Android Flutter template repository.
+This document provides guidance for AI agents and automated tools working with this Android Flutter repository. It serves as the primary rules file for both [OpenCode](https://opencode.ai) and GitHub Copilot.
 
-## 🎯 Quick Reference for AI Agents
+## Quick Reference for AI Agents
 
 **First-Time Users**: Direct them to [GETTING_STARTED.md](GETTING_STARTED.md) for complete setup guide.
 
@@ -17,39 +17,51 @@ This document provides guidance for AI agents and automated tools working with t
 
 ## Repository Overview
 
-This is a production-ready Android Flutter template with AI-powered development workflow, optimized build system (Java 17, parallel builds, caching), and comprehensive CI/CD. All agents have access to VS Code tools including terminal, debugger, test runner, and codebase explorer.
+This is **Private Chat Hub** - a privacy-first Android app for chatting with self-hosted AI models via Ollama. Built with Flutter, it features an optimized build system (Java 17, parallel builds, caching), comprehensive CI/CD, and AI-powered development workflow.
 
-## AI Agents Overview
+## AI Agent Tooling
 
-This template includes 6 specialized GitHub Copilot agents:
+This project supports two AI agent platforms with parallel configurations:
 
-| Agent | Tools | Purpose |
-|-------|-------|---------|
-| **@product-owner** | edit, search, fetch, githubRepo, codebase, terminal | Define features, requirements, user stories |
-| **@experience-designer** | edit, search, fetch, githubRepo, codebase, terminal | Design UX, user flows, wireframes |
-| **@architect** | edit, search, context7, fetch, githubRepo, codebase, terminal | Plan architecture, technical decisions |
-| **@researcher** | edit, search, fetch, context7, githubRepo, codebase, terminal | Research packages, best practices |
-| **@flutter-developer** | edit, search, terminal, runTests, debugger, problems, changes, context7, codebase | Implement features, write tests, debug |
-| **@doc-writer** | edit, search, context7, fetch, githubRepo, codebase, terminal | Create documentation, guides |
+| Platform | Config | Agents | Skills/Commands |
+|----------|--------|--------|-----------------|
+| **OpenCode** | `opencode.json` + `.opencode/` | `.opencode/agents/*.md` | `.opencode/skills/`, `.opencode/commands/` (in opencode.json) |
+| **GitHub Copilot** | `.github/agents/*.agent.md` | `.github/agents/` | `.github/skills/` |
 
-**All agents have terminal access** - They can run Flutter commands, tests, builds, and formatting.
+### OpenCode Setup
 
-## Agent Skills
+OpenCode reads this `AGENTS.md` file automatically as project rules. Additional configuration:
 
-In addition to role-based agents, this project includes **Agent Skills** - specialized, reusable workflows for specific tasks. Skills are automatically discovered by GitHub Copilot.
+- **Config**: `opencode.json` - formatter, custom commands, instruction files
+- **Agents**: `.opencode/agents/` - 6 specialized agents (flutter-developer, architect, researcher, product-owner, experience-designer, doc-writer)
+- **Skills**: `.opencode/skills/` - 4 skills (build-fix, android-debug, ci-debug, icon-generation)
+- **Commands**: `/test`, `/build`, `/analyze`, `/fix`, `/clean`, `/check`
 
-### Available Skills
+Switch agents with **Tab** in the TUI. Use `@agent-name` to invoke subagents. Use `/command` for quick actions.
+
+### GitHub Copilot Agents
+
+6 specialized agents in `.github/agents/`:
+
+| Agent | Purpose |
+|-------|---------|
+| **@product-owner** | Define features, requirements, user stories |
+| **@experience-designer** | Design UX, user flows, wireframes |
+| **@architect** | Plan architecture, technical decisions |
+| **@researcher** | Research packages, best practices |
+| **@flutter-developer** | Implement features, write tests, debug |
+| **@doc-writer** | Create documentation, guides |
+
+### Skills (Both Platforms)
 
 | Skill | Purpose | When to Use |
 |-------|---------|-------------|
-| **icon-generation** | Generate app icons and launcher assets | Creating UI or launcher icons, setting up flutter_launcher_icons |
+| **build-fix** | Diagnose build failures | Gradle errors, dependency conflicts, compilation issues |
 | **android-debug** | Debug Android app issues | App crashes, device issues, performance problems |
 | **ci-debug** | Fix GitHub Actions failures | Workflow failures, CI-specific build errors |
-| **build-fix** | Diagnose build failures | Gradle errors, dependency conflicts, compilation issues |
+| **icon-generation** | Generate app icons and launcher assets | Creating UI or launcher icons |
 
-**Location**: `.github/skills/` - Each skill has a `SKILL.md` with structured workflows and examples.
-
-**Learn more**: See [`.github/skills/README.md`](.github/skills/README.md) for complete documentation.
+**OpenCode location**: `.opencode/skills/` | **Copilot location**: `.github/skills/`
 
 ## Key Technologies
 
@@ -76,12 +88,16 @@ In addition to role-based agents, this project includes **Agent Skills** - speci
 │   │   └── persist-credentials.sh  # Persist auto-generated credentials
 │   ├── setup/              # Setup scripts
 │   └── release/            # Release scripts
-├── .github/                # CI/CD workflows and agents
+├── .opencode/              # OpenCode AI agent configuration
+│   ├── agents/             # Specialized agents (flutter-developer, architect, etc.)
+│   └── skills/             # Reusable skills (build-fix, android-debug, etc.)
+├── opencode.json           # OpenCode config (formatter, commands, instructions)
+├── .github/                # CI/CD workflows and Copilot agents
 │   ├── workflows/          # GitHub Actions
 │   ├── actions/            # Custom composite actions
 │   │   └── setup-signing/  # Auto-generate or use existing keystore
 │   ├── agents/             # Copilot Chat agents
-│   ├── skills/             # Agent skills (task-specific workflows)
+│   ├── skills/             # Copilot agent skills (task-specific workflows)
 │   └── prompts/            # Copilot custom prompts (legacy)
 ├── audit/                  # LLM-generated implementation summaries and logs
 └── pubspec.yaml            # Dependencies and project config

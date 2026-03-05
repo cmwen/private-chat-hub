@@ -655,6 +655,7 @@ Semantics(
 ## Related Documents
 
 - [UX_DESIGN.md](UX_DESIGN.md) - Complete wireframes and specifications
+- [UX_DESIGN_OPENCODE_PROVIDER_INTEGRATION.md](UX_DESIGN_OPENCODE_PROVIDER_INTEGRATION.md) - OpenCode provider UX design
 - [USER_FLOWS.md](USER_FLOWS.md) - Visual user flow diagrams
 - [USER_PERSONAS.md](USER_PERSONAS.md) - Target user definitions
 - [PRODUCT_REQUIREMENTS.md](PRODUCT_REQUIREMENTS.md) - Functional requirements

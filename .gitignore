@@ -49,3 +49,6 @@ app.*.map.json
 *.keystore
 android/key.properties
 signing-credentials.json
+
+# OpenCode session data
+.sisyphus/
