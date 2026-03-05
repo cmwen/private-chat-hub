@@ -992,6 +992,7 @@ class ChatService {
       isMe: false,
       role: MessageRole.assistant,
       timestamp: DateTime.now(),
+      isStreaming: true,
     );
 
     conversation = conversation.copyWith(
@@ -1034,7 +1035,21 @@ class ChatService {
         yield conversation;
       }
 
-      // Final save
+      // Final save with isStreaming set to false
+      final finalMessage = assistantMessage.copyWith(
+        text: buffer.toString(),
+        isStreaming: false,
+      );
+      
+      final finalMessages = conversation.messages
+          .map((m) => m.id == assistantMessageId ? finalMessage : m)
+          .toList();
+      
+      conversation = conversation.copyWith(
+        messages: finalMessages,
+        updatedAt: DateTime.now(),
+      );
+      
       await updateConversation(conversation);
       _log('OpenCode response complete: ${buffer.length} chars');
     } catch (e) {
@@ -1044,6 +1059,7 @@ class ChatService {
         text: buffer.isEmpty
             ? 'Error: $e'
             : '${buffer.toString()}\n\n[Error: $e]',
+        isStreaming: false,
       );
 
       final messages = conversation.messages

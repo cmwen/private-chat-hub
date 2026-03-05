@@ -735,7 +735,44 @@ class _ModelSelectorSheet extends StatelessWidget {
                             ),
                           ),
                         ],
-                        if (!model.isLocal && !isOllamaOnline) ...[
+                        if (UnifiedModelService.isOpenCodeModel(model.id)) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: Colors.blue.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.hub,
+                                  size: 14,
+                                  color: Colors.blue,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'OPENCODE',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (!model.isLocal &&
+                            !UnifiedModelService.isOpenCodeModel(model.id) &&
+                            !isOllamaOnline) ...[
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -781,6 +818,14 @@ class _ModelSelectorSheet extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.orange.shade700,
+                            ),
+                          )
+                        else if (UnifiedModelService.isOpenCodeModel(model.id))
+                          Text(
+                            'Cloud model via OpenCode',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blue.shade700,
                             ),
                           )
                         else

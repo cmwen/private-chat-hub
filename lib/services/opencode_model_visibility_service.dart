@@ -82,10 +82,16 @@ class OpenCodeModelVisibilityService {
   bool isModelVisible(String modelId) {
     final visible = getVisibleModelIds();
     if (visible == null) {
-      // Not initialized — show all model sources by default.
-      return true;
+      // Not initialized — OpenCode models are hidden by default,
+      // all other sources (Ollama, on-device) are shown.
+      return !_isOpenCodeModel(modelId);
     }
     return visible.contains(modelId);
+  }
+
+  /// Check if a model ID is an OpenCode model.
+  static bool _isOpenCodeModel(String modelId) {
+    return modelId.startsWith('opencode:');
   }
 
   /// Check if an OpenCode provider is visible.
