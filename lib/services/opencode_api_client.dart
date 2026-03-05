@@ -91,9 +91,10 @@ class OpenCodeApiClient {
 
   /// Create a new session.
   Future<Map<String, dynamic>> createSession({String? title}) async {
-    final response = await _post('/session', body: {
-      if (title != null) 'title': title,
-    });
+    final response = await _post(
+      '/session',
+      body: {if (title != null) 'title': title},
+    );
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw OpenCodeApiException(
         'Failed to create session',
@@ -209,8 +210,9 @@ class OpenCodeApiClient {
       }
 
       String buffer = '';
-      await for (final chunk
-          in streamedResponse.stream.transform(utf8.decoder)) {
+      await for (final chunk in streamedResponse.stream.transform(
+        utf8.decoder,
+      )) {
         buffer += chunk;
 
         // Parse SSE events from buffer
@@ -274,8 +276,7 @@ class OpenCodeApiClient {
   }) async {
     _ensureConnection();
     final url = Uri.parse('$baseUrl$path');
-    final requestTimeout =
-        longTimeout ? const Duration(minutes: 5) : timeout;
+    final requestTimeout = longTimeout ? const Duration(minutes: 5) : timeout;
     return _httpClient!
         .post(url, headers: _headers, body: jsonEncode(body ?? {}))
         .timeout(requestTimeout);
@@ -325,13 +326,19 @@ class OpenCodeApiException implements Exception {
   final int statusCode;
   final String? responseBody;
 
-  const OpenCodeApiException(this.message, this.statusCode, [this.responseBody]);
+  const OpenCodeApiException(
+    this.message,
+    this.statusCode, [
+    this.responseBody,
+  ]);
 
   @override
   String toString() {
     final buffer = StringBuffer('OpenCodeApiException($statusCode): $message');
     if (responseBody != null && responseBody!.trim().isNotEmpty) {
-      buffer..write(' - ')..write(responseBody!.trim());
+      buffer
+        ..write(' - ')
+        ..write(responseBody!.trim());
     }
     return buffer.toString();
   }

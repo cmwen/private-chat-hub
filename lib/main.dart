@@ -332,15 +332,14 @@ class _HomeScreenState extends State<HomeScreen> {
       // Initialize OpenCode service
       try {
         final openCodeConnectionManager = OpenCodeConnectionManager();
-        final savedConnection =
-            await openCodeConnectionManager.loadConnection();
+        final savedConnection = await openCodeConnectionManager
+            .loadConnection();
 
         if (savedConnection != null) {
           await openCodeConnectionManager.setConnection(savedConnection);
         }
 
-        final visibilityService =
-            OpenCodeModelVisibilityService(prefs);
+        final visibilityService = OpenCodeModelVisibilityService(prefs);
         final openCodeLLMService = OpenCodeLLMService(
           openCodeConnectionManager,
           visibilityService: visibilityService,

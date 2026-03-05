@@ -1010,9 +1010,7 @@ class ChatService {
         modelId: modelId,
         conversationHistory: conversation.messages
             .where(
-              (m) =>
-                  m.id != assistantMessageId &&
-                  m.role != MessageRole.system,
+              (m) => m.id != assistantMessageId && m.role != MessageRole.system,
             )
             .toList(),
         systemPrompt: conversation.systemPrompt,
@@ -1040,16 +1038,16 @@ class ChatService {
         text: buffer.toString(),
         isStreaming: false,
       );
-      
+
       final finalMessages = conversation.messages
           .map((m) => m.id == assistantMessageId ? finalMessage : m)
           .toList();
-      
+
       conversation = conversation.copyWith(
         messages: finalMessages,
         updatedAt: DateTime.now(),
       );
-      
+
       await updateConversation(conversation);
       _log('OpenCode response complete: ${buffer.length} chars');
     } catch (e) {
@@ -1354,9 +1352,7 @@ class ChatService {
           'OpenCode service is not configured. Please set up an OpenCode connection in Settings.',
         );
       }
-      _log(
-        'Routing sendMessageWithContext to OpenCode inference',
-      );
+      _log('Routing sendMessageWithContext to OpenCode inference');
       yield* _sendMessageOpenCode(
         conversationId,
         lastUserText(conversation),

@@ -13,11 +13,14 @@ void main() {
   });
 
   group('OpenCodeModelVisibilityService model visibility', () {
-    test('shows all models by default before initialization', () {
-      expect(service.isModelVisible('llama3.2:latest'), isTrue);
-      expect(service.isModelVisible('local:gemma3-1b'), isTrue);
-      expect(service.isModelVisible('opencode:copilot/gpt-4o'), isTrue);
-    });
+    test(
+      'shows non-OpenCode models and hides OpenCode models before initialization',
+      () {
+        expect(service.isModelVisible('llama3.2:latest'), isTrue);
+        expect(service.isModelVisible('local:gemma3-1b'), isTrue);
+        expect(service.isModelVisible('opencode:copilot/gpt-4o'), isFalse);
+      },
+    );
 
     test('toggles model visibility after initialization', () async {
       const modelId = 'opencode:copilot/gpt-4o';
@@ -41,18 +44,21 @@ void main() {
   });
 
   group('OpenCodeModelVisibilityService provider visibility', () {
-    test('defaults to connected providers when no explicit provider filter', () {
-      final connected = {'copilot'};
+    test(
+      'defaults to connected providers when no explicit provider filter',
+      () {
+        final connected = {'copilot'};
 
-      expect(
-        service.isProviderVisible('copilot', connectedProviders: connected),
-        isTrue,
-      );
-      expect(
-        service.isProviderVisible('anthropic', connectedProviders: connected),
-        isFalse,
-      );
-    });
+        expect(
+          service.isProviderVisible('copilot', connectedProviders: connected),
+          isTrue,
+        );
+        expect(
+          service.isProviderVisible('anthropic', connectedProviders: connected),
+          isFalse,
+        );
+      },
+    );
 
     test('uses explicit provider filter when configured', () async {
       await service.setVisibleProviderIds({'anthropic'});

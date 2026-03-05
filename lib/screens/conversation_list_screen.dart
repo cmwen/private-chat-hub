@@ -752,11 +752,7 @@ class _ModelSelectorSheet extends StatelessWidget {
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  Icons.hub,
-                                  size: 14,
-                                  color: Colors.blue,
-                                ),
+                                Icon(Icons.hub, size: 14, color: Colors.blue),
                                 SizedBox(width: 4),
                                 Text(
                                   'OPENCODE',

@@ -56,7 +56,7 @@ class OpenCodeConnectionManager {
 
   /// Test a connection configuration without setting it as active.
   Future<({bool healthy, String? version, int? modelCount})>
-      testConnectionConfig(OpenCodeConnection connection) async {
+  testConnectionConfig(OpenCodeConnection connection) async {
     final testClient = OpenCodeApiClient();
     testClient.setConnection(connection);
     try {

@@ -98,10 +98,7 @@ class OpenCodeModelVisibilityService {
   ///
   /// If no explicit provider filters are configured yet, this defaults to
   /// connected providers when available, otherwise all providers.
-  bool isProviderVisible(
-    String providerId, {
-    Set<String>? connectedProviders,
-  }) {
+  bool isProviderVisible(String providerId, {Set<String>? connectedProviders}) {
     final visible = getVisibleProviderIds();
     if (visible != null) {
       return visible.contains(providerId);
@@ -125,8 +122,9 @@ class OpenCodeModelVisibilityService {
 
   /// Set visibility to recommended defaults.
   Future<void> showRecommended(List<String> allModelIds) async {
-    final recommended =
-        allModelIds.where((id) => _isRecommendedModel(id)).toSet();
+    final recommended = allModelIds
+        .where((id) => _isRecommendedModel(id))
+        .toSet();
     await setVisibleModelIds(recommended);
   }
 
