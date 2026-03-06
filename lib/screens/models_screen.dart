@@ -202,6 +202,61 @@ class _ModelsScreenState extends State<ModelsScreen> {
     setState(() => _visibleModelIds = nextVisible);
   }
 
+  /// Hides all [models] from the in-app model selector.
+  ///
+  /// The currently active model is skipped — it cannot be hidden.  A snackbar
+  /// is shown to inform the user if the active model was excluded.
+  Future<void> _deselectAllOpenCodeModels(List<ModelInfo> models) async {
+    final service = widget.openCodeVisibilityService;
+    if (service == null) return;
+
+    final allIds = _allModelIds();
+    final nextVisible = (_visibleModelIds ?? allIds).toSet();
+
+    // Keep the active model visible — it cannot be hidden.
+    // If the active model is found in the list, skip it and flag the user.
+    bool activeSkipped = false;
+    for (final model in models) {
+      if (model.id == _selectedModel) {
+        activeSkipped = true; // skip, leave it in nextVisible
+      } else {
+        nextVisible.remove(model.id);
+      }
+    }
+
+    await service.setVisibleModelIds(nextVisible);
+    if (!mounted) return;
+    setState(() => _visibleModelIds = nextVisible);
+
+    if (activeSkipped) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Active model kept visible. Select another model first to hide it.',
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  }
+
+  /// Makes all [models] visible in the in-app model selector.
+  Future<void> _selectAllOpenCodeModels(List<ModelInfo> models) async {
+    final service = widget.openCodeVisibilityService;
+    if (service == null) return;
+
+    final allIds = _allModelIds();
+    final nextVisible = (_visibleModelIds ?? allIds).toSet();
+
+    for (final model in models) {
+      nextVisible.add(model.id);
+    }
+
+    await service.setVisibleModelIds(nextVisible);
+    if (!mounted) return;
+    setState(() => _visibleModelIds = nextVisible);
+  }
+
   Future<void> _deleteModel(OllamaModelInfo model) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -600,6 +655,35 @@ class _ModelsScreenState extends State<ModelsScreen> {
                                 Text(
                                   '$visibleCount/${_openCodeModels.length} enabled',
                                   style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                TextButton.icon(
+                                  onPressed: () =>
+                                      _selectAllOpenCodeModels(filtered),
+                                  icon: const Icon(Icons.check_box, size: 16),
+                                  label: const Text('Select All'),
+                                  style: TextButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  onPressed: () =>
+                                      _deselectAllOpenCodeModels(filtered),
+                                  icon: const Icon(
+                                    Icons.check_box_outline_blank,
+                                    size: 16,
+                                  ),
+                                  label: const Text('Deselect All'),
+                                  style: TextButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                  ),
                                 ),
                               ],
                             ),
