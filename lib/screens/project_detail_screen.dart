@@ -466,11 +466,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.psychology,
-                          color: _project.color,
-                          size: 20,
-                        ),
+                        Icon(Icons.psychology, color: _project.color, size: 20),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
@@ -499,8 +495,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                         ),
                         Icon(
                           Icons.chevron_right,
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           size: 20,
                         ),
                       ],

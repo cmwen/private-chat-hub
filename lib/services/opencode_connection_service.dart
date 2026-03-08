@@ -23,7 +23,9 @@ class OpenCodeConnectionService {
     try {
       final List<dynamic> jsonList = jsonDecode(jsonString) as List<dynamic>;
       return jsonList
-          .map((json) => OpenCodeConnection.fromJson(json as Map<String, dynamic>))
+          .map(
+            (json) => OpenCodeConnection.fromJson(json as Map<String, dynamic>),
+          )
           .toList();
     } catch (_) {
       return [];
@@ -91,7 +93,9 @@ class OpenCodeConnectionService {
       orElse: () => throw Exception('Connection not found'),
     );
 
-    connections = connections.where((connection) => connection.id != id).toList();
+    connections = connections
+        .where((connection) => connection.id != id)
+        .toList();
 
     if (deletedConnection.isDefault) {
       if (connections.isNotEmpty) {
@@ -108,7 +112,9 @@ class OpenCodeConnectionService {
   Future<void> setDefaultConnection(String id) async {
     final connections = getConnections();
     final updatedConnections = connections
-        .map((connection) => connection.copyWith(isDefault: connection.id == id))
+        .map(
+          (connection) => connection.copyWith(isDefault: connection.id == id),
+        )
         .toList();
 
     await _saveConnections(updatedConnections);
@@ -122,7 +128,9 @@ class OpenCodeConnectionService {
     final defaultId = _prefs.getString(_defaultConnectionKey);
     if (defaultId != null) {
       try {
-        return connections.firstWhere((connection) => connection.id == defaultId);
+        return connections.firstWhere(
+          (connection) => connection.id == defaultId,
+        );
       } catch (_) {}
     }
 
@@ -158,10 +166,7 @@ class OpenCodeConnectionService {
         id: legacy.id == 'default' ? const Uuid().v4() : legacy.id,
         isDefault: true,
       );
-      _prefs.setString(
-        _connectionsKey,
-        jsonEncode([migrated.toJson()]),
-      );
+      _prefs.setString(_connectionsKey, jsonEncode([migrated.toJson()]));
       _prefs.setString(_defaultConnectionKey, migrated.id);
       _prefs.remove(_legacyConnectionKey);
     } catch (_) {}

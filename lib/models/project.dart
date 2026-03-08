@@ -108,9 +108,7 @@ class Project {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isPinned: isPinned ?? this.isPinned,
-      modelName: modelName == _sentinel
-          ? this.modelName
-          : modelName as String?,
+      modelName: modelName == _sentinel ? this.modelName : modelName as String?,
     );
   }
 

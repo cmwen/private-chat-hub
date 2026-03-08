@@ -31,13 +31,22 @@ void main() {
 
     test('setDefaultConnection updates stored default', () async {
       final first = await service.addConnection(name: 'One', host: 'one.local');
-      final second = await service.addConnection(name: 'Two', host: 'two.local');
+      final second = await service.addConnection(
+        name: 'Two',
+        host: 'two.local',
+      );
 
       await service.setDefaultConnection(second.id);
 
       final connections = service.getConnections();
-      expect(connections.firstWhere((c) => c.id == first.id).isDefault, isFalse);
-      expect(connections.firstWhere((c) => c.id == second.id).isDefault, isTrue);
+      expect(
+        connections.firstWhere((c) => c.id == first.id).isDefault,
+        isFalse,
+      );
+      expect(
+        connections.firstWhere((c) => c.id == second.id).isDefault,
+        isTrue,
+      );
       expect(service.getDefaultConnection()?.id, second.id);
     });
 
@@ -59,7 +68,10 @@ void main() {
     });
 
     test('updateLastConnected stamps the connection', () async {
-      final connection = await service.addConnection(name: 'One', host: 'one.local');
+      final connection = await service.addConnection(
+        name: 'One',
+        host: 'one.local',
+      );
 
       await service.updateLastConnected(connection.id);
 

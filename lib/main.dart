@@ -347,7 +347,9 @@ class _HomeScreenState extends State<HomeScreen> {
             .getDefaultConnection();
 
         if (savedLmStudioConnection != null) {
-          await lmStudioConnectionManager.setConnection(savedLmStudioConnection);
+          await lmStudioConnectionManager.setConnection(
+            savedLmStudioConnection,
+          );
         }
 
         final lmStudioLLMService = LmStudioLLMService(
@@ -356,7 +358,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
         final openCodeConnectionService = OpenCodeConnectionService(prefs);
         final openCodeConnectionManager = OpenCodeConnectionManager();
-        final savedConnection = openCodeConnectionService.getDefaultConnection();
+        final savedConnection = openCodeConnectionService
+            .getDefaultConnection();
 
         if (savedConnection != null) {
           await openCodeConnectionManager.setConnection(savedConnection);

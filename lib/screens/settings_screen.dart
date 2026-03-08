@@ -1886,8 +1886,10 @@ class _OpenCodeConnectionsListState extends State<_OpenCodeConnectionsList> {
     await manager.setConnection(defaultConnection);
   }
 
-  Future<void> _saveConnection(OpenCodeConnectionDraft draft,
-      {OpenCodeConnection? existing}) async {
+  Future<void> _saveConnection(
+    OpenCodeConnectionDraft draft, {
+    OpenCodeConnection? existing,
+  }) async {
     final service = widget.connectionService;
     if (service == null) return;
 
@@ -2030,7 +2032,9 @@ class _OpenCodeConnectionsListState extends State<_OpenCodeConnectionsList> {
             onTest: () => _testConnection(connection),
             onEdit: () => _showConnectionDialog(existing: connection),
             onDelete: () => _deleteConnection(connection),
-            onSetDefault: connection.isDefault ? null : () => _setDefault(connection),
+            onSetDefault: connection.isDefault
+                ? null
+                : () => _setDefault(connection),
           ),
         ),
         Padding(
@@ -2092,8 +2096,10 @@ class _LmStudioConnectionsListState extends State<_LmStudioConnectionsList> {
     await manager.setConnection(defaultConnection);
   }
 
-  Future<void> _saveConnection(LmStudioConnectionDraft draft,
-      {LmStudioConnection? existing}) async {
+  Future<void> _saveConnection(
+    LmStudioConnectionDraft draft, {
+    LmStudioConnection? existing,
+  }) async {
     final service = widget.connectionService;
     if (service == null) return;
 
@@ -2213,8 +2219,7 @@ class _LmStudioConnectionsListState extends State<_LmStudioConnectionsList> {
       return _EmptyProviderConnectionsCard(
         icon: Icons.memory,
         title: 'No LM Studio servers',
-        subtitle:
-            'Add an LM Studio server to browse and use its local models.',
+        subtitle: 'Add an LM Studio server to browse and use its local models.',
         buttonLabel: 'Add Server',
         onPressed: _showConnectionDialog,
       );
@@ -2233,7 +2238,9 @@ class _LmStudioConnectionsListState extends State<_LmStudioConnectionsList> {
             onTest: () => _testConnection(connection),
             onEdit: () => _showConnectionDialog(existing: connection),
             onDelete: () => _deleteConnection(connection),
-            onSetDefault: connection.isDefault ? null : () => _setDefault(connection),
+            onSetDefault: connection.isDefault
+                ? null
+                : () => _setDefault(connection),
           ),
         ),
         Padding(
@@ -2275,11 +2282,7 @@ class _EmptyProviderConnectionsCard extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            Icon(
-              icon,
-              size: 48,
-              color: Theme.of(context).colorScheme.outline,
-            ),
+            Icon(icon, size: 48, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 16),
             Text(title, style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 8),
@@ -2393,19 +2396,13 @@ class _SavedServerCard extends StatelessWidget {
                   value: 'test',
                   child: Text('Test Connection'),
                 ),
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Text('Edit'),
-                ),
+                const PopupMenuItem(value: 'edit', child: Text('Edit')),
                 if (onSetDefault != null)
                   const PopupMenuItem(
                     value: 'default',
                     child: Text('Set as Default'),
                   ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Text('Delete'),
-                ),
+                const PopupMenuItem(value: 'delete', child: Text('Delete')),
               ],
             ),
           ),
@@ -2486,7 +2483,9 @@ class _OpenCodeConnectionDialogState extends State<_OpenCodeConnectionDialog> {
     super.initState();
     final existing = widget.existing;
     _nameController = TextEditingController(text: existing?.name ?? 'OpenCode');
-    _hostController = TextEditingController(text: existing?.host ?? '127.0.0.1');
+    _hostController = TextEditingController(
+      text: existing?.host ?? '127.0.0.1',
+    );
     _portController = TextEditingController(
       text: (existing?.port ?? 4096).toString(),
     );
@@ -2519,7 +2518,9 @@ class _OpenCodeConnectionDialogState extends State<_OpenCodeConnectionDialog> {
         username: _usernameController.text.trim().isEmpty
             ? null
             : _usernameController.text.trim(),
-        password: _passwordController.text.isEmpty ? null : _passwordController.text,
+        password: _passwordController.text.isEmpty
+            ? null
+            : _passwordController.text,
       ),
     );
   }
@@ -2538,15 +2539,17 @@ class _OpenCodeConnectionDialogState extends State<_OpenCodeConnectionDialog> {
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(labelText: 'Server Name'),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty ? 'Enter a name' : null,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Enter a name'
+                    : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _hostController,
                 decoration: const InputDecoration(labelText: 'Host'),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty ? 'Enter a host' : null,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Enter a host'
+                    : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -2583,10 +2586,7 @@ class _OpenCodeConnectionDialogState extends State<_OpenCodeConnectionDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
-        FilledButton(
-          onPressed: _save,
-          child: const Text('Save'),
-        ),
+        FilledButton(onPressed: _save, child: const Text('Save')),
       ],
     );
   }
@@ -2630,8 +2630,12 @@ class _LmStudioConnectionDialogState extends State<_LmStudioConnectionDialog> {
   void initState() {
     super.initState();
     final existing = widget.existing;
-    _nameController = TextEditingController(text: existing?.name ?? 'LM Studio');
-    _hostController = TextEditingController(text: existing?.host ?? '127.0.0.1');
+    _nameController = TextEditingController(
+      text: existing?.name ?? 'LM Studio',
+    );
+    _hostController = TextEditingController(
+      text: existing?.host ?? '127.0.0.1',
+    );
     _portController = TextEditingController(
       text: (existing?.port ?? 1234).toString(),
     );
@@ -2678,15 +2682,17 @@ class _LmStudioConnectionDialogState extends State<_LmStudioConnectionDialog> {
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(labelText: 'Server Name'),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty ? 'Enter a name' : null,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Enter a name'
+                    : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _hostController,
                 decoration: const InputDecoration(labelText: 'Host'),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty ? 'Enter a host' : null,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Enter a host'
+                    : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -2716,10 +2722,7 @@ class _LmStudioConnectionDialogState extends State<_LmStudioConnectionDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
-        FilledButton(
-          onPressed: _save,
-          child: const Text('Save'),
-        ),
+        FilledButton(onPressed: _save, child: const Text('Save')),
       ],
     );
   }
