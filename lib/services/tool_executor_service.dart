@@ -44,15 +44,20 @@ class ToolExecutorService {
   List<Tool> getAvailableTools() {
     final tools = <Tool>[];
 
-    // Always available
-    tools.add(AvailableTools.currentDateTime);
-    tools.add(AvailableTools.getCurrentLocation);
-    tools.add(AvailableTools.fetchUrl);
-    tools.add(AvailableTools.showNotification);
-    _debugLog(
-      '✔ Base tools added: get_current_datetime, get_current_location, '
-      'fetch_url, show_notification',
-    );
+    // Base tools — each can be individually enabled or disabled.
+    void addBaseToolIfEnabled(Tool tool) {
+      if (config.isBaseToolEnabled(tool.name)) {
+        tools.add(tool);
+        _debugLog('✔ Base tool enabled: ${tool.name}');
+      } else {
+        _debugLog('✗ Base tool disabled by user: ${tool.name}');
+      }
+    }
+
+    addBaseToolIfEnabled(AvailableTools.currentDateTime);
+    addBaseToolIfEnabled(AvailableTools.getCurrentLocation);
+    addBaseToolIfEnabled(AvailableTools.fetchUrl);
+    addBaseToolIfEnabled(AvailableTools.showNotification);
 
     // Requires Jina API key
     if (config.webSearchAvailable) {

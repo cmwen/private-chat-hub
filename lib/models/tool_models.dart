@@ -314,6 +314,20 @@ class ToolConfig {
   /// TTS speech rate (0.0 to 1.0, where 0.5 is normal speed).
   final double ttsSpeed;
 
+  /// Set of base tool names that are individually enabled.
+  ///
+  /// When null, all base tools are enabled (backward-compatible default).
+  /// When non-null, only the named tools in this set are active.
+  final Set<String>? enabledBaseTools;
+
+  /// Names of the base (always-available) tools that can be toggled.
+  static const Set<String> defaultEnabledBaseTools = {
+    'get_current_datetime',
+    'get_current_location',
+    'fetch_url',
+    'show_notification',
+  };
+
   const ToolConfig({
     this.enabled = true,
     this.webSearchEnabled = false,
@@ -322,6 +336,7 @@ class ToolConfig {
     this.cacheSearchResults = true,
     this.maxToolCalls = 20,
     this.ttsSpeed = 0.5,
+    this.enabledBaseTools,
   });
 
   /// Whether web search is available (enabled and has API key).
@@ -331,6 +346,12 @@ class ToolConfig {
       jinaApiKey != null &&
       jinaApiKey!.isNotEmpty;
 
+  /// Whether the given base tool name is enabled.
+  bool isBaseToolEnabled(String toolName) {
+    if (enabledBaseTools == null) return true; // null = all enabled
+    return enabledBaseTools!.contains(toolName);
+  }
+
   ToolConfig copyWith({
     bool? enabled,
     bool? webSearchEnabled,
@@ -339,6 +360,8 @@ class ToolConfig {
     bool? cacheSearchResults,
     int? maxToolCalls,
     double? ttsSpeed,
+    Set<String>? enabledBaseTools,
+    bool clearEnabledBaseTools = false,
   }) {
     return ToolConfig(
       enabled: enabled ?? this.enabled,
@@ -348,10 +371,18 @@ class ToolConfig {
       cacheSearchResults: cacheSearchResults ?? this.cacheSearchResults,
       maxToolCalls: maxToolCalls ?? this.maxToolCalls,
       ttsSpeed: ttsSpeed ?? this.ttsSpeed,
+      enabledBaseTools: clearEnabledBaseTools
+          ? null
+          : (enabledBaseTools ?? this.enabledBaseTools),
     );
   }
 
   factory ToolConfig.fromJson(Map<String, dynamic> json) {
+    Set<String>? enabledBaseTools;
+    final raw = json['enabledBaseTools'];
+    if (raw is List) {
+      enabledBaseTools = Set<String>.from(raw.whereType<String>());
+    }
     return ToolConfig(
       enabled: json['enabled'] as bool? ?? false,
       webSearchEnabled: json['webSearchEnabled'] as bool? ?? false,
@@ -360,6 +391,7 @@ class ToolConfig {
       cacheSearchResults: json['cacheSearchResults'] as bool? ?? true,
       maxToolCalls: json['maxToolCalls'] as int? ?? 20,
       ttsSpeed: (json['ttsSpeed'] as num?)?.toDouble() ?? 0.5,
+      enabledBaseTools: enabledBaseTools,
     );
   }
 
@@ -372,6 +404,8 @@ class ToolConfig {
       'cacheSearchResults': cacheSearchResults,
       'maxToolCalls': maxToolCalls,
       'ttsSpeed': ttsSpeed,
+      if (enabledBaseTools != null)
+        'enabledBaseTools': enabledBaseTools!.toList(),
     };
   }
 }

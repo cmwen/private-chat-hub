@@ -46,6 +46,22 @@ class _ToolSettingsWidgetState extends State<ToolSettingsWidget> {
     widget.onConfigChanged(updater(widget.config));
   }
 
+  /// Returns the enabled base tools set, falling back to defaults when null.
+  Set<String> get _enabledBaseTools =>
+      widget.config.enabledBaseTools ??
+      ToolConfig.defaultEnabledBaseTools;
+
+  /// Toggles a single base tool on/off.
+  void _toggleBaseTool(String toolName, bool enabled) {
+    final current = Set<String>.from(_enabledBaseTools);
+    if (enabled) {
+      current.add(toolName);
+    } else {
+      current.remove(toolName);
+    }
+    _updateConfig((c) => c.copyWith(enabledBaseTools: current));
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -83,6 +99,65 @@ class _ToolSettingsWidgetState extends State<ToolSettingsWidget> {
 
         if (widget.config.enabled) ...[
           const Divider(height: 1),
+
+          // ── Built-in tools ────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 4),
+            child: Text(
+              'Built-in Tools',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+
+          _BaseToolTile(
+            icon: Icons.access_time_outlined,
+            title: 'Date & Time',
+            subtitle: 'Get the current date and time',
+            toolName: 'get_current_datetime',
+            enabled: _enabledBaseTools.contains('get_current_datetime'),
+            onToggle: _toggleBaseTool,
+          ),
+          _BaseToolTile(
+            icon: Icons.location_on_outlined,
+            title: 'Current Location',
+            subtitle: 'Approximate IP-based geolocation (city/country)',
+            toolName: 'get_current_location',
+            enabled: _enabledBaseTools.contains('get_current_location'),
+            onToggle: _toggleBaseTool,
+          ),
+          _BaseToolTile(
+            icon: Icons.open_in_browser_outlined,
+            title: 'Fetch URL',
+            subtitle: 'Read content from a web page URL',
+            toolName: 'fetch_url',
+            enabled: _enabledBaseTools.contains('fetch_url'),
+            onToggle: _toggleBaseTool,
+          ),
+          _BaseToolTile(
+            icon: Icons.notifications_outlined,
+            title: 'Show Notification',
+            subtitle: 'Send a device notification',
+            toolName: 'show_notification',
+            enabled: _enabledBaseTools.contains('show_notification'),
+            onToggle: _toggleBaseTool,
+          ),
+
+          const Divider(height: 1),
+
+          // ── Web search ────────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 4),
+            child: Text(
+              'Web Search (requires API key)',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
 
           // Web search toggle
           SwitchListTile(
@@ -419,6 +494,37 @@ class _ToolSettingsWidgetState extends State<ToolSettingsWidget> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// A compact list tile for toggling a single base tool on or off.
+class _BaseToolTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String toolName;
+  final bool enabled;
+  final void Function(String toolName, bool enabled) onToggle;
+
+  const _BaseToolTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.toolName,
+    required this.enabled,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      secondary: Icon(icon, size: 20),
+      title: Text(title),
+      subtitle: Text(subtitle),
+      value: enabled,
+      onChanged: (value) => onToggle(toolName, value),
+      dense: true,
     );
   }
 }
