@@ -301,10 +301,7 @@ class ToolExecutorService {
       final response = await http
           .get(
             uri,
-            headers: {
-              'User-Agent': _userAgent,
-              'Accept': 'application/json',
-            },
+            headers: {'User-Agent': _userAgent, 'Accept': 'application/json'},
           )
           .timeout(const Duration(seconds: 10));
 
@@ -380,10 +377,7 @@ class ToolExecutorService {
         summary: 'Network error getting location: $e',
       );
     } catch (e) {
-      return ToolResult(
-        success: false,
-        summary: 'Error getting location: $e',
-      );
+      return ToolResult(success: false, summary: 'Error getting location: $e');
     }
   }
 

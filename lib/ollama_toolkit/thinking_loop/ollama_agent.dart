@@ -439,9 +439,7 @@ class OllamaAgent implements Agent {
       }
 
       // Reached maxIterations without a final answer.
-      print(
-        '[OllamaAgent.runStream] Max iterations ($maxIterations) reached.',
-      );
+      print('[OllamaAgent.runStream] Max iterations ($maxIterations) reached.');
     } catch (e, stackTrace) {
       print('[OllamaAgent.runStream] ERROR: $e');
       print('[OllamaAgent.runStream] Stack trace: $stackTrace');

@@ -55,10 +55,11 @@ class ModelCapabilityResolver {
     // Strip the 'opencode:' prefix and split into provider/model.
     final withoutPrefix = modelName.substring('opencode:'.length);
     final slashIndex = withoutPrefix.indexOf('/');
-    final provider = (slashIndex > 0
-            ? withoutPrefix.substring(0, slashIndex)
-            : withoutPrefix)
-        .toLowerCase();
+    final provider =
+        (slashIndex > 0
+                ? withoutPrefix.substring(0, slashIndex)
+                : withoutPrefix)
+            .toLowerCase();
     final modelPart = slashIndex > 0
         ? withoutPrefix.substring(slashIndex + 1).toLowerCase()
         : '';
@@ -79,8 +80,7 @@ class ModelCapabilityResolver {
             modelPart.contains('4o') ||
             modelPart.contains('4-vision') ||
             modelPart.contains('gpt-4v');
-        supportsThinking =
-            modelPart.contains('o1') || modelPart.contains('o3');
+        supportsThinking = modelPart.contains('o1') || modelPart.contains('o3');
       case 'google':
         // Gemini 1.5+ and 2.0+ support vision; flash-thinking has reasoning.
         supportsVision = true;
@@ -93,8 +93,7 @@ class ModelCapabilityResolver {
             modelPart.contains('4o') ||
             modelPart.contains('claude') ||
             modelPart.contains('vision');
-        supportsThinking =
-            modelPart.contains('o1') || modelPart.contains('o3');
+        supportsThinking = modelPart.contains('o1') || modelPart.contains('o3');
       case 'groq':
         supportsVision = modelPart.contains('vision');
       case 'mistral':

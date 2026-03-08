@@ -343,9 +343,10 @@ class OllamaClient {
       // bytes across chunks and only emits complete lines, preventing
       // silent token loss that occurred with the previous chunk.split('\n')
       // approach.
-      await for (final line in response.stream
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())) {
+      await for (final line
+          in response.stream
+              .transform(utf8.decoder)
+              .transform(const LineSplitter())) {
         if (line.trim().isNotEmpty) {
           try {
             yield json.decode(line) as Map<String, dynamic>;
