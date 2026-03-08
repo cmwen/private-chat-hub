@@ -77,8 +77,8 @@ class _ModelsScreenState extends State<ModelsScreen> {
     final localF = () async {
       if (widget.onDeviceLLMService == null) return <ModelInfo>[];
       try {
-        final downloaded =
-            await widget.onDeviceLLMService!.modelManager.getDownloadedModels();
+        final downloaded = await widget.onDeviceLLMService!.modelManager
+            .getDownloadedModels();
         return downloaded
             .map(
               (model) => model.copyWith(id: 'local:${model.id}', isLocal: true),
@@ -92,8 +92,9 @@ class _ModelsScreenState extends State<ModelsScreen> {
     final openCodeF = () async {
       if (widget.openCodeLLMService == null) return <ModelInfo>[];
       try {
-        return await widget.openCodeLLMService!
-            .getAvailableModelsForSelection(applyProviderFilter: false);
+        return await widget.openCodeLLMService!.getAvailableModelsForSelection(
+          applyProviderFilter: false,
+        );
       } catch (_) {
         return <ModelInfo>[];
       }

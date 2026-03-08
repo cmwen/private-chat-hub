@@ -314,14 +314,9 @@ void main() {
     });
 
     test('copyWith preserves enabledBaseTools when not overridden', () {
-      const config = ToolConfig(
-        enabledBaseTools: {'get_current_datetime'},
-      );
+      const config = ToolConfig(enabledBaseTools: {'get_current_datetime'});
       final updated = config.copyWith(enabled: false);
-      expect(
-        updated.enabledBaseTools,
-        equals({'get_current_datetime'}),
-      );
+      expect(updated.enabledBaseTools, equals({'get_current_datetime'}));
     });
 
     test('copyWith can update enabledBaseTools', () {
@@ -329,7 +324,10 @@ void main() {
       final updated = config.copyWith(
         enabledBaseTools: {'fetch_url', 'show_notification'},
       );
-      expect(updated.enabledBaseTools, equals({'fetch_url', 'show_notification'}));
+      expect(
+        updated.enabledBaseTools,
+        equals({'fetch_url', 'show_notification'}),
+      );
     });
 
     test('copyWith can clear enabledBaseTools back to null', () {

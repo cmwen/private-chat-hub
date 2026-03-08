@@ -128,7 +128,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
       );
       final mergedById = <String, ModelInfo>{
         for (final m in nonOllamaModels) m.id: m, // lower priority
-        for (final m in allWithOllama) m.id: m,   // higher priority (Ollama)
+        for (final m in allWithOllama) m.id: m, // higher priority (Ollama)
       };
       _allModels = mergedById.values.toList();
 

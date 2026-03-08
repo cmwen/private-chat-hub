@@ -46,27 +46,25 @@ class UnifiedModelService {
       () async {
         if (_onDeviceLLMService == null) return <ModelInfo>[];
         try {
-          final downloaded =
-              await _onDeviceLLMService.modelManager.getDownloadedModels();
+          final downloaded = await _onDeviceLLMService.modelManager
+              .getDownloadedModels();
           return downloaded
-              .map(
-                (localModel) {
-                  final modelId = '$localModelPrefix${localModel.id}';
-                  if (_visibilityService != null &&
-                      !_visibilityService.isModelVisible(modelId)) {
-                    return null;
-                  }
-                  return ModelInfo(
-                    id: modelId,
-                    name: localModel.name,
-                    description: localModel.description,
-                    sizeBytes: localModel.sizeBytes,
-                    isDownloaded: localModel.isDownloaded,
-                    capabilities: localModel.capabilities,
-                    isLocal: true,
-                  );
-                },
-              )
+              .map((localModel) {
+                final modelId = '$localModelPrefix${localModel.id}';
+                if (_visibilityService != null &&
+                    !_visibilityService.isModelVisible(modelId)) {
+                  return null;
+                }
+                return ModelInfo(
+                  id: modelId,
+                  name: localModel.name,
+                  description: localModel.description,
+                  sizeBytes: localModel.sizeBytes,
+                  isDownloaded: localModel.isDownloaded,
+                  capabilities: localModel.capabilities,
+                  isLocal: true,
+                );
+              })
               .whereType<ModelInfo>()
               .toList();
         } catch (e) {
@@ -78,8 +76,7 @@ class UnifiedModelService {
       () async {
         if (_openCodeLLMService == null) return <ModelInfo>[];
         try {
-          final openCodeModels =
-              await _openCodeLLMService.getAvailableModels();
+          final openCodeModels = await _openCodeLLMService.getAvailableModels();
           return openCodeModels.where((model) {
             if (_visibilityService != null &&
                 !_visibilityService.isModelVisible(model.id)) {

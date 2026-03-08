@@ -48,8 +48,7 @@ class _ToolSettingsWidgetState extends State<ToolSettingsWidget> {
 
   /// Returns the enabled base tools set, falling back to defaults when null.
   Set<String> get _enabledBaseTools =>
-      widget.config.enabledBaseTools ??
-      ToolConfig.defaultEnabledBaseTools;
+      widget.config.enabledBaseTools ?? ToolConfig.defaultEnabledBaseTools;
 
   /// Toggles a single base tool on/off.
   void _toggleBaseTool(String toolName, bool enabled) {
@@ -102,7 +101,12 @@ class _ToolSettingsWidgetState extends State<ToolSettingsWidget> {
 
           // ── Built-in tools ────────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 4),
+            padding: const EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 12,
+              bottom: 4,
+            ),
             child: Text(
               'Built-in Tools',
               style: theme.textTheme.labelMedium?.copyWith(
@@ -149,7 +153,12 @@ class _ToolSettingsWidgetState extends State<ToolSettingsWidget> {
 
           // ── Web search ────────────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 4),
+            padding: const EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 12,
+              bottom: 4,
+            ),
             child: Text(
               'Web Search (requires API key)',
               style: theme.textTheme.labelMedium?.copyWith(
