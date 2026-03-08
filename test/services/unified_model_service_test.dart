@@ -20,10 +20,7 @@ void main() {
         isTrue,
       );
       expect(UnifiedModelService.isLocalModel('llama3.2:latest'), isFalse);
-      expect(
-        UnifiedModelService.isLmStudioModel('llama3.2:latest'),
-        isFalse,
-      );
+      expect(UnifiedModelService.isLmStudioModel('llama3.2:latest'), isFalse);
       expect(UnifiedModelService.isOpenCodeModel('llama3.2:latest'), isFalse);
     });
 

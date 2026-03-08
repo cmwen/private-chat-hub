@@ -404,9 +404,15 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                                   _selectedModel != null &&
                                   !UnifiedModelService.isLocalModel(
                                     _selectedModel!,
+                                  ) &&
+                                  !UnifiedModelService.isLmStudioModel(
+                                    _selectedModel!,
+                                  ) &&
+                                  !UnifiedModelService.isOpenCodeModel(
+                                    _selectedModel!,
                                   ))
                                 Text(
-                                  'Server offline — messages will be queued',
+                                  'Ollama offline — messages will be queued',
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: Colors.orange.shade700,
@@ -806,7 +812,11 @@ class _ModelSelectorSheet extends StatelessWidget {
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.memory, size: 14, color: Colors.teal),
+                                Icon(
+                                  Icons.memory,
+                                  size: 14,
+                                  color: Colors.teal,
+                                ),
                                 SizedBox(width: 4),
                                 Text(
                                   'LM STUDIO',
@@ -863,7 +873,10 @@ class _ModelSelectorSheet extends StatelessWidget {
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (!model.isLocal && !isOllamaOnline)
+                        if (!model.isLocal &&
+                            !isOllamaOnline &&
+                            !UnifiedModelService.isLmStudioModel(model.id) &&
+                            !UnifiedModelService.isOpenCodeModel(model.id))
                           Text(
                             'Messages will be queued until server is back',
                             style: TextStyle(

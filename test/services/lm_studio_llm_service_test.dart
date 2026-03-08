@@ -6,7 +6,9 @@ import 'package:private_chat_hub/services/lm_studio_connection_manager.dart';
 import 'package:private_chat_hub/services/lm_studio_llm_service.dart';
 
 class _FakeLmStudioApiClient extends LmStudioApiClient {
-  LmStudioModelsResponse modelsResponse = const LmStudioModelsResponse(models: []);
+  LmStudioModelsResponse modelsResponse = const LmStudioModelsResponse(
+    models: [],
+  );
   LmStudioChatResult chatResponse = const LmStudioChatResult(output: []);
   List<LmStudioChatStreamEvent> streamEvents = const [];
   bool failStream = false;
