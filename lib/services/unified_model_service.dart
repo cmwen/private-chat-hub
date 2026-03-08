@@ -48,8 +48,11 @@ class UnifiedModelService {
     // Fetch local and OpenCode models in parallel for faster loading.
     // Each future resolves to a List<ModelInfo>; destructuring preserves
     // the explicit relationship between the fetch order and the result names.
-    final [localModels, lmStudioModels, openCodeModels] =
-      await Future.wait<List<ModelInfo>>([
+    final [
+      localModels,
+      lmStudioModels,
+      openCodeModels,
+    ] = await Future.wait<List<ModelInfo>>([
       // On-device local models
       () async {
         if (_onDeviceLLMService == null) return <ModelInfo>[];
@@ -132,7 +135,7 @@ class UnifiedModelService {
     }
 
     unifiedList.addAll(localModels);
-  unifiedList.addAll(lmStudioModels);
+    unifiedList.addAll(lmStudioModels);
     unifiedList.addAll(openCodeModels);
 
     return unifiedList;

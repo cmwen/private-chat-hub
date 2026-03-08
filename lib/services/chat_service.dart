@@ -862,9 +862,7 @@ class ChatService {
 
     try {
       final history = conversation.messages
-          .where(
-            (m) => m.id != userMessage.id && m.role != MessageRole.system,
-          )
+          .where((m) => m.id != userMessage.id && m.role != MessageRole.system)
           .toList();
 
       final buffer = StringBuffer();
@@ -944,9 +942,7 @@ class ChatService {
 
     try {
       final history = conversation.messages
-          .where(
-            (m) => m.id != userMessage.id && m.role != MessageRole.system,
-          )
+          .where((m) => m.id != userMessage.id && m.role != MessageRole.system)
           .toList();
 
       final buffer = StringBuffer();
@@ -1412,7 +1408,10 @@ class ChatService {
             )
             .toList(),
         systemPrompt: conversation.systemPrompt,
-        attachments: _lastUserMessageAttachments(conversation, assistantMessageId),
+        attachments: _lastUserMessageAttachments(
+          conversation,
+          assistantMessageId,
+        ),
       )) {
         buffer.write(token);
         final updatedMessage = assistantMessage.copyWith(
@@ -1764,7 +1763,10 @@ class ChatService {
       final isAvailable = await _openCodeLLMService!.isAvailable();
       if (!isAvailable) {
         _log('OpenCode offline in sendMessageWithContext: queueing for retry');
-        conversation = await _queueLastUserMessage(conversationId, conversation);
+        conversation = await _queueLastUserMessage(
+          conversationId,
+          conversation,
+        );
         yield conversation;
         return;
       }
@@ -1792,7 +1794,10 @@ class ChatService {
       final isAvailable = await _lmStudioLLMService!.isAvailable();
       if (!isAvailable) {
         _log('LM Studio offline in sendMessageWithContext: queueing for retry');
-        conversation = await _queueLastUserMessage(conversationId, conversation);
+        conversation = await _queueLastUserMessage(
+          conversationId,
+          conversation,
+        );
         yield conversation;
         return;
       }

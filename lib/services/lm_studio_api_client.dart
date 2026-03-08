@@ -110,10 +110,7 @@ class LmStudioApiClient {
   }) async* {
     _ensureConnection();
 
-    final request = http.Request(
-      'POST',
-      Uri.parse('${baseUrl!}/api/v1/chat'),
-    );
+    final request = http.Request('POST', Uri.parse('${baseUrl!}/api/v1/chat'));
     request.headers.addAll({
       ..._headers,
       'Accept': 'text/event-stream',
@@ -134,7 +131,9 @@ class LmStudioApiClient {
 
     final client = http.Client();
     try {
-      final response = await client.send(request).timeout(const Duration(minutes: 5));
+      final response = await client
+          .send(request)
+          .timeout(const Duration(minutes: 5));
       if (response.statusCode != 200) {
         final body = await response.stream.bytesToString();
         throw LmStudioApiException(
@@ -147,9 +146,10 @@ class LmStudioApiClient {
       String currentEvent = 'message';
       final dataBuffer = StringBuffer();
 
-      await for (final line in response.stream
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())) {
+      await for (final line
+          in response.stream
+              .transform(utf8.decoder)
+              .transform(const LineSplitter())) {
         if (line.isEmpty) {
           if (dataBuffer.isNotEmpty) {
             final rawData = dataBuffer.toString().trim();
@@ -177,7 +177,8 @@ class LmStudioApiClient {
 
       if (dataBuffer.isNotEmpty) {
         try {
-          final payload = jsonDecode(dataBuffer.toString()) as Map<String, dynamic>;
+          final payload =
+              jsonDecode(dataBuffer.toString()) as Map<String, dynamic>;
           yield LmStudioChatStreamEvent(type: currentEvent, data: payload);
         } catch (_) {}
       }
@@ -277,7 +278,11 @@ class LmStudioApiException implements Exception {
   final int statusCode;
   final String? responseBody;
 
-  const LmStudioApiException(this.message, this.statusCode, [this.responseBody]);
+  const LmStudioApiException(
+    this.message,
+    this.statusCode, [
+    this.responseBody,
+  ]);
 
   @override
   String toString() {
