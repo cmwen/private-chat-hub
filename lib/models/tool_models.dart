@@ -451,6 +451,28 @@ class AvailableTools {
     },
   );
 
+  /// Get current location tool definition.
+  static const Tool getCurrentLocation = Tool(
+    name: 'get_current_location',
+    description:
+        'Get the approximate current location of the device based on IP '
+        'geolocation. Use this when you need to know the user\'s general '
+        'location (city, region, country) for location-aware responses. '
+        'Note: this returns an approximate location based on IP address, '
+        'not precise GPS coordinates.',
+    parameters: {
+      'type': 'object',
+      'properties': {
+        'include_timezone': {
+          'type': 'boolean',
+          'description':
+              'Whether to include timezone information in the result. '
+              'Default is true.',
+        },
+      },
+    },
+  );
+
   /// Show notification tool definition.
   static const Tool showNotification = Tool(
     name: 'show_notification',
@@ -545,6 +567,7 @@ class AvailableTools {
   static List<Tool> get all => [
     webSearch,
     currentDateTime,
+    getCurrentLocation,
     readUrl,
     fetchUrl,
     showNotification,

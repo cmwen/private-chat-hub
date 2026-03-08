@@ -289,12 +289,17 @@ void main() {
       expect(AvailableTools.currentDateTime.name, 'get_current_datetime');
     });
 
+    test('should have current location tool', () {
+      expect(AvailableTools.getCurrentLocation.name, 'get_current_location');
+      expect(AvailableTools.getCurrentLocation.description.isNotEmpty, true);
+    });
+
     test('should have read url tool', () {
       expect(AvailableTools.readUrl.name, 'read_url');
     });
 
     test('should list all tools', () {
-      expect(AvailableTools.all.length, 9);
+      expect(AvailableTools.all.length, 10);
     });
 
     test('should have fetch url tool', () {
@@ -331,6 +336,11 @@ void main() {
     test('should get tool by name', () {
       final tool = AvailableTools.getByName('web_search');
       expect(tool.name, 'web_search');
+    });
+
+    test('should get location tool by name', () {
+      final tool = AvailableTools.getByName('get_current_location');
+      expect(tool.name, 'get_current_location');
     });
 
     test('should throw for unknown tool', () {
