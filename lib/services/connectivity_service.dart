@@ -102,6 +102,13 @@ class ConnectivityService {
         return;
       }
 
+      // If no Ollama server is configured, treat network-available as connected.
+      // There is nothing to check — showing "unreachable" would be misleading.
+      if (_ollamaManager.connection == null) {
+        _updateStatus(OllamaConnectivityStatus.connected);
+        return;
+      }
+
       // Network is available, now check Ollama server
       final ollamaReachable = await _testOllamaConnection();
 

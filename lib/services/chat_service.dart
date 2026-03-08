@@ -75,15 +75,29 @@ class ChatService {
     _connectivityService = ConnectivityService(_ollamaManager);
     _queueService = MessageQueueService(_storage);
 
-    // Listen for connectivity changes and process queue when online.
+    // Listen for connectivity changes and process queue when network is available.
+    // Triggers when:
+    //   1. Ollama comes online (original behaviour).
+    //   2. Network is restored after being completely offline (covers LM Studio
+    //      and OpenCode queued messages as well).
     // A short stabilisation delay prevents firing into a half-open socket
-    // when the connection briefly flickers (connected → checking → connected).
+    // when the connection briefly flickers.
+    OllamaConnectivityStatus? lastConnectivityStatus =
+        OllamaConnectivityStatus.checking;
     _connectivityService.statusStream.listen((status) {
-      if (status == OllamaConnectivityStatus.connected && !_isProcessingQueue) {
-        _log('Connection restored, waiting for connection to stabilise…');
+      final wasOffline =
+          lastConnectivityStatus == OllamaConnectivityStatus.offline;
+      lastConnectivityStatus = status;
+
+      final networkRestored =
+          wasOffline && status != OllamaConnectivityStatus.offline;
+      final ollamaConnected = status == OllamaConnectivityStatus.connected;
+
+      if ((ollamaConnected || networkRestored) && !_isProcessingQueue) {
+        _log('Connection available, waiting for connection to stabilise…');
         Future.delayed(const Duration(seconds: 2), () {
-          // Re-check: the status may have changed during the delay.
-          if (_connectivityService.isOnline && !_isProcessingQueue) {
+          // Re-check: only stop if there is genuinely no network.
+          if (!_connectivityService.isOffline && !_isProcessingQueue) {
             _log('Connection stable, processing message queue');
             processMessageQueue();
           }
@@ -613,8 +627,11 @@ class ChatService {
       return;
     }
 
-    if (!isOnline) {
-      _log('Cannot process queue while offline');
+    // Only stop if there is genuinely no network. Individual provider
+    // availability is checked per-item, so a single offline provider
+    // should not block messages destined for other providers.
+    if (_connectivityService.isOffline) {
+      _log('Cannot process queue while offline (no network)');
       return;
     }
 
@@ -659,9 +676,9 @@ class ChatService {
           );
           await Future.delayed(delay);
 
-          // Re-check connectivity after the delay.
-          if (!isOnline) {
-            _log('Lost connection during retry delay, stopping');
+          // Stop if there is no network at all.
+          if (_connectivityService.isOffline) {
+            _log('Lost network during retry delay, stopping');
             break;
           }
         }
@@ -677,9 +694,9 @@ class ChatService {
           _log('Failed to send queued message: $e');
           await _queueService.incrementRetryCount(queueItem.id, e.toString());
 
-          // Check if we should continue or stop
-          if (!isOnline) {
-            _log('Lost connection during queue processing, stopping');
+          // Stop if there is no network at all.
+          if (_connectivityService.isOffline) {
+            _log('Lost network during queue processing, stopping');
             break;
           }
 
@@ -712,6 +729,8 @@ class ChatService {
   }
 
   /// Sends a queued message synchronously (no streaming for queued messages).
+  ///
+  /// Routes to the appropriate provider based on the conversation's model name.
   Future<void> _sendQueuedMessageSync(
     String conversationId,
     Message userMessage,
@@ -721,6 +740,21 @@ class ChatService {
       throw Exception('Conversation not found');
     }
 
+    final modelName = conversation.modelName;
+
+    // Route to LM Studio for lmstudio: models
+    if (UnifiedModelService.isLmStudioModel(modelName)) {
+      await _sendQueuedLmStudioMessageSync(conversationId, userMessage);
+      return;
+    }
+
+    // Route to OpenCode for opencode: models
+    if (UnifiedModelService.isOpenCodeModel(modelName)) {
+      await _sendQueuedOpenCodeMessageSync(conversationId, userMessage);
+      return;
+    }
+
+    // Default: Ollama
     final client = _ollamaManager.client;
     if (client == null) {
       throw Exception('No Ollama connection configured');
@@ -789,6 +823,170 @@ class ChatService {
       _log('Successfully sent queued message: ${userMessage.id}');
     } catch (e) {
       _log('Error sending queued message: $e');
+      await _notificationService.cancelStreamingNotification();
+      await _updateMessageStatus(
+        conversationId,
+        userMessage.id,
+        MessageStatus.failed,
+      );
+      rethrow;
+    }
+  }
+
+  /// Sends a queued LM Studio message synchronously.
+  Future<void> _sendQueuedLmStudioMessageSync(
+    String conversationId,
+    Message userMessage,
+  ) async {
+    if (_lmStudioLLMService == null) {
+      throw Exception('LM Studio service not configured');
+    }
+    if (!_lmStudioLLMService!.hasConfiguredConnection) {
+      throw Exception('LM Studio server is no longer configured');
+    }
+
+    final conversation = getConversation(conversationId);
+    if (conversation == null) throw Exception('Conversation not found');
+
+    await _updateMessageStatus(
+      conversationId,
+      userMessage.id,
+      MessageStatus.sending,
+    );
+
+    unawaited(
+      _notificationService.showStreamingNotification(
+        conversationTitle: conversation.title,
+      ),
+    );
+
+    try {
+      final history = conversation.messages
+          .where(
+            (m) => m.id != userMessage.id && m.role != MessageRole.system,
+          )
+          .toList();
+
+      final buffer = StringBuffer();
+      await for (final token in _lmStudioLLMService!.generateResponse(
+        prompt: userMessage.text,
+        modelId: conversation.modelName,
+        conversationHistory: history,
+        systemPrompt: conversation.systemPrompt,
+      )) {
+        buffer.write(token);
+      }
+
+      final content = buffer.toString();
+      if (content.trim().isEmpty) {
+        throw Exception(
+          'LM Studio returned an empty response — try sending the message again.',
+        );
+      }
+
+      await _updateMessageStatus(
+        conversationId,
+        userMessage.id,
+        MessageStatus.sent,
+      );
+
+      final assistantMessage = Message.assistant(
+        id: const Uuid().v4(),
+        text: content,
+        timestamp: DateTime.now(),
+      );
+      await addMessage(conversationId, assistantMessage);
+
+      final updatedConversation = getConversation(conversationId);
+      if (updatedConversation != null) {
+        await _showResponseCompleteNotification(updatedConversation, content);
+      }
+
+      _log('Successfully sent queued LM Studio message: ${userMessage.id}');
+    } catch (e) {
+      _log('Error sending queued LM Studio message: $e');
+      await _notificationService.cancelStreamingNotification();
+      await _updateMessageStatus(
+        conversationId,
+        userMessage.id,
+        MessageStatus.failed,
+      );
+      rethrow;
+    }
+  }
+
+  /// Sends a queued OpenCode message synchronously.
+  Future<void> _sendQueuedOpenCodeMessageSync(
+    String conversationId,
+    Message userMessage,
+  ) async {
+    if (_openCodeLLMService == null) {
+      throw Exception('OpenCode service not configured');
+    }
+    if (!_openCodeLLMService!.hasConfiguredConnection) {
+      throw Exception('OpenCode server is no longer configured');
+    }
+
+    final conversation = getConversation(conversationId);
+    if (conversation == null) throw Exception('Conversation not found');
+
+    await _updateMessageStatus(
+      conversationId,
+      userMessage.id,
+      MessageStatus.sending,
+    );
+
+    unawaited(
+      _notificationService.showStreamingNotification(
+        conversationTitle: conversation.title,
+      ),
+    );
+
+    try {
+      final history = conversation.messages
+          .where(
+            (m) => m.id != userMessage.id && m.role != MessageRole.system,
+          )
+          .toList();
+
+      final buffer = StringBuffer();
+      await for (final token in _openCodeLLMService!.generateResponse(
+        prompt: userMessage.text,
+        modelId: conversation.modelName,
+        conversationHistory: history,
+        systemPrompt: conversation.systemPrompt,
+      )) {
+        buffer.write(token);
+      }
+
+      final content = buffer.toString();
+      if (content.trim().isEmpty) {
+        throw Exception(
+          'OpenCode returned an empty response — try sending the message again.',
+        );
+      }
+
+      await _updateMessageStatus(
+        conversationId,
+        userMessage.id,
+        MessageStatus.sent,
+      );
+
+      final assistantMessage = Message.assistant(
+        id: const Uuid().v4(),
+        text: content,
+        timestamp: DateTime.now(),
+      );
+      await addMessage(conversationId, assistantMessage);
+
+      final updatedConversation = getConversation(conversationId);
+      if (updatedConversation != null) {
+        await _showResponseCompleteNotification(updatedConversation, content);
+      }
+
+      _log('Successfully sent queued OpenCode message: ${userMessage.id}');
+    } catch (e) {
+      _log('Error sending queued OpenCode message: $e');
       await _notificationService.cancelStreamingNotification();
       await _updateMessageStatus(
         conversationId,
@@ -900,6 +1098,14 @@ class ChatService {
           'OpenCode server removed. Choose another saved OpenCode server or add a new one in Settings.',
         );
       }
+      // Check if server is temporarily unavailable — queue instead of failing.
+      final isAvailable = await _openCodeLLMService!.isAvailable();
+      if (!isAvailable) {
+        _log('OpenCode offline: queueing message for retry');
+        final conversation = await queueMessage(conversationId, text);
+        yield conversation;
+        return;
+      }
       _log('Using OpenCode inference (opencode model selected)');
       yield* _sendMessageOpenCode(conversationId, text);
       return;
@@ -915,6 +1121,14 @@ class ChatService {
         throw Exception(
           'LM Studio server removed. Choose another saved LM Studio server or add a new one in Settings.',
         );
+      }
+      // Check if server is temporarily unavailable — queue instead of failing.
+      final isAvailable = await _lmStudioLLMService!.isAvailable();
+      if (!isAvailable) {
+        _log('LM Studio offline: queueing message for retry');
+        final conversation = await queueMessage(conversationId, text);
+        yield conversation;
+        return;
       }
       _log('Using LM Studio inference (lmstudio model selected)');
       yield* _sendMessageLmStudio(conversationId, text);
@@ -1546,6 +1760,14 @@ class ChatService {
           'OpenCode server removed. Choose another saved OpenCode server or add a new one in Settings.',
         );
       }
+      // Check if server is temporarily unavailable — queue instead of failing.
+      final isAvailable = await _openCodeLLMService!.isAvailable();
+      if (!isAvailable) {
+        _log('OpenCode offline in sendMessageWithContext: queueing for retry');
+        conversation = await _queueLastUserMessage(conversationId, conversation);
+        yield conversation;
+        return;
+      }
       _log('Routing sendMessageWithContext to OpenCode inference');
       yield* _sendMessageOpenCode(
         conversationId,
@@ -1565,6 +1787,14 @@ class ChatService {
         throw Exception(
           'LM Studio server removed. Choose another saved LM Studio server or add a new one in Settings.',
         );
+      }
+      // Check if server is temporarily unavailable — queue instead of failing.
+      final isAvailable = await _lmStudioLLMService!.isAvailable();
+      if (!isAvailable) {
+        _log('LM Studio offline in sendMessageWithContext: queueing for retry');
+        conversation = await _queueLastUserMessage(conversationId, conversation);
+        yield conversation;
+        return;
       }
       _log('Routing sendMessageWithContext to LM Studio inference');
       yield* _sendMessageLmStudio(
@@ -1594,17 +1824,7 @@ class ChatService {
       }
 
       _log('Offline mode in sendMessageWithContext: queueing for remote model');
-      final lastUserMessage = conversation.messages.lastWhere(
-        (m) => m.role == MessageRole.user,
-        orElse: () => Message.user(id: '', text: '', timestamp: DateTime.now()),
-      );
-
-      if (lastUserMessage.id.isNotEmpty) {
-        conversation = await _queueExistingMessage(
-          conversationId,
-          lastUserMessage.id,
-        );
-      }
+      conversation = await _queueLastUserMessage(conversationId, conversation);
 
       yield conversation;
       return;
@@ -2853,6 +3073,27 @@ When you have sufficient information from tool results, provide a complete respo
       updatedAt: DateTime.now(),
     );
     await updateConversation(conversation);
+    return conversation;
+  }
+
+  /// Returns the last user [Message] in [conversation], or null if none.
+  Message? _getLastUserMessage(Conversation conversation) {
+    for (final m in conversation.messages.reversed) {
+      if (m.role == MessageRole.user) return m;
+    }
+    return null;
+  }
+
+  /// Queues the last user message in a conversation when the provider is
+  /// temporarily unreachable.  Returns the updated conversation.
+  Future<Conversation> _queueLastUserMessage(
+    String conversationId,
+    Conversation conversation,
+  ) async {
+    final lastUserMessage = _getLastUserMessage(conversation);
+    if (lastUserMessage != null) {
+      return _queueExistingMessage(conversationId, lastUserMessage.id);
+    }
     return conversation;
   }
 
