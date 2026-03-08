@@ -1,0 +1,224 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+const getLink = (path) => {
+  const base = import.meta.env.BASE_URL;
+  const b = base.endsWith('/') ? base : base + '/';
+  if (path === '/') return b;
+  return b + path.replace(/^\//, '');
+};
+---
+<BaseLayout title="Features — Private Chat Hub">
+  <section>
+    <h2>Features</h2>
+    <p class="lead">A complete overview of everything Private Chat Hub can do.</p>
+
+    <!-- ── Multi-Backend Support ─────────────────────────────────────── -->
+    <div class="card">
+      <h3>🤖 Multi-Backend AI Support</h3>
+      <p>Private Chat Hub supports four distinct AI backend types. Switch between them from the settings screen at any time:</p>
+      <ul>
+        <li>
+          <strong>Ollama</strong> — Connect to any self-hosted Ollama server over your local network.
+          Supports the full Ollama model library: Llama 3, Mistral, Gemma, Qwen, DeepSeek, Phi, and more.
+          Full tool-calling and vision support for compatible models.
+        </li>
+        <li>
+          <strong>LM Studio</strong> — Connect to LM Studio's local server running any GGUF model.
+          Vision and multimodal input supported where the loaded model allows.
+        </li>
+        <li>
+          <strong>OpenCode</strong> — Route requests through a self-hosted <a href="https://opencode.ai" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">opencode</a> server
+          to cloud providers (OpenAI GPT-4o, Anthropic Claude, Google Gemini, and more).
+          You supply your own API keys; traffic goes through your own server.
+        </li>
+        <li>
+          <strong>On-Device (LiteRT)</strong> — Run Gemma 3 or Gemini Nano locally on the Android device
+          with Google's LiteRT runtime. Completely offline—no network requests made.
+        </li>
+      </ul>
+    </div>
+
+    <!-- ── Real-Time Streaming ─────────────────────────────────────────── -->
+    <div class="card">
+      <h3>⚡ Real-Time Streaming Responses</h3>
+      <p>Responses appear token-by-token as the model generates them, just like a human typing. The app handles streaming for all supported backends:</p>
+      <ul>
+        <li>Ollama — newline-delimited JSON stream</li>
+        <li>LM Studio — Server-Sent Events (SSE)</li>
+        <li>OpenCode — SSE event stream</li>
+        <li>On-Device — live inference callbacks</li>
+      </ul>
+    </div>
+
+    <!-- ── Tool / Function Calling ─────────────────────────────────────── -->
+    <div class="card">
+      <h3>🛠️ Tool Calling / Function Calling</h3>
+      <p>AI models can invoke built-in tools during a conversation to retrieve real-world information or perform actions. Tool calling is supported on Ollama (and cloud models via OpenCode).</p>
+      <p style="margin-top:8px"><strong>Built-in tools:</strong></p>
+      <ul>
+        <li><strong>Current Date &amp; Time</strong> — Returns the current timestamp</li>
+        <li><strong>Get Current Location</strong> — Returns the device's approximate location via IP geolocation</li>
+        <li><strong>Web Search</strong> — Searches the web using Jina AI and returns results with clickable source links</li>
+        <li><strong>Fetch URL</strong> — Retrieves and returns the contents of any web page or URL</li>
+        <li><strong>Show Notification</strong> — Sends a local Android notification from the AI response</li>
+      </ul>
+      <p style="margin-top:8px">Tools can be individually enabled or disabled per conversation in <em>Chat Settings → Tools</em>. The app uses an agentic loop: if the model requests a tool call, the app executes it and sends the result back, continuing until a final text response is produced.</p>
+    </div>
+
+    <!-- ── Web Search ─────────────────────────────────────────────────── -->
+    <div class="card">
+      <h3>🌐 Web Search Integration</h3>
+      <p>The built-in web search tool uses <strong>Jina AI</strong> to fetch live search results. When the AI uses web search:</p>
+      <ul>
+        <li>Results include titles, snippets, and URLs</li>
+        <li>Source links are rendered as tappable links in the response</li>
+        <li>Works on any model that supports tool calling</li>
+        <li>No Jina API key required for basic usage</li>
+      </ul>
+    </div>
+
+    <!-- ── Vision & Image Input ───────────────────────────────────────── -->
+    <div class="card">
+      <h3>👁️ Vision &amp; Image Input</h3>
+      <p>Attach images and documents directly to your chat messages:</p>
+      <ul>
+        <li>Pick photos from the gallery or take a new photo with the camera</li>
+        <li>Attach files (PDFs, text, documents) for document-based Q&amp;A</li>
+        <li>Vision models (e.g. <code>llava</code>, <code>gemma3</code>, <code>llama3.2-vision</code>) can describe, analyze, and reason about attached images</li>
+        <li>Images are encoded locally and sent to the model; they never leave your network</li>
+        <li>Works with Ollama vision models and LM Studio vision models</li>
+        <li>Receive shared images from other Android apps via Share intent</li>
+      </ul>
+    </div>
+
+    <!-- ── TTS ────────────────────────────────────────────────────────── -->
+    <div class="card">
+      <h3>🔊 Text-to-Speech (TTS)</h3>
+      <p>Have AI responses read aloud using your device's built-in TTS engine:</p>
+      <ul>
+        <li>Tap the speaker icon on any message to start playback</li>
+        <li>Streaming TTS: speech begins playing before the full response is complete</li>
+        <li>Tap again to stop playback at any time</li>
+        <li>Uses Android's native TTS engine (no additional apps required)</li>
+        <li>Works with all backends and all models</li>
+      </ul>
+    </div>
+
+    <!-- ── Model Comparison ───────────────────────────────────────────── -->
+    <div class="card">
+      <h3>📊 Model Comparison</h3>
+      <p>Run the same prompt against two or more models simultaneously and compare responses side-by-side:</p>
+      <ul>
+        <li>Open the comparison screen from the chat menu</li>
+        <li>Select any two models (can mix backends, e.g. Ollama vs LM Studio)</li>
+        <li>Responses appear in parallel columns, streaming in real time</li>
+        <li>Quickly evaluate quality, speed, and style differences between models</li>
+      </ul>
+    </div>
+
+    <!-- ── System Prompt ──────────────────────────────────────────────── -->
+    <div class="card">
+      <h3>📝 System Prompt per Conversation</h3>
+      <p>Each conversation can have its own system prompt (AI persona / instructions):</p>
+      <ul>
+        <li>Set or edit the system prompt in <em>Chat Settings</em></li>
+        <li>The prompt is sent to the model at the start of every request</li>
+        <li>Persisted with the conversation so it survives app restarts</li>
+        <li>Examples: "You are a Python expert", "Respond only in French", "Be concise"</li>
+      </ul>
+    </div>
+
+    <!-- ── Project Workspaces ─────────────────────────────────────────── -->
+    <div class="card">
+      <h3>📁 Project Workspaces</h3>
+      <p>Organise conversations into named projects or topics:</p>
+      <ul>
+        <li>Create projects from the conversation list screen</li>
+        <li>Assign conversations to projects for easy navigation</li>
+        <li>Filter the conversation list by project</li>
+        <li>Ideal for separating work, personal, and experimental chats</li>
+      </ul>
+    </div>
+
+    <!-- ── Thinking / Reasoning ───────────────────────────────────────── -->
+    <div class="card">
+      <h3>🧠 Thinking / Extended Reasoning</h3>
+      <p>Support for models that expose their internal reasoning steps:</p>
+      <ul>
+        <li>Thinking traces are displayed in a collapsible section above the final answer</li>
+        <li>Works with Ollama models that support the <code>think</code> parameter (e.g. <code>deepseek-r1</code>, <code>qwq</code>)</li>
+        <li>Helps you verify the model's reasoning process</li>
+      </ul>
+    </div>
+
+    <!-- ── Offline & Queuing ──────────────────────────────────────────── -->
+    <div class="card">
+      <h3>📶 Offline &amp; Message Queuing</h3>
+      <ul>
+        <li><strong>On-device models</strong> work completely offline—no network required</li>
+        <li>Network connectivity is monitored in real time</li>
+        <li>Messages sent while offline are queued locally and delivered automatically when reconnected</li>
+        <li>Connection status is displayed in the app's status bar</li>
+      </ul>
+    </div>
+
+    <!-- ── Conversation Management ───────────────────────────────────── -->
+    <div class="card">
+      <h3>💬 Conversation Management</h3>
+      <ul>
+        <li>Full conversation history with search</li>
+        <li>Edit the conversation title at any time</li>
+        <li>Delete individual messages or entire conversations</li>
+        <li>Export conversations as <strong>JSON</strong> or <strong>Markdown</strong></li>
+        <li>Import previously exported conversations</li>
+        <li>Conversations are stored entirely on-device (SQLite / shared preferences)</li>
+      </ul>
+    </div>
+
+    <!-- ── Markdown & LaTeX ───────────────────────────────────────────── -->
+    <div class="card">
+      <h3>✍️ Rich Rendering: Markdown &amp; LaTeX</h3>
+      <ul>
+        <li>Responses are rendered with full <strong>Markdown</strong> support: headings, bold, italic, lists, tables, code blocks with syntax highlighting</li>
+        <li><strong>LaTeX / MathJax</strong> expressions (inline and block) are rendered as proper math notation</li>
+        <li>Code blocks include a copy button</li>
+        <li>Links in responses are tappable</li>
+      </ul>
+    </div>
+
+    <!-- ── Privacy & Data ────────────────────────────────────────────── -->
+    <div class="card">
+      <h3>🔒 Privacy &amp; Data Ownership</h3>
+      <ul>
+        <li>All conversation data stored locally on your device</li>
+        <li>No telemetry, analytics, or crash reporting sent anywhere</li>
+        <li>Cloud API keys (for OpenCode) stored encrypted on-device</li>
+        <li>Network traffic goes only to your own servers (or directly on-device)</li>
+        <li>Open-source (MIT License) — audit the code yourself</li>
+        <li>Export and own your full conversation history at any time</li>
+      </ul>
+    </div>
+
+    <!-- ── Android Integration ───────────────────────────────────────── -->
+    <div class="card">
+      <h3>📱 Android Integration</h3>
+      <ul>
+        <li>Receive text and images shared from other apps via Android's Share intent</li>
+        <li>Share conversations or responses to other Android apps</li>
+        <li>Local push notifications for long-running AI tasks</li>
+        <li>Material Design 3 adaptive theming (dark mode always on)</li>
+        <li>Background task support with notification actions</li>
+        <li>Clipboard integration for quick copy/paste</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>📚 Learn More</h3>
+      <p>
+        <a href={getLink('/install')} style="color:var(--accent);text-decoration:none">Installation Guide</a> •
+        <a href={getLink('/api-comparison')} style="color:var(--accent);text-decoration:none">API Comparison (Ollama vs LM Studio vs OpenCode)</a> •
+        <a href="https://github.com/cmwen/private-chat-hub" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub Repository</a>
+      </p>
+    </div>
+  </section>
+</BaseLayout>

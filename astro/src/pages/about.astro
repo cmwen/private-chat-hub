@@ -1,40 +1,62 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
+const getLink = (path) => {
+  const base = import.meta.env.BASE_URL;
+  const b = base.endsWith('/') ? base : base + '/';
+  if (path === '/') return b;
+  return b + path.replace(/^\//, '');
+};
 ---
 <BaseLayout title="About Private Chat Hub">
   <section>
     <h2>About Private Chat Hub</h2>
-    <p class="lead">Private Chat Hub is a privacy-first mobile application that lets you interact with self-hosted AI models directly on your Android device. Your conversations stay under your control.</p>
+    <p class="lead">Private Chat Hub is a privacy-first Android app for chatting with AI models you run yourself—on your local network or entirely on-device. Connect to <strong>Ollama</strong>, <strong>LM Studio</strong>, or <strong>OpenCode</strong>, or run <strong>Gemma / Gemini Nano</strong> with zero internet access. Your conversations never leave your control.</p>
 
     <div class="card">
       <h3>🎨 Our Philosophy</h3>
-      <p><strong>Privacy First:</strong> User data never leaves your control</p>
-      <p><strong>Local Performance:</strong> Optimize for local network operations</p>
-      <p><strong>Simplicity:</strong> Complex AI made accessible to everyone</p>
-      <p><strong>Transparency:</strong> Always show what's happening (model, resource usage)</p>
-      <p><strong>Extensibility:</strong> Build for today, prepare for tomorrow</p>
+      <p><strong>Privacy First:</strong> User data never leaves your control—no telemetry, no cloud sync</p>
+      <p><strong>Local Performance:</strong> Optimized for local network and on-device operations</p>
+      <p><strong>Simplicity:</strong> Complex AI capabilities made accessible through a clean interface</p>
+      <p><strong>Transparency:</strong> Always show what's happening—active model, token counts, tool calls</p>
+      <p><strong>Extensibility:</strong> Multiple backends, pluggable tools, and open-source codebase</p>
     </div>
 
     <div class="card">
-      <h3>👥 Who is this for?</h3>
-      
+      <h3>👥 Who Is This For?</h3>
+
       <p><strong>The Privacy Advocate</strong></p>
-      <p>Runs home servers and self-hosted services. Distrusts cloud AI services. Values complete control over data. Willing to invest in hardware for digital sovereignty.</p>
-      
+      <p>Runs home servers and self-hosted services. Distrusts cloud AI. Values complete data sovereignty. Wants an AI assistant that never phones home.</p>
+
       <p style="margin-top:16px"><strong>The AI Developer</strong></p>
-      <p>Experiments with LLMs and models. Needs flexible testing environment. Wants to integrate AI into workflows. Understands technical trade-offs and values rapid experimentation.</p>
-      
+      <p>Experiments with LLMs, tool calling, and multi-model workflows. Needs a flexible testing client that exposes real API behaviour—streaming, function calls, thinking traces—without rate limits or costs.</p>
+
       <p style="margin-top:16px"><strong>The Power User</strong></p>
-      <p>Uses AI daily for productivity. Concerned about subscription costs. Wants offline/local capabilities. Values customization and control over generic cloud solutions.</p>
+      <p>Uses AI daily for writing, coding, and research. Values TTS read-aloud, model comparison, project workspaces, web search integration, and offline capability on a single mobile app.</p>
+
+      <p style="margin-top:16px"><strong>The Offline User</strong></p>
+      <p>Needs AI in environments without internet. Uses on-device Gemma/Gemini Nano inference that runs entirely on the Android device—no server, no network.</p>
+    </div>
+
+    <div class="card">
+      <h3>🤖 Supported Backends</h3>
+      <ul>
+        <li><strong>Ollama</strong> — Self-hosted LLM server. Supports the full Ollama model library with tool calling, vision, and thinking modes. Default port <code>11434</code>.</li>
+        <li><strong>LM Studio</strong> — Run any GGUF/GGML model from LM Studio's desktop app over your local network. Default port <code>1234</code>.</li>
+        <li><strong>OpenCode</strong> — Routes requests to cloud providers (OpenAI, Anthropic, Google) via the self-hosted <a href="https://opencode.ai" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">opencode</a> server. Default port <code>8080</code>.</li>
+        <li><strong>On-Device (LiteRT)</strong> — Gemma 3 / Gemini Nano running natively on the Android device via Google's LiteRT runtime. Completely offline, no server required.</li>
+      </ul>
     </div>
 
     <div class="card">
       <h3>🏗️ Built With</h3>
       <ul>
-        <li><strong>Flutter 3.10.1+</strong> - Cross-platform mobile development</li>
-        <li><strong>Dart 3.10.1+</strong> - Fast, type-safe language</li>
-        <li><strong>Material Design 3</strong> - Beautiful, accessible UI</li>
-        <li><strong>Ollama Integration</strong> - Connect to any self-hosted LLM</li>
+        <li><strong>Flutter 3.10.1+</strong> — Cross-platform Android development</li>
+        <li><strong>Dart 3.10.1+</strong> — Fast, type-safe language</li>
+        <li><strong>Material Design 3</strong> — Beautiful dark UI with adaptive theming</li>
+        <li><strong>LiteRT (TensorFlow Lite)</strong> — On-device model inference</li>
+        <li><strong>flutter_markdown + LaTeX</strong> — Rich formatted responses with math</li>
+        <li><strong>Jina AI</strong> — Web search with source links</li>
+        <li><strong>flutter_tts</strong> — Text-to-speech read-aloud</li>
       </ul>
     </div>
 
@@ -42,27 +64,23 @@ import BaseLayout from '../layouts/BaseLayout.astro'
       <h3>🎯 Product Principles</h3>
       <ol>
         <li><strong>Data Ownership:</strong> Users own 100% of their conversation data</li>
-        <li><strong>No Subscriptions:</strong> Free to use, costs only your hardware</li>
-        <li><strong>Model Flexibility:</strong> Switch between models instantly</li>
-        <li><strong>Local Network:</strong> All communication stays on your network</li>
-        <li><strong>Open Development:</strong> Built in the open, transparent roadmap</li>
+        <li><strong>No Subscriptions:</strong> Free to use; costs only your own hardware</li>
+        <li><strong>Backend Flexibility:</strong> Swap between Ollama, LM Studio, OpenCode, or on-device at any time</li>
+        <li><strong>Model Flexibility:</strong> Switch models instantly within any conversation</li>
+        <li><strong>Offline First:</strong> On-device inference works with zero network</li>
+        <li><strong>Open Development:</strong> MIT-licensed, built in the open</li>
       </ol>
     </div>
 
     <div class="card">
-      <h3>📊 Success Metrics</h3>
-      <p>We measure success by:</p>
-      <ul>
-        <li>User satisfaction and app store ratings (target: 4.5+)</li>
-        <li>Community feedback and feature adoption</li>
-        <li>Technical performance (response time, reliability)</li>
-        <li>User retention (30-day: 60%+)</li>
-      </ul>
-    </div>
-
-    <div class="card">
       <h3>🔗 Project Links</h3>
-      <p><a href="https://github.com/cmwen/private-chat-hub" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub Repository</a> • <a href="/releases" style="color:var(--accent);text-decoration:none">Releases & Downloads</a> • <a href="/install" style="color:var(--accent);text-decoration:none">Installation Guide</a></p>
+      <p>
+        <a href="https://github.com/cmwen/private-chat-hub" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub Repository</a> •
+        <a href={getLink('/releases')} style="color:var(--accent);text-decoration:none">Releases &amp; Downloads</a> •
+        <a href={getLink('/install')} style="color:var(--accent);text-decoration:none">Installation Guide</a> •
+        <a href={getLink('/features')} style="color:var(--accent);text-decoration:none">All Features</a> •
+        <a href={getLink('/api-comparison')} style="color:var(--accent);text-decoration:none">API Comparison</a>
+      </p>
     </div>
   </section>
 </BaseLayout>
