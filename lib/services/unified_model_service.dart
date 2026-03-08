@@ -38,9 +38,62 @@ class UnifiedModelService {
   Future<List<ModelInfo>> getUnifiedModelList(
     List<OllamaModelInfo> ollamaModels,
   ) async {
+    // Fetch local and OpenCode models in parallel for faster loading.
+    // Each future resolves to a List<ModelInfo>; destructuring preserves
+    // the explicit relationship between the fetch order and the result names.
+    final [localModels, openCodeModels] = await Future.wait<List<ModelInfo>>([
+      // On-device local models
+      () async {
+        if (_onDeviceLLMService == null) return <ModelInfo>[];
+        try {
+          final downloaded = await _onDeviceLLMService.modelManager
+              .getDownloadedModels();
+          return downloaded
+              .map((localModel) {
+                final modelId = '$localModelPrefix${localModel.id}';
+                if (_visibilityService != null &&
+                    !_visibilityService.isModelVisible(modelId)) {
+                  return null;
+                }
+                return ModelInfo(
+                  id: modelId,
+                  name: localModel.name,
+                  description: localModel.description,
+                  sizeBytes: localModel.sizeBytes,
+                  isDownloaded: localModel.isDownloaded,
+                  capabilities: localModel.capabilities,
+                  isLocal: true,
+                );
+              })
+              .whereType<ModelInfo>()
+              .toList();
+        } catch (e) {
+          print('[UnifiedModelService] Failed to get local models: $e');
+          return <ModelInfo>[];
+        }
+      }(),
+      // OpenCode cloud models
+      () async {
+        if (_openCodeLLMService == null) return <ModelInfo>[];
+        try {
+          final openCodeModels = await _openCodeLLMService.getAvailableModels();
+          return openCodeModels.where((model) {
+            if (_visibilityService != null &&
+                !_visibilityService.isModelVisible(model.id)) {
+              return false;
+            }
+            return true;
+          }).toList();
+        } catch (e) {
+          print('[UnifiedModelService] Failed to get OpenCode models: $e');
+          return <ModelInfo>[];
+        }
+      }(),
+    ]);
+
     final List<ModelInfo> unifiedList = [];
 
-    // Add Ollama models (remote)
+    // Add Ollama models first (remote, highest priority)
     for (final OllamaModelInfo ollamaModel in ollamaModels) {
       if (_visibilityService != null &&
           !_visibilityService.isModelVisible(ollamaModel.name)) {
@@ -60,54 +113,8 @@ class UnifiedModelService {
       );
     }
 
-    // Add on-device models (local)
-    if (_onDeviceLLMService != null) {
-      try {
-        final localModels = await _onDeviceLLMService.modelManager
-            .getDownloadedModels();
-
-        for (final localModel in localModels) {
-          final modelId = '$localModelPrefix${localModel.id}';
-          if (_visibilityService != null &&
-              !_visibilityService.isModelVisible(modelId)) {
-            continue;
-          }
-
-          unifiedList.add(
-            ModelInfo(
-              id: modelId,
-              name: localModel.name,
-              description: localModel.description,
-              sizeBytes: localModel.sizeBytes,
-              isDownloaded: localModel.isDownloaded,
-              capabilities: localModel.capabilities,
-              isLocal: true,
-            ),
-          );
-        }
-      } catch (e) {
-        // Failed to get local models - that's OK
-        print('[UnifiedModelService] Failed to get local models: $e');
-      }
-    }
-
-    // Add OpenCode models (cloud)
-    if (_openCodeLLMService != null) {
-      try {
-        final openCodeModels = await _openCodeLLMService.getAvailableModels();
-
-        for (final model in openCodeModels) {
-          // Filter by visibility if service is available
-          if (_visibilityService != null &&
-              !_visibilityService.isModelVisible(model.id)) {
-            continue;
-          }
-          unifiedList.add(model);
-        }
-      } catch (e) {
-        print('[UnifiedModelService] Failed to get OpenCode models: $e');
-      }
-    }
+    unifiedList.addAll(localModels);
+    unifiedList.addAll(openCodeModels);
 
     return unifiedList;
   }

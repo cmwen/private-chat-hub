@@ -247,6 +247,206 @@ class OllamaAgent implements Agent {
     }
   }
 
+  /// Run the agent with tools and stream the final text response.
+  ///
+  /// Identical to [runWithTools] for the tool-calling loop (each iteration
+  /// uses [OllamaClient.chat] so that tool-call JSON is received atomically).
+  /// Once the model produces a final answer without tool calls, the response
+  /// is re-requested via [OllamaClient.chatStream] so that text tokens reach
+  /// the caller incrementally.
+  ///
+  /// [onStep] is called synchronously for every [AgentStep] as it occurs.
+  Stream<String> runStream(
+    String input,
+    List<Tool> tools, {
+    void Function(AgentStep step)? onStep,
+  }) async* {
+    final steps = <AgentStep>[];
+    try {
+      if (systemPrompt != null && memory.length == 0) {
+        memory.addMessage(OllamaMessage.system(systemPrompt!));
+      }
+
+      memory.addMessage(OllamaMessage.user(input));
+      final inputStep = AgentStep(type: 'input', content: input);
+      steps.add(inputStep);
+      onStep?.call(inputStep);
+
+      bool modelSupportsTools = tools.isNotEmpty;
+
+      for (var iteration = 0; iteration < maxIterations; iteration++) {
+        final toolDefinitions = modelSupportsTools && tools.isNotEmpty
+            ? tools
+                  .map(
+                    (t) => ToolDefinition(
+                      name: t.name,
+                      description: t.description,
+                      parameters: t.parameters,
+                    ),
+                  )
+                  .toList()
+            : null;
+
+        print(
+          '[OllamaAgent.runStream] Iteration ${iteration + 1}/$maxIterations: '
+          'Sending ${toolDefinitions?.length ?? 0} tools to model $model',
+        );
+
+        late OllamaChatResponse response;
+        try {
+          response = await client.chat(
+            model,
+            memory.getMessages(),
+            think: enableThinking,
+            tools: toolDefinitions,
+          );
+        } catch (e) {
+          if (e.toString().contains('does not support tools') &&
+              modelSupportsTools) {
+            print(
+              '[OllamaAgent.runStream] Model $model does not support tools.'
+              ' Retrying without tools...',
+            );
+            modelSupportsTools = false;
+            continue;
+          }
+          rethrow;
+        }
+
+        final message = response.message;
+
+        if (message.thinking != null && message.thinking!.isNotEmpty) {
+          final thinkStep = AgentStep(
+            type: 'thinking',
+            content: message.thinking!,
+          );
+          steps.add(thinkStep);
+          onStep?.call(thinkStep);
+        }
+
+        // Model requested tool calls – execute them and continue.
+        if (message.toolCalls != null && message.toolCalls!.isNotEmpty) {
+          memory.addMessage(message);
+
+          final toolResults = await Future.wait(
+            message.toolCalls!.map((toolCall) async {
+              if (toolCall.name.isEmpty) {
+                return {
+                  'toolName': '',
+                  'result': 'Tool call had empty name',
+                  'toolId': toolCall.id,
+                  'skip': true,
+                };
+              }
+
+              final callStep = AgentStep(
+                type: 'tool_call',
+                content: 'Calling ${toolCall.name}',
+                toolName: toolCall.name,
+                toolArgs: toolCall.arguments,
+              );
+              steps.add(callStep);
+              onStep?.call(callStep);
+
+              Tool? tool;
+              try {
+                tool = tools.firstWhere((t) => t.name == toolCall.name);
+              } catch (_) {
+                tool = null;
+              }
+
+              if (tool == null) {
+                return {
+                  'toolName': toolCall.name,
+                  'result': 'Tool not found: ${toolCall.name}',
+                  'toolId': toolCall.id,
+                  'skip': false,
+                };
+              }
+
+              final result = await tool.execute(toolCall.arguments);
+
+              final resultStep = AgentStep(
+                type: 'tool_result',
+                content: result,
+                toolName: toolCall.name,
+              );
+              steps.add(resultStep);
+              onStep?.call(resultStep);
+
+              return {
+                'result': result,
+                'toolName': toolCall.name,
+                'toolId': toolCall.id,
+                'skip': false,
+              };
+            }),
+          );
+
+          for (final toolResult in toolResults) {
+            if (toolResult['skip'] == true) continue;
+            final toolName = toolResult['toolName'] as String?;
+            final toolId = toolResult['toolId'] as String?;
+            final result = toolResult['result'] as String?;
+            if (toolName != null && toolName.isNotEmpty && result != null) {
+              memory.addMessage(
+                OllamaMessage.tool(
+                  result,
+                  toolName: toolName,
+                  toolId: toolId ?? '',
+                ),
+              );
+            }
+          }
+
+          continue; // next iteration with tool results
+        }
+
+        // No tool calls → this is the final answer.
+        // The non-streaming call already returned the full text.  Instead
+        // of displaying it all at once, re-request using chatStream so the
+        // caller can display tokens progressively.
+        // Note: message is NOT added to memory here – the streaming re-call
+        // will produce the same content, which is added after streaming.
+        print(
+          '[OllamaAgent.runStream] Final response reached. '
+          'Switching to chatStream for progressive display.',
+        );
+
+        final streamBuffer = StringBuffer();
+        await for (final chunk in client.chatStream(
+          model,
+          memory.getMessages(),
+          think: enableThinking,
+        )) {
+          if (chunk.message.content.isNotEmpty) {
+            streamBuffer.write(chunk.message.content);
+            yield chunk.message.content;
+          }
+        }
+
+        // Add the complete final response to memory (for multi-turn continuity).
+        memory.addMessage(OllamaMessage.assistant(streamBuffer.toString()));
+
+        final answerStep = AgentStep(
+          type: 'answer',
+          content: streamBuffer.toString(),
+        );
+        steps.add(answerStep);
+        onStep?.call(answerStep);
+
+        return; // done
+      }
+
+      // Reached maxIterations without a final answer.
+      print('[OllamaAgent.runStream] Max iterations ($maxIterations) reached.');
+    } catch (e, stackTrace) {
+      print('[OllamaAgent.runStream] ERROR: $e');
+      print('[OllamaAgent.runStream] Stack trace: $stackTrace');
+      rethrow;
+    }
+  }
+
   /// Clear conversation memory
   void clearMemory() {
     memory.clear();

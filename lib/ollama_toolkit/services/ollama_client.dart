@@ -337,15 +337,21 @@ class OllamaClient {
         );
       }
 
-      await for (final chunk in response.stream.transform(utf8.decoder)) {
-        final lines = chunk.split('\n');
-        for (final line in lines) {
-          if (line.trim().isNotEmpty) {
-            try {
-              yield json.decode(line) as Map<String, dynamic>;
-            } catch (e) {
-              // Skip invalid JSON lines
-            }
+      // Use LineSplitter to handle newline-delimited JSON correctly.
+      // A single HTTP chunk may contain multiple JSON lines, or a JSON
+      // line may span multiple HTTP chunks.  LineSplitter accumulates
+      // bytes across chunks and only emits complete lines, preventing
+      // silent token loss that occurred with the previous chunk.split('\n')
+      // approach.
+      await for (final line
+          in response.stream
+              .transform(utf8.decoder)
+              .transform(const LineSplitter())) {
+        if (line.trim().isNotEmpty) {
+          try {
+            yield json.decode(line) as Map<String, dynamic>;
+          } catch (e) {
+            // Skip invalid JSON lines (e.g., keep-alive pings)
           }
         }
       }

@@ -277,6 +277,64 @@ void main() {
       expect(restored.webSearchEnabled, true);
       expect(restored.maxSearchResults, 10);
     });
+
+    test('all base tools enabled by default (enabledBaseTools is null)', () {
+      const config = ToolConfig();
+      expect(config.enabledBaseTools, isNull);
+      // null means all enabled
+      expect(config.isBaseToolEnabled('get_current_datetime'), true);
+      expect(config.isBaseToolEnabled('get_current_location'), true);
+      expect(config.isBaseToolEnabled('fetch_url'), true);
+      expect(config.isBaseToolEnabled('show_notification'), true);
+    });
+
+    test('can disable individual base tools', () {
+      const config = ToolConfig(
+        enabledBaseTools: {'get_current_datetime', 'fetch_url'},
+      );
+      expect(config.isBaseToolEnabled('get_current_datetime'), true);
+      expect(config.isBaseToolEnabled('fetch_url'), true);
+      expect(config.isBaseToolEnabled('get_current_location'), false);
+      expect(config.isBaseToolEnabled('show_notification'), false);
+    });
+
+    test('enabledBaseTools round-trips through JSON', () {
+      const config = ToolConfig(
+        enabled: true,
+        enabledBaseTools: {'get_current_datetime', 'fetch_url'},
+      );
+      final json = config.toJson();
+      final restored = ToolConfig.fromJson(json);
+      expect(restored.enabledBaseTools, isNotNull);
+      expect(
+        restored.enabledBaseTools,
+        containsAll(['get_current_datetime', 'fetch_url']),
+      );
+      expect(restored.enabledBaseTools!.contains('show_notification'), false);
+    });
+
+    test('copyWith preserves enabledBaseTools when not overridden', () {
+      const config = ToolConfig(enabledBaseTools: {'get_current_datetime'});
+      final updated = config.copyWith(enabled: false);
+      expect(updated.enabledBaseTools, equals({'get_current_datetime'}));
+    });
+
+    test('copyWith can update enabledBaseTools', () {
+      const config = ToolConfig(enabledBaseTools: {'get_current_datetime'});
+      final updated = config.copyWith(
+        enabledBaseTools: {'fetch_url', 'show_notification'},
+      );
+      expect(
+        updated.enabledBaseTools,
+        equals({'fetch_url', 'show_notification'}),
+      );
+    });
+
+    test('copyWith can clear enabledBaseTools back to null', () {
+      const config = ToolConfig(enabledBaseTools: {'fetch_url'});
+      final updated = config.copyWith(clearEnabledBaseTools: true);
+      expect(updated.enabledBaseTools, isNull);
+    });
   });
 
   group('AvailableTools', () {
@@ -289,12 +347,17 @@ void main() {
       expect(AvailableTools.currentDateTime.name, 'get_current_datetime');
     });
 
+    test('should have current location tool', () {
+      expect(AvailableTools.getCurrentLocation.name, 'get_current_location');
+      expect(AvailableTools.getCurrentLocation.description.isNotEmpty, true);
+    });
+
     test('should have read url tool', () {
       expect(AvailableTools.readUrl.name, 'read_url');
     });
 
     test('should list all tools', () {
-      expect(AvailableTools.all.length, 9);
+      expect(AvailableTools.all.length, 10);
     });
 
     test('should have fetch url tool', () {
@@ -331,6 +394,11 @@ void main() {
     test('should get tool by name', () {
       final tool = AvailableTools.getByName('web_search');
       expect(tool.name, 'web_search');
+    });
+
+    test('should get location tool by name', () {
+      final tool = AvailableTools.getByName('get_current_location');
+      expect(tool.name, 'get_current_location');
     });
 
     test('should throw for unknown tool', () {

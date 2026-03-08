@@ -55,44 +55,55 @@ class _ModelsScreenState extends State<ModelsScreen> {
     });
 
     String? remoteError;
-    var remoteModels = <OllamaModelInfo>[];
-    var localModels = <ModelInfo>[];
-    var openCodeModels = <ModelInfo>[];
 
+    // Set up connection before firing parallel fetches
     final connection = widget.connectionService.getDefaultConnection();
     if (connection != null) {
-      try {
-        widget.ollamaManager.setConnection(connection);
-        remoteModels = await widget.ollamaManager.listModels();
-      } catch (e) {
-        remoteError = e.toString();
-      }
+      widget.ollamaManager.setConnection(connection);
     }
 
-    // Models view is a management surface, so it must show all available
-    // models, not only currently-visible ones.
-    if (widget.onDeviceLLMService != null) {
+    // Start all three source fetches concurrently.  Using separate typed
+    // futures avoids the dynamic casts that Future.wait<dynamic> would need.
+    final remoteF = () async {
+      if (connection == null) return <OllamaModelInfo>[];
+      try {
+        return await widget.ollamaManager.listModels();
+      } catch (e) {
+        remoteError = e.toString();
+        return <OllamaModelInfo>[];
+      }
+    }();
+
+    final localF = () async {
+      if (widget.onDeviceLLMService == null) return <ModelInfo>[];
       try {
         final downloaded = await widget.onDeviceLLMService!.modelManager
             .getDownloadedModels();
-        localModels = downloaded
+        return downloaded
             .map(
               (model) => model.copyWith(id: 'local:${model.id}', isLocal: true),
             )
             .toList();
       } catch (_) {
-        localModels = [];
+        return <ModelInfo>[];
       }
-    }
+    }();
 
-    if (widget.openCodeLLMService != null) {
+    final openCodeF = () async {
+      if (widget.openCodeLLMService == null) return <ModelInfo>[];
       try {
-        openCodeModels = await widget.openCodeLLMService!
-            .getAvailableModelsForSelection(applyProviderFilter: false);
+        return await widget.openCodeLLMService!.getAvailableModelsForSelection(
+          applyProviderFilter: false,
+        );
       } catch (_) {
-        openCodeModels = [];
+        return <ModelInfo>[];
       }
-    }
+    }();
+
+    // Await all results — the futures are already running in parallel above
+    final remoteModels = await remoteF;
+    final localModels = await localF;
+    final openCodeModels = await openCodeF;
 
     final hasAnyModel =
         remoteModels.isNotEmpty ||

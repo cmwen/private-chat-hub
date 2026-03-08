@@ -91,28 +91,47 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
       visibilityService: widget.openCodeVisibilityService,
     );
 
+    // Set up connection before firing parallel fetches
+    final connection = widget.connectionService.getDefaultConnection();
+    if (connection != null) {
+      widget.ollamaManager.setConnection(connection);
+    }
+
     try {
-      final connection = widget.connectionService.getDefaultConnection();
-
-      if (connection != null) {
-        widget.ollamaManager.setConnection(connection);
-
-        // Add a reasonable timeout for initial model loading (5 seconds)
-        // This prevents long waits when Ollama is offline
-        _ollamaModels = await widget.ollamaManager.listModels().timeout(
+      // Start both fetches concurrently: Ollama models (with short timeout) and
+      // local+OpenCode via UnifiedModelService.  Using typed futures avoids
+      // dynamic casts and makes the relationship between future and result clear.
+      final ollamaF = () async {
+        if (connection == null) return <OllamaModelInfo>[];
+        return widget.ollamaManager.listModels().timeout(
           const Duration(seconds: 5),
           onTimeout: () {
             throw Exception('Connection timeout - Ollama may be offline');
           },
         );
-      } else {
-        _ollamaModels = [];
-      }
+      }();
+
+      // Start non-Ollama models immediately — they don't depend on Ollama.
+      final nonOllamaF = unifiedModelService.getUnifiedModelList([]);
+
+      // Await both; if Ollama times out, the outer catch handles it.
+      _ollamaModels = await ollamaF;
+      final nonOllamaModels = await nonOllamaF;
 
       _isOllamaOnline = true;
 
-      // Get unified model list (Ollama + local models)
-      _allModels = await unifiedModelService.getUnifiedModelList(_ollamaModels);
+      // Build the full list: Ollama models first, then local and OpenCode.
+      // Merge the two sets by ID — Ollama models take priority over any
+      // stale non-Ollama copy of the same ID.
+      final allWithOllama = await unifiedModelService.getUnifiedModelList(
+        _ollamaModels,
+      );
+      final mergedById = <String, ModelInfo>{
+        for (final m in nonOllamaModels) m.id: m, // lower priority
+        for (final m in allWithOllama) m.id: m, // higher priority (Ollama)
+      };
+      _allModels = mergedById.values.toList();
+
       _publishAvailableModels();
 
       // Cache the remote models for offline fallback

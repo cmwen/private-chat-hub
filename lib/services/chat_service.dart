@@ -1690,7 +1690,7 @@ class ChatService {
   ) async {
     _log('Starting agent-based generation for _generateWithTools');
 
-    // Check streaming preference - apply to tool calling as well
+    // Check streaming preference — applied to the final response text.
     final streamingEnabled = await _configService.getStreamEnabled();
     _log('Streaming enabled for tool calling: $streamingEnabled');
 
@@ -1708,7 +1708,6 @@ class ChatService {
 
     // Get available tools
     final executor = _toolExecutor!;
-    // Set project context so project tools know which project to operate on
     _log(
       'Setting project context: projectId=${conversation.projectId} '
       '(project tools only active when this is non-null)',
@@ -1734,14 +1733,18 @@ class ChatService {
     }
     final lastUserMessage = userMessages.last;
 
-    // Run agent with tools
-    final List<app_tools.ToolCall> toolCalls = [];
-    var responseText = StringBuffer();
+    // Collected tool-call steps for the badge UI.
+    final collectedSteps = <AgentStep>[];
+    final toolCalls = <app_tools.ToolCall>[];
+    final responseText = StringBuffer();
 
     try {
-      _log('Running agent.runWithTools for model: ${conversation.modelName}');
+      _log(
+        'Running agent.runStream for model: ${conversation.modelName}, '
+        'streamingEnabled=$streamingEnabled',
+      );
 
-      // Show initial status
+      // Show initial status while tool-calling loop runs.
       conversation = await _updateStatusMessage(
         conversation,
         assistantMessageId,
@@ -1751,109 +1754,108 @@ class ChatService {
         streamController.add(conversation);
       }
 
-      final result = await agent.runWithTools(lastUserMessage.text, tools);
+      if (streamingEnabled) {
+        // ── Streaming path ──────────────────────────────────────────────────
+        // agent.runStream runs the blocking tool loop and then streams the
+        // final text response token-by-token via chatStream.
+        await for (final textChunk in agent.runStream(
+          lastUserMessage.text,
+          tools,
+          onStep: (step) {
+            collectedSteps.add(step);
+            _log('Agent step: type=${step.type}, tool=${step.toolName}');
+          },
+        )) {
+          if (streamController.isClosed) break;
 
-      _log('Agent completed with ${result.steps.length} steps');
-      StatusService().showTransient(
-        '[Agent] Completed: ${result.steps.where((s) => s.type == 'tool_call').length} tool calls',
-      );
+          // On the very first text chunk, clear the status and rebuild the
+          // tool call list from steps seen so far.
+          if (responseText.isEmpty) {
+            toolCalls
+              ..clear()
+              ..addAll(_buildToolCallsFromSteps(collectedSteps));
+            conversation = await _updateStatusMessage(
+              conversation,
+              assistantMessageId,
+              null,
+            );
+          }
 
-      // Check if agent failed (e.g., max iterations reached)
-      if (!result.success && result.error != null) {
-        _log('Agent failed: ${result.error}');
-        // Throw error to trigger error message display
-        throw Exception(result.error);
-      }
+          responseText.write(textChunk);
 
-      // Build a lookup of tool results: match each tool_call step with the
-      // nearest subsequent tool_result step with the same tool name so we can
-      // surface the result summary inside the ToolBadge detail view.
-      // Use Map<toolName, List<AgentStep>> for O(n) matching instead of O(n²).
-      final pendingByName = <String, List<AgentStep>>{};
-      final callResultPairs = <(AgentStep, String?)>[];
-      for (final step in result.steps) {
-        if (step.type == 'tool_call' && step.toolName != null) {
-          pendingByName.putIfAbsent(step.toolName!, () => []).add(step);
-        } else if (step.type == 'tool_result' && step.toolName != null) {
-          final pending = pendingByName[step.toolName!];
-          if (pending != null && pending.isNotEmpty) {
-            callResultPairs.add((pending.removeAt(0), step.content));
+          conversation = await _updateAssistantMessage(
+            conversation,
+            assistantMessageId,
+            responseText.toString(),
+            isStreaming: true,
+            toolCalls: toolCalls,
+          );
+
+          if (!streamController.isClosed) {
+            streamController.add(conversation);
           }
         }
-      }
-      // Any call steps without a matching result step get null result
-      for (final steps in pendingByName.values) {
-        for (final step in steps) {
-          callResultPairs.add((step, null));
+
+        // If no text was ever yielded from the stream, treat that as an error.
+        if (responseText.isEmpty) {
+          // Rebuild tool calls from any steps collected before the stream ended.
+          toolCalls
+            ..clear()
+            ..addAll(_buildToolCallsFromSteps(collectedSteps));
+          _handleError(
+            conversationId,
+            conversation,
+            assistantMessageId,
+            streamController,
+            'The model did not produce a response. This can happen when the '
+            'model is unable to decide on a tool to call or is temporarily '
+            'confused — try sending the message again.',
+          );
+          return;
         }
-      }
+      } else {
+        // ── Non-streaming path ──────────────────────────────────────────────
+        // Use the blocking runWithTools for simplicity when streaming is off.
+        final result = await agent.runWithTools(lastUserMessage.text, tools);
 
-      // Collect tool calls from paired steps and update status
-      for (final (callStep, resultContent) in callResultPairs) {
-        _log(
-          'Tool call: ${callStep.toolName}, result: ${resultContent != null ? '${resultContent.length} chars' : 'none'}',
-        );
-        StatusService().showTransient(
-          '[Agent] Tool used: ${callStep.toolName}',
-        );
+        _log('Agent completed with ${result.steps.length} steps');
 
-        // Update status message (shown during streaming while agent is working)
-        final toolDisplayName = _getToolDisplayName(callStep.toolName!);
+        if (!result.success && result.error != null) {
+          _log('Agent failed: ${result.error}');
+          throw Exception(result.error);
+        }
+
+        collectedSteps.addAll(result.steps);
+        toolCalls.addAll(_buildToolCallsFromSteps(result.steps));
+        responseText.write(result.response);
+        _log('Final response length: ${result.response.length}');
+
+        if (responseText.toString().trim().isEmpty) {
+          _handleError(
+            conversationId,
+            conversation,
+            assistantMessageId,
+            streamController,
+            'The model did not produce a response. This can happen when the '
+            'model is unable to decide on a tool to call or is temporarily '
+            'confused — try sending the message again.',
+          );
+          return;
+        }
+
+        // Clear status message before showing the final response.
         conversation = await _updateStatusMessage(
           conversation,
           assistantMessageId,
-          '⚙️ Executing $toolDisplayName...',
+          null,
         );
-        if (!streamController.isClosed) {
-          streamController.add(conversation);
-        }
-
-        final toolCall = app_tools.ToolCall(
-          id: const Uuid().v4(),
-          toolName: callStep.toolName!,
-          arguments: callStep.toolArgs ?? {},
-          status: app_tools.ToolCallStatus.success,
-          result: resultContent != null
-              ? app_tools.ToolResult(success: true, summary: resultContent)
-              : null,
-          createdAt: callStep.timestamp,
-        );
-        toolCalls.add(toolCall);
-        _log('Added tool call: ${callStep.toolName}');
       }
 
-      // Log all steps for debug visibility
-      for (final step in result.steps) {
-        _log('Step: type=${step.type}, tool=${step.toolName}');
-      }
-
-      // Clear status message before final response
-      conversation = await _updateStatusMessage(
-        conversation,
-        assistantMessageId,
-        null,
+      StatusService().showTransient(
+        '[Agent] Completed: ${toolCalls.length} tool calls',
       );
-
-      responseText.write(result.response);
-      _log('Final response length: ${result.response.length}');
-
-      // Guard: if the agent returned success but no text, treat it as an error
-      // so the user sees a visible failure rather than a blank message.
-      if (responseText.toString().trim().isEmpty) {
-        _handleError(
-          conversationId,
-          conversation,
-          assistantMessageId,
-          streamController,
-          'The model did not produce a response. This can happen when the model '
-          'is unable to decide on a tool to call or is temporarily confused — '
-          'try sending the message again.',
-        );
-        return;
-      }
     } catch (e) {
       _log('Error during agent execution: $e');
-      // Re-throw to use the error handling mechanism
       _handleError(
         conversationId,
         conversation,
@@ -1864,15 +1866,12 @@ class ChatService {
       return;
     }
 
-    // Update message with final response and tool calls
-    // Note: Agent execution completes before we can stream, so isStreaming is always false
-    // But we respect the streaming preference for consistency
+    // Finalise the message with the complete text and all tool calls.
     conversation = await _updateAssistantMessage(
       conversation,
       assistantMessageId,
       responseText.toString(),
-      isStreaming:
-          false, // Agent runs to completion, can't stream intermediate states
+      isStreaming: false,
       toolCalls: toolCalls,
     );
 
@@ -1883,11 +1882,52 @@ class ChatService {
 
     _markGenerationCompleted(conversationId);
 
-    // Show notification when response completes
     await _showResponseCompleteNotification(
       conversation,
       responseText.toString(),
     );
+  }
+
+  /// Pairs tool_call steps with their nearest subsequent tool_result step
+  /// of the same name and returns a list of [app_tools.ToolCall] objects.
+  List<app_tools.ToolCall> _buildToolCallsFromSteps(List<AgentStep> steps) {
+    final pendingByName = <String, List<AgentStep>>{};
+    final pairs = <(AgentStep, String?)>[];
+
+    for (final step in steps) {
+      if (step.type == 'tool_call' && step.toolName != null) {
+        pendingByName.putIfAbsent(step.toolName!, () => []).add(step);
+        StatusService().showTransient(
+          '[Agent] Used: ${_getToolDisplayName(step.toolName!)}',
+        );
+      } else if (step.type == 'tool_result' && step.toolName != null) {
+        final pending = pendingByName[step.toolName!];
+        if (pending != null && pending.isNotEmpty) {
+          pairs.add((pending.removeAt(0), step.content));
+        }
+      }
+    }
+    // Remaining call steps without a matching result get null.
+    for (final remaining in pendingByName.values) {
+      for (final step in remaining) {
+        pairs.add((step, null));
+      }
+    }
+
+    return pairs.map((pair) {
+      final callStep = pair.$1;
+      final resultContent = pair.$2;
+      return app_tools.ToolCall(
+        id: const Uuid().v4(),
+        toolName: callStep.toolName!,
+        arguments: callStep.toolArgs ?? {},
+        status: app_tools.ToolCallStatus.success,
+        result: resultContent != null
+            ? app_tools.ToolResult(success: true, summary: resultContent)
+            : null,
+        createdAt: callStep.timestamp,
+      );
+    }).toList();
   }
 
   // ============================================================================
@@ -2362,6 +2402,8 @@ class ChatService {
         return '🌐 Fetching URL';
       case 'get_current_datetime':
         return '🕒 Getting Time';
+      case 'get_current_location':
+        return '📍 Getting Location';
       case 'show_notification':
         return '🔔 Sending Notification';
       case 'get_project_memory':

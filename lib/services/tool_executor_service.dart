@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' show min;
 import 'package:http/http.dart' as http;
 import 'package:private_chat_hub/models/tool_models.dart';
@@ -43,13 +44,20 @@ class ToolExecutorService {
   List<Tool> getAvailableTools() {
     final tools = <Tool>[];
 
-    // Always available
-    tools.add(AvailableTools.currentDateTime);
-    tools.add(AvailableTools.fetchUrl);
-    tools.add(AvailableTools.showNotification);
-    _debugLog(
-      '✔ Base tools added: get_current_datetime, fetch_url, show_notification',
-    );
+    // Base tools — each can be individually enabled or disabled.
+    void addBaseToolIfEnabled(Tool tool) {
+      if (config.isBaseToolEnabled(tool.name)) {
+        tools.add(tool);
+        _debugLog('✔ Base tool enabled: ${tool.name}');
+      } else {
+        _debugLog('✗ Base tool disabled by user: ${tool.name}');
+      }
+    }
+
+    addBaseToolIfEnabled(AvailableTools.currentDateTime);
+    addBaseToolIfEnabled(AvailableTools.getCurrentLocation);
+    addBaseToolIfEnabled(AvailableTools.fetchUrl);
+    addBaseToolIfEnabled(AvailableTools.showNotification);
 
     // Requires Jina API key
     if (config.webSearchAvailable) {
@@ -165,6 +173,8 @@ class ToolExecutorService {
         return _handleWebSearch(arguments);
       case 'get_current_datetime':
         return _handleGetDateTime(arguments);
+      case 'get_current_location':
+        return _handleGetCurrentLocation(arguments);
       case 'read_url':
         return _handleReadUrl(arguments);
       case 'fetch_url':
@@ -278,6 +288,102 @@ class ToolExecutorService {
       },
       summary: 'Current date and time: $dayOfWeek, $formattedTime',
     );
+  }
+
+  /// Handles get_current_location tool calls.
+  ///
+  /// Uses IP-based geolocation via the free ipapi.co service (HTTPS).
+  /// Returns city, region, country, and optionally timezone.
+  /// No GPS permissions are required.
+  Future<ToolResult> _handleGetCurrentLocation(
+    Map<String, dynamic> arguments,
+  ) async {
+    final includeTimezone = arguments['include_timezone'] as bool? ?? true;
+
+    try {
+      // ipapi.co provides free HTTPS geolocation by IP address.
+      final uri = Uri.parse('https://ipapi.co/json/');
+      final response = await http
+          .get(
+            uri,
+            headers: {'User-Agent': _userAgent, 'Accept': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode != 200) {
+        return ToolResult(
+          success: false,
+          summary: 'Failed to get location: HTTP ${response.statusCode}',
+        );
+      }
+
+      final json = _parseJson(response.body);
+      if (json == null) {
+        return const ToolResult(
+          success: false,
+          summary: 'Failed to parse location response.',
+        );
+      }
+
+      // ipapi.co returns an `error` field on failure.
+      if (json['error'] == true) {
+        final reason = json['reason'] as String? ?? 'Unknown error';
+        return ToolResult(
+          success: false,
+          summary: 'Location lookup failed: $reason',
+        );
+      }
+
+      final city = json['city'] as String? ?? '';
+      final regionName = json['region'] as String? ?? '';
+      final country = json['country_name'] as String? ?? '';
+      final countryCode = json['country_code'] as String? ?? '';
+      final lat = json['latitude'];
+      final lon = json['longitude'];
+      final timezone = json['timezone'] as String? ?? '';
+      final ip = json['ip'] as String? ?? '';
+
+      final locationParts = [
+        if (city.isNotEmpty) city,
+        if (regionName.isNotEmpty && regionName != city) regionName,
+        if (country.isNotEmpty) country,
+      ];
+      final locationStr = locationParts.join(', ');
+
+      final data = <String, dynamic>{
+        'city': city,
+        'region': regionName,
+        'country': country,
+        'country_code': countryCode,
+        'latitude': lat,
+        'longitude': lon,
+        'ip_address': ip,
+      };
+      if (includeTimezone && timezone.isNotEmpty) {
+        data['timezone'] = timezone;
+      }
+
+      final summaryParts = ['📍 Location: $locationStr'];
+      if (lat != null && lon != null) {
+        summaryParts.add('Coordinates: $lat, $lon');
+      }
+      if (includeTimezone && timezone.isNotEmpty) {
+        summaryParts.add('Timezone: $timezone');
+      }
+
+      return ToolResult(
+        success: true,
+        data: data,
+        summary: summaryParts.join('\n'),
+      );
+    } on http.ClientException catch (e) {
+      return ToolResult(
+        success: false,
+        summary: 'Network error getting location: $e',
+      );
+    } catch (e) {
+      return ToolResult(success: false, summary: 'Error getting location: $e');
+    }
   }
 
   /// Handles read_url tool calls (Jina-powered reader).
@@ -650,5 +756,14 @@ class ToolExecutorService {
 
     final toolCalls = message['tool_calls'] as List<dynamic>?;
     return toolCalls != null && toolCalls.isNotEmpty;
+  }
+
+  /// Safely parses a JSON string, returning null on error.
+  Map<String, dynamic>? _parseJson(String body) {
+    try {
+      return jsonDecode(body) as Map<String, dynamic>?;
+    } catch (_) {
+      return null;
+    }
   }
 }
