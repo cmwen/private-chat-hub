@@ -1,111 +1,163 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
+const getLink = (path) => {
+  const base = import.meta.env.BASE_URL;
+  const b = base.endsWith('/') ? base : base + '/';
+  if (path === '/') return b;
+  return b + path.replace(/^\//, '');
+};
 ---
 
 <BaseLayout title="Install & Getting Started">
   <section>
     <h2>Getting Started with Private Chat Hub</h2>
 
-    <p class="lead">Get Private Chat Hub running on your Android device and connect to your Ollama instance in minutes.</p>
+    <p class="lead">Get Private Chat Hub running on your Android device and connect to your preferred AI backend in minutes.</p>
 
     <div class="card">
       <h3>📋 Prerequisites</h3>
       <ul>
-        <li><strong>Android Device</strong> - Android 6.0 or higher</li>
-        <li><strong>Ollama Instance</strong> - Running on your local network (home server, PC, etc.)</li>
-        <li><strong>Network Connection</strong> - Local network access between phone and Ollama host</li>
+        <li><strong>Android Device</strong> — Android 7.0 (API 24) or higher</li>
+        <li><strong>AI Backend</strong> — One of: Ollama, LM Studio, OpenCode server, or on-device model (no server needed)</li>
+        <li><strong>Network Connection</strong> — Same WiFi network as your server (not required for on-device models)</li>
       </ul>
     </div>
 
     <div class="card">
-      <h3>📥 Installation Options</h3>
-      
+      <h3>📥 Installation</h3>
+
       <p><strong>Option 1: Download APK (Easiest)</strong></p>
       <ol>
         <li>Download the latest APK from <a href="https://github.com/cmwen/private-chat-hub/releases/latest" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub Releases</a></li>
-        <li>Enable "Install from Unknown Sources" in Android settings</li>
-        <li>Open the APK and follow the installation prompt</li>
-        <li>Launch the app and configure your Ollama connection</li>
+        <li>Enable <em>Install from Unknown Sources</em> in Android Settings → Security</li>
+        <li>Open the downloaded APK and follow the installation prompt</li>
+        <li>Launch <strong>Private Chat Hub</strong> and configure your backend connection</li>
       </ol>
 
       <p style="margin-top:16px"><strong>Option 2: Build from Source</strong></p>
       <ol>
-        <li>Install <a href="https://flutter.dev/docs/get-started/install" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">Flutter SDK 3.10.1+</a> and Dart</li>
-        <li>Clone the repository: <code>git clone https://github.com/cmwen/private-chat-hub.git</code></li>
+        <li>Install <a href="https://flutter.dev/docs/get-started/install" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">Flutter SDK 3.10.1+</a></li>
+        <li>Clone: <code>git clone https://github.com/cmwen/private-chat-hub.git</code></li>
         <li>Get dependencies: <code>flutter pub get</code></li>
-        <li>Build APK: <code>flutter build apk --release</code></li>
+        <li>Build: <code>flutter build apk --release</code></li>
         <li>Install: <code>flutter install</code></li>
       </ol>
     </div>
 
     <div class="card">
-      <h3>⚙️ Configure Ollama Connection</h3>
-      
-      <p><strong>Step 1: Find Your Ollama Host</strong></p>
+      <h3>🦙 Connect to Ollama</h3>
+      <p>Ollama is the recommended backend for most users. It runs locally and supports the widest range of open models.</p>
+
+      <p style="margin-top:12px"><strong>Step 1: Install and Start Ollama</strong></p>
       <ul>
-        <li>If Ollama is running on your PC: Use your computer's local IP (e.g., <code>192.168.1.100</code>)</li>
-        <li>If Ollama is running on a NAS/Server: Use the server's local IP</li>
-        <li>Default Ollama port: <code>11434</code></li>
+        <li>Download from <a href="https://ollama.com" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">ollama.com</a> and install on your PC, Mac, or Linux server</li>
+        <li>Pull a model: <code>ollama pull mistral</code></li>
+        <li>Ollama listens on port <code>11434</code> by default</li>
+        <li>To allow access from your phone, set: <code>OLLAMA_HOST=0.0.0.0</code></li>
       </ul>
 
-      <p style="margin-top:16px"><strong>Step 2: Connect in the App</strong></p>
+      <p style="margin-top:12px"><strong>Step 2: Configure in the App</strong></p>
       <ol>
-        <li>Open Private Chat Hub</li>
-        <li>Tap "Settings" → "Connection"</li>
-        <li>Enter your Ollama host IP and port (e.g., <code>http://192.168.1.100:11434</code>)</li>
-        <li>Tap "Test Connection" to verify</li>
-        <li>Once connected, download or select a model</li>
+        <li>Open Private Chat Hub → <strong>Settings</strong> → <strong>Connection</strong></li>
+        <li>Select <strong>Ollama</strong> as the backend</li>
+        <li>Enter your host URL, e.g. <code>http://192.168.1.100:11434</code></li>
+        <li>Tap <em>Test Connection</em> to verify</li>
+        <li>Select a downloaded model and start chatting</li>
       </ol>
 
-      <p style="margin-top:16px"><strong>Troubleshooting Connection Issues</strong></p>
+      <p style="margin-top:12px"><strong>Recommended Starter Models</strong></p>
       <ul>
-        <li><strong>Can't find host:</strong> Ensure your phone is on the same WiFi as your Ollama host</li>
-        <li><strong>Connection refused:</strong> Check that Ollama is running and listening on port 11434</li>
-        <li><strong>Slow responses:</strong> This is normal for first requests. Responses improve after warm-up</li>
-      </ul>
-    </div>
-
-    <div class="card">
-      <h3>🤖 Download AI Models</h3>
-      <ol>
-        <li>In the app, go to "Models" tab</li>
-        <li>Tap "Download Model"</li>
-        <li>Search for a model (e.g., <code>mistral</code>, <code>neural-chat</code>, <code>dolphin-mixtral</code>)</li>
-        <li>Tap to download (this happens on your Ollama host, not your phone)</li>
-        <li>Once downloaded, you can chat with it immediately</li>
-      </ol>
-      
-      <p style="margin-top:12px"><strong>Recommended Models for Getting Started:</strong></p>
-      <ul>
-        <li><strong>mistral</strong> (7B) - Fast and capable, great balance</li>
-        <li><strong>neural-chat</strong> (7B) - Optimized for conversation</li>
-        <li><strong>dolphin-mixtral</strong> (8x7B) - More powerful, higher quality</li>
+        <li><code>mistral</code> (7B) — Fast, well-rounded</li>
+        <li><code>llama3.2</code> (3B/8B) — Meta's latest, great quality</li>
+        <li><code>gemma3:4b</code> — Google's Gemma 3, excellent for chat</li>
+        <li><code>qwen2.5:7b</code> — Strong reasoning and code</li>
+        <li><code>deepseek-r1:7b</code> — Thinking / extended reasoning</li>
       </ul>
     </div>
 
     <div class="card">
-      <h3>🎯 First Chat</h3>
+      <h3>🎬 Connect to LM Studio</h3>
+      <p>LM Studio lets you run any GGUF model with a GUI on Windows, macOS, or Linux.</p>
+
+      <p style="margin-top:12px"><strong>Step 1: Install and Configure LM Studio</strong></p>
       <ol>
-        <li>Select a model from the dropdown at the top</li>
-        <li>Type a message in the chat input</li>
-        <li>Hit send and wait for a response (first response may take 10-30 seconds)</li>
-        <li>Your conversation is saved locally on your device</li>
+        <li>Download from <a href="https://lmstudio.ai" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">lmstudio.ai</a></li>
+        <li>Download a model inside LM Studio</li>
+        <li>Go to <strong>Local Server</strong> tab and start the server</li>
+        <li>Enable <em>Allow connections from network</em> (so your phone can reach it)</li>
+        <li>Note the server URL shown (usually <code>http://&lt;your-ip&gt;:1234</code>)</li>
       </ol>
+
+      <p style="margin-top:12px"><strong>Step 2: Configure in the App</strong></p>
+      <ol>
+        <li>Open Private Chat Hub → <strong>Settings</strong> → <strong>Connection</strong></li>
+        <li>Select <strong>LM Studio</strong> as the backend</li>
+        <li>Enter your LM Studio URL, e.g. <code>http://192.168.1.100:1234</code></li>
+        <li>Tap <em>Test Connection</em> to verify</li>
+        <li>Choose a loaded model and start chatting</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h3>🔗 Connect to OpenCode</h3>
+      <p>OpenCode routes your requests through cloud providers (OpenAI, Anthropic, Google) via a self-hosted server. You bring your own API keys.</p>
+
+      <p style="margin-top:12px"><strong>Step 1: Install and Start OpenCode Server</strong></p>
+      <ol>
+        <li>Install <a href="https://opencode.ai" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">opencode</a> on your server or PC</li>
+        <li>Configure your cloud API keys in opencode's config</li>
+        <li>Start the server (default port <code>8080</code>)</li>
+      </ol>
+
+      <p style="margin-top:12px"><strong>Step 2: Configure in the App</strong></p>
+      <ol>
+        <li>Open Private Chat Hub → <strong>Settings</strong> → <strong>Connection</strong></li>
+        <li>Select <strong>OpenCode</strong> as the backend</li>
+        <li>Enter your server URL, e.g. <code>http://192.168.1.100:8080</code></li>
+        <li>Enter HTTP Basic Auth credentials if configured</li>
+        <li>Tap <em>Test Connection</em> and choose a provider/model</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h3>📱 On-Device Models (Offline)</h3>
+      <p>Run Gemma or Gemini Nano directly on your Android device—no server or internet connection required.</p>
+      <ol>
+        <li>Open Private Chat Hub → <strong>Settings</strong> → <strong>On-Device Model</strong></li>
+        <li>Download a compatible on-device model (Gemma 3 recommended)</li>
+        <li>Select it as your active model</li>
+        <li>Chat fully offline—no network requests made</li>
+      </ol>
+      <p style="margin-top:8px"><strong>Note:</strong> On-device models require a modern Android device with sufficient RAM (4 GB+ recommended).</p>
     </div>
 
     <div class="card">
       <h3>💡 Tips for Best Experience</h3>
       <ul>
-        <li><strong>WiFi is best:</strong> Larger models respond faster over WiFi</li>
-        <li><strong>Keep Ollama running:</strong> The app connects to your host in real-time</li>
-        <li><strong>Export conversations:</strong> Use the menu to export chats as backup</li>
-        <li><strong>Try different models:</strong> Each model has different strengths and response styles</li>
+        <li><strong>WiFi is best</strong> — Large models respond faster over WiFi than mobile data</li>
+        <li><strong>System prompts</strong> — Set a custom persona per conversation in <em>Chat Settings</em></li>
+        <li><strong>Tool calling</strong> — Enable tools (web search, location, URL fetch) in <em>Settings → Tools</em></li>
+        <li><strong>Model comparison</strong> — Use the comparison mode to run the same prompt across two models</li>
+        <li><strong>TTS</strong> — Tap the speaker icon to have a response read aloud</li>
+        <li><strong>Export</strong> — Back up your chats via <em>Menu → Export Conversation</em></li>
       </ul>
     </div>
 
     <div class="card">
-      <h3>📖 For Developers</h3>
-      <p>Want to build from source or contribute? Check the <a href="https://github.com/cmwen/private-chat-hub" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub repository</a> for development setup and contribution guidelines.</p>
+      <h3>🔧 Troubleshooting</h3>
+      <ul>
+        <li><strong>Can't find host:</strong> Ensure your phone and server are on the same WiFi network</li>
+        <li><strong>Connection refused:</strong> Check the server is running and listening on the correct port</li>
+        <li><strong>Ollama not reachable:</strong> Set <code>OLLAMA_HOST=0.0.0.0</code> to allow LAN connections</li>
+        <li><strong>LM Studio not reachable:</strong> Enable <em>Allow connections from network</em> in LM Studio</li>
+        <li><strong>Slow first response:</strong> Normal for large models—subsequent responses are faster after warm-up</li>
+        <li><strong>Tool calls failing:</strong> Some models don't support tool calling; try <code>llama3.1</code> or <code>mistral-nemo</code> with Ollama</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>📖 Developer Setup</h3>
+      <p>Want to build from source or contribute? See the <a href="https://github.com/cmwen/private-chat-hub" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub repository</a> for full development setup, architecture docs, and contribution guidelines.</p>
     </div>
   </section>
 </BaseLayout>

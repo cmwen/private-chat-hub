@@ -1,14 +1,20 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
+const getLink = (path) => {
+  const base = import.meta.env.BASE_URL;
+  const b = base.endsWith('/') ? base : base + '/';
+  if (path === '/') return b;
+  return b + path.replace(/^\//, '');
+};
 ---
 <BaseLayout title="Private Chat Hub">
   <section>
     <h2>Your AI, Your Data, Your Control</h2>
-    <p class="lead"><strong>Private Chat Hub</strong> empowers you to own your AI conversations by providing a seamless, privacy-first mobile experience for interacting with self-hosted AI models. Your data never leaves your control.</p>
+    <p class="lead"><strong>Private Chat Hub</strong> is a privacy-first Android app for chatting with self-hosted and on-device AI models. Connect to <strong>Ollama</strong>, <strong>LM Studio</strong>, or <strong>OpenCode</strong>—or run entirely on-device with Gemma/Gemini Nano. Your conversations never leave your control.</p>
 
     <div class="card">
       <h3>🎯 The Problem</h3>
-      <p>Cloud AI services lock you into their infrastructure and send your conversations to corporate servers. <strong>Private Chat Hub</strong> is different—all your conversations stay on your devices and infrastructure.</p>
+      <p>Cloud AI services lock you into their infrastructure and send your conversations to corporate servers. <strong>Private Chat Hub</strong> is different—all your conversations stay on your devices and infrastructure, whether you're using a local server or a completely offline on-device model.</p>
     </div>
 
     <div class="card">
@@ -17,7 +23,7 @@ import BaseLayout from '../layouts/BaseLayout.astro'
         <tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
           <td style="padding:8px 0"><strong>Feature</strong></td>
           <td style="padding:8px 0"><strong>Private Chat Hub</strong></td>
-          <td style="padding:8px 0"><strong>ChatGPT/Claude</strong></td>
+          <td style="padding:8px 0"><strong>ChatGPT / Claude</strong></td>
         </tr>
         <tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
           <td style="padding:8px 0">Data Ownership</td>
@@ -26,55 +32,96 @@ import BaseLayout from '../layouts/BaseLayout.astro'
         </tr>
         <tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
           <td style="padding:8px 0">Model Choice</td>
-          <td style="padding:8px 0">✅ Any Ollama Model</td>
+          <td style="padding:8px 0">✅ Any Model (Ollama, LM Studio, On-Device)</td>
           <td style="padding:8px 0">❌ Provider Locked</td>
         </tr>
         <tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
-          <td style="padding:8px 0">Works Offline</td>
-          <td style="padding:8px 0">✅ Local Network</td>
+          <td style="padding:8px 0">Works Fully Offline</td>
+          <td style="padding:8px 0">✅ On-Device Models</td>
           <td style="padding:8px 0">❌ Internet Required</td>
         </tr>
         <tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
+          <td style="padding:8px 0">Tool / Function Calling</td>
+          <td style="padding:8px 0">✅ Built-in (Web Search, Location, URL Fetch…)</td>
+          <td style="padding:8px 0">⚠️ Platform Dependent</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
+          <td style="padding:8px 0">Vision / Image Input</td>
+          <td style="padding:8px 0">✅ Supported</td>
+          <td style="padding:8px 0">✅ Supported</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
+          <td style="padding:8px 0">Text-to-Speech</td>
+          <td style="padding:8px 0">✅ Built-in TTS</td>
+          <td style="padding:8px 0">❌ Not Included</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
           <td style="padding:8px 0">Cost</td>
-          <td style="padding:8px 0">✅ Free</td>
+          <td style="padding:8px 0">✅ Free (self-hosted)</td>
           <td style="padding:8px 0">💰 Subscription</td>
         </tr>
         <tr>
-          <td style="padding:8px 0">Customization</td>
-          <td style="padding:8px 0">✅ Full Control</td>
-          <td style="padding:8px 0">⚠️ Limited</td>
+          <td style="padding:8px 0">Open Source</td>
+          <td style="padding:8px 0">✅ MIT License</td>
+          <td style="padding:8px 0">❌ Proprietary</td>
         </tr>
       </table>
     </div>
 
     <div class="card">
+      <h3>🤖 Supported AI Backends</h3>
+      <p style="margin-bottom:12px">Connect to the backend that fits your setup—or combine several at once:</p>
+      <ul>
+        <li><strong>Ollama</strong> — Any model from the Ollama library (Llama 3, Mistral, Gemma, Qwen, DeepSeek, and more). Tool calling fully supported.</li>
+        <li><strong>LM Studio</strong> — Run any GGUF model locally via LM Studio's desktop app. Connect over your local network.</li>
+        <li><strong>OpenCode</strong> — Route requests through the <a href="https://opencode.ai" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">OpenCode</a> server to cloud providers (OpenAI, Anthropic, Google). Tool calling handled by the provider.</li>
+        <li><strong>On-Device (LiteRT / Gemma)</strong> — Completely offline inference using Gemma or Gemini Nano running directly on your Android device. No server needed.</li>
+      </ul>
+    </div>
+
+    <div class="card">
       <h3>🚀 Core Features</h3>
       <ul>
-        <li><strong>Connect to Ollama</strong> - Set up your local AI instance once, chat from anywhere on your network</li>
-        <li><strong>Multiple Models</strong> - Switch between different AI models instantly, experiment freely</li>
-        <li><strong>Offline First</strong> - Works entirely on your local network, no cloud dependencies</li>
-        <li><strong>Privacy Focused</strong> - Complete control over your data and conversations</li>
-        <li><strong>Material Design 3</strong> - Beautiful, familiar interface with dark mode</li>
-        <li><strong>Export Conversations</strong> - Own your chat history, export and backup anytime</li>
+        <li><strong>Real-Time Streaming</strong> — Responses stream token by token as the model generates them</li>
+        <li><strong>Tool / Function Calling</strong> — AI can call built-in tools: web search, current time, device location, URL fetch, and notifications</li>
+        <li><strong>Web Search Integration</strong> — Powered by Jina AI; results include clickable source links</li>
+        <li><strong>Vision &amp; Image Input</strong> — Attach photos or files; vision-capable models can see and describe them</li>
+        <li><strong>Text-to-Speech</strong> — Have any AI response read aloud with built-in TTS streaming</li>
+        <li><strong>Model Comparison</strong> — Run the same prompt side-by-side across two or more models</li>
+        <li><strong>System Prompt per Conversation</strong> — Set a custom persona or instructions for each chat</li>
+        <li><strong>Project Workspaces</strong> — Organize conversations into named projects</li>
+        <li><strong>Offline Message Queue</strong> — Messages sent while offline are queued and delivered when reconnected</li>
+        <li><strong>Conversation Export</strong> — Export chats as JSON or Markdown; you own your history</li>
+        <li><strong>Markdown + LaTeX Rendering</strong> — Rich formatted responses with math support</li>
+        <li><strong>Thinking / Extended Reasoning</strong> — Support for reasoning-focused models with visible thought traces</li>
+        <li><strong>Multiple Model Switching</strong> — Swap models instantly within any conversation</li>
+        <li><strong>Material Design 3</strong> — Beautiful dark UI with adaptive theming</li>
       </ul>
     </div>
 
     <div class="card">
       <h3>👥 Built For</h3>
-      <p><strong>Privacy Advocates</strong> - Run your own infrastructure, maintain complete data ownership</p>
-      <p><strong>AI Developers</strong> - Test and compare different models rapidly without rate limits or costs</p>
-      <p><strong>Power Users</strong> - Use advanced features like context management and custom agents</p>
+      <p><strong>Privacy Advocates</strong> — Run your own infrastructure; no data leaves your network</p>
+      <p><strong>AI Developers</strong> — Test and compare models rapidly, experiment with tool calling, inspect streaming responses</p>
+      <p><strong>Power Users</strong> — Advanced features: tool toggles, model comparison, project workspaces, TTS, LaTeX</p>
+      <p><strong>Offline Users</strong> — Fully on-device inference with Gemma/Gemini Nano, no internet required</p>
     </div>
 
     <div class="card">
       <h3>⚡ Get Started</h3>
-      <p>Install the app, point it to your Ollama instance, and start chatting. No cloud signup required.</p>
-      <p><a href="https://github.com/cmwen/private-chat-hub/releases/latest" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">📥 Download Latest Release →</a></p>
+      <p>Download the APK, connect to your preferred backend, and start chatting. No cloud sign-up required.</p>
+      <p style="margin-top:8px"><a href="https://github.com/cmwen/private-chat-hub/releases/latest" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">📥 Download Latest Release →</a></p>
     </div>
 
     <div class="card">
       <h3>📚 Learn More</h3>
-      <p><a href="/about" style="color:var(--accent);text-decoration:none">About the Project</a> • <a href="/install" style="color:var(--accent);text-decoration:none">Installation Guide</a> • <a href="https://github.com/cmwen/private-chat-hub" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub Repository</a></p>
+      <p>
+        <a href={getLink('/features')} style="color:var(--accent);text-decoration:none">All Features</a> •
+        <a href={getLink('/about')} style="color:var(--accent);text-decoration:none">About the Project</a> •
+        <a href={getLink('/install')} style="color:var(--accent);text-decoration:none">Installation Guide</a> •
+        <a href={getLink('/api-comparison')} style="color:var(--accent);text-decoration:none">API Comparison</a> •
+        <a href="https://github.com/cmwen/private-chat-hub" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub</a>
+      </p>
     </div>
   </section>
 </BaseLayout>

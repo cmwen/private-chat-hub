@@ -1,63 +1,65 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro'
+const getLink = (path) => {
+  const base = import.meta.env.BASE_URL;
+  const b = base.endsWith('/') ? base : base + '/';
+  if (path === '/') return b;
+  return b + path.replace(/^\//, '');
+};
 ---
 
 <BaseLayout title="Releases & Downloads">
   <section>
-    <h2>Releases & Downloads</h2>
+    <h2>Releases &amp; Downloads</h2>
 
     <p class="lead">Get the latest version of Private Chat Hub for your Android device.</p>
 
     <div class="card">
       <h3>📥 Latest Release</h3>
       <p>Download the newest version with all the latest features and improvements.</p>
-      <p style="margin-top:12px"><a href="https://github.com/cmwen/private-chat-hub/releases/latest" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-weight:bold">→ Download Latest Release</a></p>
+      <p style="margin-top:12px"><a href="https://github.com/cmwen/private-chat-hub/releases/latest" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-weight:bold">→ Download Latest Release (APK)</a></p>
     </div>
 
     <div class="card">
       <h3>📱 What You'll Get</h3>
       <ul>
-        <li><strong>APK</strong> - Direct installation on Android device</li>
-        <li><strong>Release Notes</strong> - What's new in this version</li>
-        <li><strong>Changelog</strong> - All improvements and fixes</li>
+        <li><strong>APK</strong> — Direct installation on Android devices</li>
+        <li><strong>Release Notes</strong> — Summary of what's new in this version</li>
+        <li><strong>Changelog</strong> — All improvements and fixes since last release</li>
+        <li><strong>Source Code</strong> — Full source available for building yourself</li>
       </ul>
     </div>
 
     <div class="card">
       <h3>✅ System Requirements</h3>
       <ul>
-        <li>Android 6.0 or higher</li>
-        <li>Ollama instance on local network</li>
-        <li>At least 100MB free storage</li>
-        <li>WiFi or local network connection</li>
+        <li>Android 7.0 (API 24) or higher</li>
+        <li>At least 100 MB free storage</li>
+        <li>WiFi or local network (for Ollama / LM Studio / OpenCode backends)</li>
+        <li>4 GB+ RAM recommended for on-device model inference</li>
+        <li><strong>No server required</strong> when using on-device models</li>
       </ul>
     </div>
 
     <div class="card">
-      <h3>🎯 Installation Instructions</h3>
+      <h3>🎯 Installation</h3>
       <ol>
-        <li>Download the APK file</li>
-        <li>Enable "Install from Unknown Sources" in Android Settings</li>
+        <li>Download the <code>.apk</code> file from the release page</li>
+        <li>Enable <em>Install from Unknown Sources</em> in Android Settings → Security</li>
         <li>Open the APK and follow the installation prompt</li>
-        <li>Launch Private Chat Hub and configure your Ollama connection</li>
-        <li>See the <a href="/install" style="color:var(--accent);text-decoration:none">Installation Guide</a> for detailed setup</li>
+        <li>Launch Private Chat Hub and configure your backend</li>
+        <li>See the <a href={getLink('/install')} style="color:var(--accent);text-decoration:none">Installation Guide</a> for detailed setup per backend</li>
       </ol>
     </div>
 
     <div class="card">
       <h3>🔄 Version History</h3>
-      <p>View all releases, including older versions and release notes on <a href="https://github.com/cmwen/private-chat-hub/releases" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub Releases</a>.</p>
+      <p>View all releases including older versions and full release notes on <a href="https://github.com/cmwen/private-chat-hub/releases" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub Releases</a>.</p>
     </div>
 
     <div class="card">
       <h3>🛠️ Building from Source</h3>
-      <p>Prefer to build the app yourself? Check the <a href="https://github.com/cmwen/private-chat-hub" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub repository</a> for build instructions and development setup.</p>
-    </div>
-
-    <div class="card">
-      <h3>📊 What's New?</h3>
-      <p>Each release includes improvements, bug fixes, and new features. Check the release notes to see what's changed in the latest version.</p>
-      <p><a href="https://github.com/cmwen/private-chat-hub/releases/latest" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">View Latest Release Notes →</a></p>
+      <p>Prefer to build the app yourself? See the <a href="https://github.com/cmwen/private-chat-hub" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub repository</a> for build instructions. Requires Flutter 3.10.1+ and Java 17.</p>
     </div>
   </section>
 </BaseLayout>

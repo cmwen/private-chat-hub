@@ -1,0 +1,501 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+const getLink = (path) => {
+  const base = import.meta.env.BASE_URL;
+  const b = base.endsWith('/') ? base : base + '/';
+  if (path === '/') return b;
+  return b + path.replace(/^\//, '');
+};
+---
+<BaseLayout title="REST API Comparison — Ollama vs LM Studio vs OpenCode">
+  <section>
+    <h2>REST API Comparison</h2>
+    <p class="lead">
+      Private Chat Hub talks to three self-hosted AI backends—<strong>Ollama</strong>,
+      <strong>LM Studio</strong>, and <strong>OpenCode</strong>—each with its own REST API.
+      This page documents the key differences and similarities as they apply to the features
+      used in this app: model selection, system prompts, tool/function calling, streaming,
+      and authentication.
+    </p>
+
+    <!-- ── Quick Reference ───────────────────────────────────────────── -->
+    <div class="card">
+      <h3>🗺️ Quick Reference</h3>
+      <table style="width:100%;margin-top:12px;font-size:0.9em">
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.15)">
+          <td style="padding:8px 6px"><strong>Aspect</strong></td>
+          <td style="padding:8px 6px"><strong>Ollama</strong></td>
+          <td style="padding:8px 6px"><strong>LM Studio</strong></td>
+          <td style="padding:8px 6px"><strong>OpenCode</strong></td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
+          <td style="padding:8px 6px">Default port</td>
+          <td style="padding:8px 6px"><code>11434</code></td>
+          <td style="padding:8px 6px"><code>1234</code></td>
+          <td style="padding:8px 6px"><code>8080</code></td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
+          <td style="padding:8px 6px">Chat endpoint</td>
+          <td style="padding:8px 6px"><code>POST /api/chat</code></td>
+          <td style="padding:8px 6px"><code>POST /api/v1/chat</code></td>
+          <td style="padding:8px 6px"><code>POST /session/&#123;id&#125;/message</code></td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
+          <td style="padding:8px 6px">Model field</td>
+          <td style="padding:8px 6px"><code>"model": "string"</code></td>
+          <td style="padding:8px 6px"><code>"model": "string"</code></td>
+          <td style="padding:8px 6px"><code>"model": &#123;"providerID":…,"modelID":…&#125;</code></td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
+          <td style="padding:8px 6px">System prompt</td>
+          <td style="padding:8px 6px">Message with <code>role: "system"</code></td>
+          <td style="padding:8px 6px">Top-level <code>"system_prompt"</code> field</td>
+          <td style="padding:8px 6px">Embedded in the prompt text</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
+          <td style="padding:8px 6px">Tool calling</td>
+          <td style="padding:8px 6px">✅ Native (<code>tools</code> array)</td>
+          <td style="padding:8px 6px">❌ Not in proprietary API</td>
+          <td style="padding:8px 6px">✅ Via provider (OpenAI/Anthropic)</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
+          <td style="padding:8px 6px">Streaming format</td>
+          <td style="padding:8px 6px">Newline-delimited JSON</td>
+          <td style="padding:8px 6px">Server-Sent Events (SSE)</td>
+          <td style="padding:8px 6px">SSE (separate <code>GET /event</code>)</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
+          <td style="padding:8px 6px">Vision / images</td>
+          <td style="padding:8px 6px">Base64 in <code>images</code> array on message</td>
+          <td style="padding:8px 6px"><code>data_url</code> in <code>input</code> array</td>
+          <td style="padding:8px 6px">Provider-dependent</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
+          <td style="padding:8px 6px">Authentication</td>
+          <td style="padding:8px 6px">None (local)</td>
+          <td style="padding:8px 6px">Optional Bearer token</td>
+          <td style="padding:8px 6px">Optional HTTP Basic Auth</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 6px">Session management</td>
+          <td style="padding:8px 6px">Stateless (history in messages)</td>
+          <td style="padding:8px 6px">Stateful via <code>previous_response_id</code></td>
+          <td style="padding:8px 6px">Stateful via named sessions</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- ── 1. Model Selection ─────────────────────────────────────────── -->
+    <div class="card">
+      <h3>1. Specifying the Model</h3>
+
+      <p><strong>Ollama</strong></p>
+      <p>Pass the model name as a plain string in the <code>model</code> field. The format is <code>&lt;name&gt;:&lt;tag&gt;</code> (tag defaults to <code>latest</code>).</p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`POST /api/chat
+{
+  "model": "mistral",
+  "messages": [...]
+}`}</code></pre>
+      <p style="margin-top:8px">Other examples: <code>"llama3.2:8b"</code>, <code>"gemma3:4b"</code>, <code>"deepseek-r1:7b"</code></p>
+      <p style="margin-top:8px">List available models: <code>GET /api/tags</code></p>
+
+      <p style="margin-top:16px"><strong>LM Studio</strong></p>
+      <p>Pass the model identifier as a plain string in the <code>model</code> field. The exact ID depends on what is loaded in LM Studio's server (visible in the server tab).</p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`POST /api/v1/chat
+{
+  "model": "lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF",
+  "input": "Hello"
+}`}</code></pre>
+      <p style="margin-top:8px">List available models: <code>GET /api/v1/models</code></p>
+
+      <p style="margin-top:16px"><strong>OpenCode</strong></p>
+      <p>OpenCode routes to cloud providers, so the model is identified by a <strong>two-part object</strong> with a <code>providerID</code> and a <code>modelID</code>:</p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`POST /session/{sessionId}/message
+{
+  "parts": [{"type": "text", "text": "Hello"}],
+  "model": {
+    "providerID": "openai",
+    "modelID": "gpt-4o"
+  }
+}`}</code></pre>
+      <p style="margin-top:8px">Other examples: <code>&#123;"providerID":"anthropic","modelID":"claude-sonnet-4-5"&#125;</code>, <code>&#123;"providerID":"google","modelID":"gemini-2.5-flash"&#125;</code></p>
+      <p style="margin-top:8px">List all providers and their models: <code>GET /provider</code></p>
+
+      <p style="margin-top:16px"><strong>Summary:</strong> Ollama and LM Studio both use a flat string; OpenCode uses a structured object because it routes to different cloud providers.</p>
+    </div>
+
+    <!-- ── 2. System Prompt ───────────────────────────────────────────── -->
+    <div class="card">
+      <h3>2. System Prompt</h3>
+
+      <p><strong>Ollama</strong></p>
+      <p>The system prompt is sent as a message in the <code>messages</code> array with <code>"role": "system"</code>. It must appear before the first user message.</p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`POST /api/chat
+{
+  "model": "mistral",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful coding assistant. Prefer Python."
+    },
+    {
+      "role": "user",
+      "content": "Write a function to reverse a string."
+    }
+  ]
+}`}</code></pre>
+      <p style="margin-top:8px">
+        <strong>Note:</strong> The older <code>POST /api/generate</code> endpoint also supports a top-level
+        <code>"system"</code> field (separate from the prompt), but <code>/api/chat</code> uses the messages array exclusively.
+      </p>
+
+      <p style="margin-top:16px"><strong>LM Studio</strong></p>
+      <p>LM Studio's proprietary API uses a top-level <code>system_prompt</code> field—it is <em>not</em> part of the messages array. This maps to the model's system role internally.</p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`POST /api/v1/chat
+{
+  "model": "...",
+  "input": "Write a function to reverse a string.",
+  "system_prompt": "You are a helpful coding assistant. Prefer Python.",
+  "stream": false
+}`}</code></pre>
+      <p style="margin-top:8px">
+        <strong>Note:</strong> LM Studio also exposes an OpenAI-compatible endpoint at
+        <code>/v1/chat/completions</code> where the system prompt follows the standard OpenAI
+        messages format (<code>role: "system"</code> in the array). Private Chat Hub uses the
+        proprietary <code>/api/v1/chat</code> endpoint which has its own format.
+      </p>
+
+      <p style="margin-top:16px"><strong>OpenCode</strong></p>
+      <p>OpenCode does not have a dedicated system prompt field in the message request. The app embeds the system instructions directly into the conversation text before sending to the OpenCode session. OpenCode then forwards the full text to the underlying cloud provider (which handles the system role natively).</p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`POST /session/{sessionId}/message
+{
+  "parts": [
+    {
+      "type": "text",
+      "text": "[System: You are a helpful coding assistant.]\n\nWrite a function to reverse a string."
+    }
+  ],
+  "model": {"providerID": "openai", "modelID": "gpt-4o"}
+}`}</code></pre>
+
+      <p style="margin-top:16px"><strong>Summary:</strong> All three support system prompts, but through different mechanisms. Ollama uses the standard OpenAI-style <code>role: "system"</code> message. LM Studio uses a dedicated top-level field. OpenCode requires embedding the instruction in the prompt text.</p>
+    </div>
+
+    <!-- ── 3. Tool / Function Calling ─────────────────────────────────── -->
+    <div class="card">
+      <h3>3. Tool / Function Calling</h3>
+
+      <p><strong>Ollama — Native Tool Calling</strong></p>
+      <p>Ollama has first-class tool calling support. Tools are defined in an OpenAI-compatible format and passed in the top-level <code>tools</code> array. When a model decides to call a tool, it returns a <code>tool_calls</code> array instead of a plain text response.</p>
+
+      <p style="margin-top:12px"><strong>Request (with tools):</strong></p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`POST /api/chat
+{
+  "model": "llama3.1",
+  "messages": [
+    {"role": "user", "content": "What's the weather in Paris right now?"}
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "web_search",
+        "description": "Search the web for current information",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "The search query"
+            }
+          },
+          "required": ["query"]
+        }
+      }
+    }
+  ]
+}`}</code></pre>
+
+      <p style="margin-top:12px"><strong>Response when model calls a tool:</strong></p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`{
+  "model": "llama3.1",
+  "done": true,
+  "message": {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "call_abc123",
+        "function": {
+          "name": "web_search",
+          "arguments": {
+            "query": "current weather in Paris"
+          }
+        }
+      }
+    ]
+  }
+}`}</code></pre>
+
+      <p style="margin-top:12px"><strong>Returning the tool result (next request):</strong></p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`POST /api/chat
+{
+  "model": "llama3.1",
+  "messages": [
+    {"role": "user",      "content": "What's the weather in Paris right now?"},
+    {"role": "assistant", "content": "",
+     "tool_calls": [{"id": "call_abc123", "function": {"name":"web_search","arguments":{"query":"current weather in Paris"}}}]},
+    {
+      "role": "tool",
+      "tool_name": "web_search",
+      "tool_id": "call_abc123",
+      "content": "Paris: 18°C, partly cloudy. (source: weather.com)"
+    }
+  ],
+  "tools": [...]
+}`}</code></pre>
+      <p style="margin-top:8px">This loop continues until the model returns a plain text response without <code>tool_calls</code>. Private Chat Hub's agentic loop handles this automatically.</p>
+
+      <p style="margin-top:16px"><strong>LM Studio — No Tool Calling in Proprietary API</strong></p>
+      <p>LM Studio's <code>/api/v1/chat</code> proprietary API does not expose a <code>tools</code> parameter. Tool calling is not supported when using this endpoint.</p>
+      <p style="margin-top:8px"><strong>Alternative:</strong> LM Studio also provides an OpenAI-compatible <code>/v1/chat/completions</code> endpoint which <em>does</em> support the standard OpenAI <code>tools</code> parameter for models that have been fine-tuned for function calling. Private Chat Hub currently uses the proprietary endpoint and therefore does not support tool calls on LM Studio.</p>
+
+      <p style="margin-top:16px"><strong>OpenCode — Provider-Level Tool Calling</strong></p>
+      <p>OpenCode itself does not expose a <code>tools</code> parameter in its message API. Tool calling is handled transparently by the underlying cloud provider (OpenAI, Anthropic, or Google), depending on which model is selected. The tool definitions and the multi-turn tool call loop happen inside OpenCode's server, invisible to the client. Private Chat Hub receives the final text response after all tool calls have been resolved.</p>
+
+      <p style="margin-top:16px"><strong>Summary:</strong></p>
+      <table style="width:100%;margin-top:8px;font-size:0.9em">
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.15)">
+          <td style="padding:6px"><strong>Backend</strong></td>
+          <td style="padding:6px"><strong>Client-side tool definitions?</strong></td>
+          <td style="padding:6px"><strong>Agentic loop?</strong></td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
+          <td style="padding:6px">Ollama</td>
+          <td style="padding:6px">✅ Yes — pass <code>tools</code> array in request</td>
+          <td style="padding:6px">✅ Handled by app</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
+          <td style="padding:6px">LM Studio (proprietary)</td>
+          <td style="padding:6px">❌ Not supported</td>
+          <td style="padding:6px">❌ Not applicable</td>
+        </tr>
+        <tr>
+          <td style="padding:6px">OpenCode</td>
+          <td style="padding:6px">❌ Not exposed to client</td>
+          <td style="padding:6px">✅ Handled server-side</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- ── 4. Streaming ───────────────────────────────────────────────── -->
+    <div class="card">
+      <h3>4. Streaming Responses</h3>
+
+      <p><strong>Ollama — Newline-Delimited JSON</strong></p>
+      <p>Set <code>"stream": true</code>. The server sends a series of JSON objects, each on its own line. Each chunk contains a partial <code>message.content</code>. The last chunk has <code>"done": true</code>.</p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`{"model":"mistral","message":{"role":"assistant","content":"The"},"done":false}
+{"model":"mistral","message":{"role":"assistant","content":" capital"},"done":false}
+{"model":"mistral","message":{"role":"assistant","content":" of France is Paris."},"done":false}
+{"model":"mistral","message":{"role":"assistant","content":""},"done":true,"eval_count":23}`}</code></pre>
+
+      <p style="margin-top:16px"><strong>LM Studio — Server-Sent Events (SSE)</strong></p>
+      <p>Set <code>"stream": true</code> and add <code>Accept: text/event-stream</code>. The server sends SSE events. The <code>message.delta</code> event carries each text chunk; <code>chat.end</code> signals completion.</p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`event: message.delta
+data: {"content": "The"}
+
+event: message.delta
+data: {"content": " capital of France is Paris."}
+
+event: chat.end
+data: {"result": {"output": [{"type":"text","content":"The capital of France is Paris."}]}}`}</code></pre>
+
+      <p style="margin-top:16px"><strong>OpenCode — SSE via Separate Event Endpoint</strong></p>
+      <p>OpenCode streaming is handled differently. You send the message via <code>POST /session/&#123;id&#125;/prompt_async</code> (which returns immediately with 204), then subscribe to a persistent SSE stream at <code>GET /event</code> to receive events as they arrive.</p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`// Step 1 — send message async (returns 204 immediately)
+POST /session/{sessionId}/prompt_async
+{"parts":[{"type":"text","text":"Hello"}],"model":{...}}
+
+// Step 2 — listen for events
+GET /event
+Accept: text/event-stream
+
+event: message.part
+data: {"sessionID":"...","part":{"type":"text","text":"The capital"}}
+
+event: message.part
+data: {"sessionID":"...","part":{"type":"text","text":" of France is Paris."}}
+
+event: message.complete
+data: {"sessionID":"..."}`}</code></pre>
+
+      <p style="margin-top:16px"><strong>Summary:</strong> All three support streaming, but the wire formats differ significantly. Ollama uses the simplest format (plain newline-delimited JSON). LM Studio and OpenCode both use SSE, but OpenCode separates the send and receive into two HTTP connections.</p>
+    </div>
+
+    <!-- ── 5. Authentication ──────────────────────────────────────────── -->
+    <div class="card">
+      <h3>5. Authentication</h3>
+
+      <p><strong>Ollama</strong> — No authentication by default. All requests to <code>localhost:11434</code> are accepted. When exposed over a network, access control is managed at the network/firewall level.</p>
+
+      <p style="margin-top:12px"><strong>LM Studio</strong> — Optional Bearer token. If an API key is configured in LM Studio's server settings, include it in the <code>Authorization</code> header:</p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`Authorization: Bearer lm-studio-api-key`}</code></pre>
+
+      <p style="margin-top:12px"><strong>OpenCode</strong> — Optional HTTP Basic Auth. If a username/password is configured on the opencode server, encode the credentials in the <code>Authorization</code> header:</p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`Authorization: Basic base64(username:password)`}</code></pre>
+    </div>
+
+    <!-- ── 6. Vision / Images ─────────────────────────────────────────── -->
+    <div class="card">
+      <h3>6. Sending Images (Vision)</h3>
+
+      <p><strong>Ollama</strong></p>
+      <p>Images are attached to a user message as a list of base64-encoded strings in the <code>images</code> field:</p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`{
+  "model": "llava",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What is in this image?",
+      "images": ["iVBORw0KGgoAAAANSUhEUg..."]
+    }
+  ]
+}`}</code></pre>
+
+      <p style="margin-top:16px"><strong>LM Studio</strong></p>
+      <p>Images are included in the <code>input</code> field as an array of typed parts. Text and images are separate objects in the array:</p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`{
+  "model": "...",
+  "input": [
+    {"type": "message", "content": "What is in this image?"},
+    {"type": "image",   "data_url": "data:image/jpeg;base64,iVBOR..."}
+  ]
+}`}</code></pre>
+
+      <p style="margin-top:16px"><strong>OpenCode</strong></p>
+      <p>Image input is handled by the underlying cloud provider. The format depends on which provider/model is selected (e.g. OpenAI vision uses <code>image_url</code> content parts). OpenCode may forward the image data transparently depending on provider support.</p>
+
+      <p style="margin-top:16px"><strong>Summary:</strong> Ollama and LM Studio both embed images as base64 data, but in different fields and formats. Ollama uses a simple array on the message; LM Studio uses a typed parts array as the input.</p>
+    </div>
+
+    <!-- ── 7. Session / Conversation State ───────────────────────────── -->
+    <div class="card">
+      <h3>7. Conversation State &amp; History</h3>
+
+      <p><strong>Ollama — Stateless</strong></p>
+      <p>Ollama is fully stateless. To maintain conversation context, the client must send the full message history on every request (all previous <code>user</code>, <code>assistant</code>, and <code>tool</code> messages). The app manages this array locally.</p>
+
+      <p style="margin-top:12px"><strong>LM Studio — Stateful via Response ID</strong></p>
+      <p>LM Studio's <code>/api/v1/chat</code> endpoint is stateful. Each chat response returns a <code>response_id</code>. To continue the conversation, pass the previous response ID as <code>previous_response_id</code> in the next request—you don't need to resend the full history.</p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`// First turn
+POST /api/v1/chat  →  {"response_id": "resp_abc"}
+
+// Second turn (continues the same conversation)
+POST /api/v1/chat
+{"model": "...", "input": "And what about Lyon?",
+ "previous_response_id": "resp_abc"}`}</code></pre>
+
+      <p style="margin-top:12px"><strong>OpenCode — Stateful via Sessions</strong></p>
+      <p>OpenCode manages conversation state as named <strong>sessions</strong>. Create a session once (<code>POST /session</code>), then send all messages to that session. The server maintains the history; you only send the new user message each time.</p>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;overflow-x:auto;margin-top:8px"><code>{`// Create a session
+POST /session  →  {"id": "sess_xyz", "title": "My conversation"}
+
+// All messages go to the same session
+POST /session/sess_xyz/message
+{"parts": [{"type":"text","text":"Tell me about Paris"}], "model": {...}}
+
+POST /session/sess_xyz/message
+{"parts": [{"type":"text","text":"And Lyon?"}], "model": {...}}`}</code></pre>
+
+      <p style="margin-top:16px"><strong>Summary:</strong> Ollama requires the client to track and send full history; LM Studio uses a response-chaining pattern; OpenCode uses a persistent server-side session.</p>
+    </div>
+
+    <!-- ── 8. Other API Endpoints ─────────────────────────────────────── -->
+    <div class="card">
+      <h3>8. Other Notable Endpoints</h3>
+      <table style="width:100%;margin-top:8px;font-size:0.9em">
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.15)">
+          <td style="padding:6px"><strong>Operation</strong></td>
+          <td style="padding:6px"><strong>Ollama</strong></td>
+          <td style="padding:6px"><strong>LM Studio</strong></td>
+          <td style="padding:6px"><strong>OpenCode</strong></td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
+          <td style="padding:6px">List models</td>
+          <td style="padding:6px"><code>GET /api/tags</code></td>
+          <td style="padding:6px"><code>GET /api/v1/models</code></td>
+          <td style="padding:6px"><code>GET /provider</code></td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
+          <td style="padding:6px">Pull / download model</td>
+          <td style="padding:6px"><code>POST /api/pull</code></td>
+          <td style="padding:6px">Via LM Studio GUI</td>
+          <td style="padding:6px">N/A (cloud)</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
+          <td style="padding:6px">Delete model</td>
+          <td style="padding:6px"><code>DELETE /api/delete</code></td>
+          <td style="padding:6px">Via LM Studio GUI</td>
+          <td style="padding:6px">N/A</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
+          <td style="padding:6px">Health check</td>
+          <td style="padding:6px"><code>GET /api/tags</code> (200 = healthy)</td>
+          <td style="padding:6px"><code>GET /api/v1/models</code> (200 = healthy)</td>
+          <td style="padding:6px"><code>GET /global/health</code></td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
+          <td style="padding:6px">Model info</td>
+          <td style="padding:6px"><code>POST /api/show</code></td>
+          <td style="padding:6px">Included in models list</td>
+          <td style="padding:6px">Included in provider list</td>
+        </tr>
+        <tr>
+          <td style="padding:6px">Embeddings</td>
+          <td style="padding:6px"><code>POST /api/embeddings</code></td>
+          <td style="padding:6px">N/A</td>
+          <td style="padding:6px">Via provider</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- ── 9. What Is Similar ─────────────────────────────────────────── -->
+    <div class="card">
+      <h3>9. What Is Similar Across All Three</h3>
+      <ul>
+        <li>All use <strong>HTTP REST</strong> over a local (or LAN) server</li>
+        <li>All use <strong>JSON</strong> for request and response bodies</li>
+        <li>All require <strong>Content-Type: application/json</strong></li>
+        <li>All support <strong>streaming</strong> (though in different formats)</li>
+        <li>All return partial text tokens during streaming, not full messages</li>
+        <li>All support <strong>temperature</strong> or equivalent sampling controls</li>
+        <li>Tool definitions use the same <strong>JSON Schema</strong> structure (<code>type: "object"</code>, <code>properties</code>, <code>required</code>)</li>
+        <li>The logical concept of <strong>user / assistant turns</strong> is present in all</li>
+      </ul>
+    </div>
+
+    <!-- ── 10. What Is Different ──────────────────────────────────────── -->
+    <div class="card">
+      <h3>10. Key Differences at a Glance</h3>
+      <ul>
+        <li><strong>Model identifier format:</strong> Ollama/LM Studio use a flat string; OpenCode requires a structured object (<code>providerID + modelID</code>)</li>
+        <li><strong>System prompt placement:</strong> Ollama puts it in the messages array (<code>role: "system"</code>); LM Studio has a dedicated top-level field (<code>system_prompt</code>); OpenCode embeds it in the text</li>
+        <li><strong>Tool calling:</strong> Ollama exposes a first-class <code>tools</code> API; LM Studio's proprietary endpoint has none; OpenCode delegates to the cloud provider</li>
+        <li><strong>Streaming wire format:</strong> Ollama = newline JSON; LM Studio = SSE on the chat endpoint; OpenCode = SSE on a separate persistent event endpoint</li>
+        <li><strong>Conversation state:</strong> Ollama = stateless (client sends full history); LM Studio = response-ID chaining; OpenCode = server-managed sessions</li>
+        <li><strong>Image attachment format:</strong> Ollama = base64 in <code>images[]</code> on message; LM Studio = typed parts array in <code>input</code></li>
+        <li><strong>Authentication:</strong> Ollama has none; LM Studio uses Bearer; OpenCode uses Basic Auth</li>
+        <li><strong>Model management:</strong> Ollama supports pull/delete via API; LM Studio and OpenCode manage models outside the chat API</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>📚 Related Pages</h3>
+      <p>
+        <a href={getLink('/features')} style="color:var(--accent);text-decoration:none">All Features</a> •
+        <a href={getLink('/install')} style="color:var(--accent);text-decoration:none">Installation Guide</a> •
+        <a href="https://github.com/cmwen/private-chat-hub" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">GitHub Repository</a>
+      </p>
+    </div>
+  </section>
+</BaseLayout>
