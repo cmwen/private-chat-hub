@@ -32,7 +32,10 @@ class LmStudioLLMService implements LLMService {
   Future<List<ModelInfo>> getAvailableModels() async {
     final response = await _connectionManager.client.listModels();
 
-    return response.models.where((model) => model.isLlm).map(_toModelInfo).toList();
+    return response.models
+        .where((model) => model.isLlm)
+        .map(_toModelInfo)
+        .toList();
   }
 
   @override
@@ -90,7 +93,8 @@ class LmStudioLLMService implements LLMService {
           case 'error':
             final error = event.data['error'];
             if (error is Map<String, dynamic>) {
-              final message = error['message'] as String? ?? 'Unknown LM Studio error';
+              final message =
+                  error['message'] as String? ?? 'Unknown LM Studio error';
               throw Exception(message);
             }
         }
@@ -137,8 +141,7 @@ class LmStudioLLMService implements LLMService {
       if (model.publisher.isNotEmpty) model.publisher,
       if (model.paramsString != null && model.paramsString!.isNotEmpty)
         model.paramsString!,
-      if (model.maxContextLength != null)
-        '${model.maxContextLength} ctx',
+      if (model.maxContextLength != null) '${model.maxContextLength} ctx',
     ];
 
     return ModelInfo(

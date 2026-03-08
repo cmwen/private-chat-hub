@@ -806,7 +806,11 @@ class _ModelSelectorSheet extends StatelessWidget {
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.memory, size: 14, color: Colors.teal),
+                                Icon(
+                                  Icons.memory,
+                                  size: 14,
+                                  color: Colors.teal,
+                                ),
                                 SizedBox(width: 4),
                                 Text(
                                   'LM STUDIO',

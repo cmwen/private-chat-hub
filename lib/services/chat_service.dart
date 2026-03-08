@@ -1198,7 +1198,10 @@ class ChatService {
             )
             .toList(),
         systemPrompt: conversation.systemPrompt,
-        attachments: _lastUserMessageAttachments(conversation, assistantMessageId),
+        attachments: _lastUserMessageAttachments(
+          conversation,
+          assistantMessageId,
+        ),
       )) {
         buffer.write(token);
         final updatedMessage = assistantMessage.copyWith(

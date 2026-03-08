@@ -514,9 +514,9 @@ class _ModelsScreenState extends State<ModelsScreen> {
     }
 
     if (_models.isEmpty &&
-      _localModels.isEmpty &&
-      _lmStudioModels.isEmpty &&
-      _openCodeModels.isEmpty) {
+        _localModels.isEmpty &&
+        _lmStudioModels.isEmpty &&
+        _openCodeModels.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
