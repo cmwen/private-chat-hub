@@ -18,6 +18,9 @@ class ModelCapabilityResolver {
     if (_isLocalModel(modelName)) {
       return OnDeviceModelCapabilitiesRegistry.getCapabilities(modelName);
     }
+    if (_isLmStudioModel(modelName)) {
+      return _getLmStudioCapabilities(modelName);
+    }
     if (_isOpenCodeModel(modelName)) {
       return _getOpenCodeCapabilities(modelName);
     }
@@ -46,6 +49,33 @@ class ModelCapabilityResolver {
 
   static bool _isOpenCodeModel(String modelName) {
     return modelName.trim().toLowerCase().startsWith('opencode:');
+  }
+
+  static bool _isLmStudioModel(String modelName) {
+    return modelName.trim().toLowerCase().startsWith('lmstudio:');
+  }
+
+  static ModelCapabilities _getLmStudioCapabilities(String modelName) {
+    final normalized = modelName.substring('lmstudio:'.length).toLowerCase();
+    final supportsVision =
+        normalized.contains('vision') ||
+        normalized.contains('llava') ||
+        normalized.contains('minicpm-v');
+    final supportsTools =
+        normalized.contains('tool') ||
+        normalized.contains('function') ||
+        normalized.contains('qwen') ||
+        normalized.contains('llama-3.1') ||
+        normalized.contains('llama3.1');
+
+    return ModelCapabilities(
+      supportsToolCalling: supportsTools,
+      supportsVision: supportsVision,
+      supportsAudio: false,
+      supportsThinking: false,
+      contextWindow: 32768,
+      description: 'LM Studio model',
+    );
   }
 
   /// Returns capabilities for an OpenCode cloud model based on known

@@ -1251,6 +1251,28 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                         ),
                       ],
+                      if (_conversation != null &&
+                          _conversation!.modelName.startsWith('lmstudio:')) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: const Text(
+                            'LM STUDIO',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.teal,
+                            ),
+                          ),
+                        ),
+                      ],
                       if (_conversation != null) ...[
                         const SizedBox(width: 6),
                         Flexible(

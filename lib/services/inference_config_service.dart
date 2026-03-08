@@ -280,7 +280,7 @@ class InferenceConfigService {
   String get modeDescription {
     switch (inferenceMode) {
       case InferenceMode.remote:
-        return 'Remote (Ollama Server)';
+        return 'Remote (Ollama or LM Studio)';
       case InferenceMode.onDevice:
         return 'On-Device (LiteRT)';
       case InferenceMode.openCode:
@@ -311,7 +311,7 @@ extension InferenceModeExtension on InferenceMode {
   String get displayName {
     switch (this) {
       case InferenceMode.remote:
-        return 'Remote (Ollama)';
+        return 'Remote';
       case InferenceMode.onDevice:
         return 'On-Device (LiteRT)';
       case InferenceMode.openCode:
@@ -322,7 +322,7 @@ extension InferenceModeExtension on InferenceMode {
   String get description {
     switch (this) {
       case InferenceMode.remote:
-        return 'Run models on your Ollama server. More models available, unlimited size.';
+        return 'Run models on your Ollama or LM Studio server. More models available, unlimited size.';
       case InferenceMode.onDevice:
         return 'Run models directly on your device. Fully private, works offline.';
       case InferenceMode.openCode:

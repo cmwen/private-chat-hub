@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
 import 'package:private_chat_hub/services/llm_service.dart';
+import 'package:private_chat_hub/services/lm_studio_llm_service.dart';
 import 'package:private_chat_hub/services/on_device_llm_service.dart';
 import 'package:private_chat_hub/services/opencode_llm_service.dart';
 import 'package:private_chat_hub/services/opencode_model_visibility_service.dart';
@@ -14,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// SharedPreferences so they remain visible when Ollama goes offline.
 class UnifiedModelService {
   final OnDeviceLLMService? _onDeviceLLMService;
+  final LmStudioLLMService? _lmStudioLLMService;
   final OpenCodeLLMService? _openCodeLLMService;
   final OpenCodeModelVisibilityService? _visibilityService;
 
@@ -22,9 +24,11 @@ class UnifiedModelService {
 
   UnifiedModelService({
     OnDeviceLLMService? onDeviceLLMService,
+    LmStudioLLMService? lmStudioLLMService,
     OpenCodeLLMService? openCodeLLMService,
     OpenCodeModelVisibilityService? visibilityService,
   }) : _onDeviceLLMService = onDeviceLLMService,
+       _lmStudioLLMService = lmStudioLLMService,
        _openCodeLLMService = openCodeLLMService,
        _visibilityService = visibilityService;
 
@@ -34,6 +38,9 @@ class UnifiedModelService {
   /// Prefix for OpenCode model names
   static const String openCodeModelPrefix = 'opencode:';
 
+  /// Prefix for LM Studio model names
+  static const String lmStudioModelPrefix = 'lmstudio:';
+
   /// Get a unified list of models from both Ollama and on-device sources
   Future<List<ModelInfo>> getUnifiedModelList(
     List<OllamaModelInfo> ollamaModels,
@@ -41,7 +48,8 @@ class UnifiedModelService {
     // Fetch local and OpenCode models in parallel for faster loading.
     // Each future resolves to a List<ModelInfo>; destructuring preserves
     // the explicit relationship between the fetch order and the result names.
-    final [localModels, openCodeModels] = await Future.wait<List<ModelInfo>>([
+    final [localModels, lmStudioModels, openCodeModels] =
+      await Future.wait<List<ModelInfo>>([
       // On-device local models
       () async {
         if (_onDeviceLLMService == null) return <ModelInfo>[];
@@ -69,6 +77,16 @@ class UnifiedModelService {
               .toList();
         } catch (e) {
           print('[UnifiedModelService] Failed to get local models: $e');
+          return <ModelInfo>[];
+        }
+      }(),
+      // LM Studio models
+      () async {
+        if (_lmStudioLLMService == null) return <ModelInfo>[];
+        try {
+          return await _lmStudioLLMService.getAvailableModels();
+        } catch (e) {
+          print('[UnifiedModelService] Failed to get LM Studio models: $e');
           return <ModelInfo>[];
         }
       }(),
@@ -114,6 +132,7 @@ class UnifiedModelService {
     }
 
     unifiedList.addAll(localModels);
+  unifiedList.addAll(lmStudioModels);
     unifiedList.addAll(openCodeModels);
 
     return unifiedList;
@@ -146,10 +165,23 @@ class UnifiedModelService {
     return modelName.startsWith(openCodeModelPrefix);
   }
 
+  /// Check if a model name is an LM Studio model
+  static bool isLmStudioModel(String modelName) {
+    return modelName.startsWith(lmStudioModelPrefix);
+  }
+
   /// Get the actual model ID without the local prefix
   static String getLocalModelId(String modelName) {
     if (isLocalModel(modelName)) {
       return modelName.substring(localModelPrefix.length);
+    }
+    return modelName;
+  }
+
+  /// Get the actual model ID without the LM Studio prefix
+  static String getLmStudioModelId(String modelName) {
+    if (isLmStudioModel(modelName)) {
+      return modelName.substring(lmStudioModelPrefix.length);
     }
     return modelName;
   }
@@ -162,6 +194,9 @@ class UnifiedModelService {
     if (isOpenCodeModel(modelName)) {
       // Show provider/model without the opencode: prefix
       return modelName.substring(openCodeModelPrefix.length);
+    }
+    if (isLmStudioModel(modelName)) {
+      return getLmStudioModelId(modelName);
     }
     return modelName;
   }

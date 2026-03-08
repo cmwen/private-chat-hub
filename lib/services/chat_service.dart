@@ -9,6 +9,7 @@ import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
 import 'package:private_chat_hub/services/connectivity_service.dart';
 import 'package:private_chat_hub/services/inference_config_service.dart';
 import 'package:private_chat_hub/services/llm_service.dart';
+import 'package:private_chat_hub/services/lm_studio_llm_service.dart';
 import 'package:private_chat_hub/services/message_queue_service.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
@@ -35,6 +36,7 @@ class ChatService {
   // Hybrid inference mode support
   InferenceConfigService? _inferenceConfigService;
   OnDeviceLLMService? _onDeviceLLMService;
+  LmStudioLLMService? _lmStudioLLMService;
   OpenCodeLLMService? _openCodeLLMService;
 
   // Conversation update stream (for UI sync)
@@ -121,6 +123,16 @@ class ChatService {
       StatusService().showTransient('On-device LLM service attached');
     } catch (_) {}
   }
+
+  /// Set the LM Studio LLM service
+  void setLmStudioLLMService(LmStudioLLMService service) {
+    _lmStudioLLMService = service;
+    _log('LM Studio LLM service attached');
+    StatusService().showTransient('LM Studio LLM service attached');
+  }
+
+  /// Get the LM Studio LLM service
+  LmStudioLLMService? get lmStudioLLMService => _lmStudioLLMService;
 
   /// Set the OpenCode LLM service
   void setOpenCodeLLMService(OpenCodeLLMService service) {
@@ -844,13 +856,18 @@ class ChatService {
     final isOpenCodeModel = UnifiedModelService.isOpenCodeModel(
       initialConversation.modelName,
     );
+    final isLmStudioModel = UnifiedModelService.isLmStudioModel(
+      initialConversation.modelName,
+    );
 
     _log(
       'Routing decision: model=${initialConversation.modelName}, '
       'isLocalModel=$isLocalModel, '
       'isOpenCodeModel=$isOpenCodeModel, '
+      'isLmStudioModel=$isLmStudioModel, '
       'inferenceMode=$currentInferenceMode, '
       'onDeviceServiceReady=${_onDeviceLLMService != null}, '
+      'lmStudioServiceReady=${_lmStudioLLMService != null}, '
       'openCodeServiceReady=${_openCodeLLMService != null}, '
       'isOnline=$isOnline',
     );
@@ -878,8 +895,29 @@ class ChatService {
           'OpenCode service is not configured. Please set up an OpenCode connection in Settings.',
         );
       }
+      if (!_openCodeLLMService!.hasConfiguredConnection) {
+        throw Exception(
+          'OpenCode server removed. Choose another saved OpenCode server or add a new one in Settings.',
+        );
+      }
       _log('Using OpenCode inference (opencode model selected)');
       yield* _sendMessageOpenCode(conversationId, text);
+      return;
+    }
+
+    if (isLmStudioModel) {
+      if (_lmStudioLLMService == null) {
+        throw Exception(
+          'LM Studio is not configured. Please set up an LM Studio connection in Settings.',
+        );
+      }
+      if (!_lmStudioLLMService!.hasConfiguredConnection) {
+        throw Exception(
+          'LM Studio server removed. Choose another saved LM Studio server or add a new one in Settings.',
+        );
+      }
+      _log('Using LM Studio inference (lmstudio model selected)');
+      yield* _sendMessageLmStudio(conversationId, text);
       return;
     }
 
@@ -954,11 +992,19 @@ class ChatService {
     if (_openCodeLLMService == null) {
       throw Exception('OpenCode service not configured');
     }
+    if (!_openCodeLLMService!.hasConfiguredConnection) {
+      throw Exception(
+        'OpenCode server removed. Choose another saved OpenCode server or add a new one in Settings.',
+      );
+    }
 
     final isAvailable = await _openCodeLLMService!.isAvailable();
     if (!isAvailable) {
+      final connectionName = _openCodeLLMService!.activeConnectionName;
       throw Exception(
-        'OpenCode server is not reachable. Check your connection settings.',
+        connectionName == null
+            ? 'OpenCode server unavailable. Check your connection settings.'
+            : 'OpenCode server unavailable. "$connectionName" is not responding right now.',
       );
     }
 
@@ -1052,6 +1098,144 @@ class ChatService {
       _log('OpenCode response complete: ${buffer.length} chars');
     } catch (e) {
       _log('OpenCode generation error: $e');
+
+      final errorMessage = assistantMessage.copyWith(
+        text: buffer.isEmpty
+            ? 'Error: $e'
+            : '${buffer.toString()}\n\n[Error: $e]',
+        isStreaming: false,
+      );
+
+      final messages = conversation.messages
+          .map((m) => m.id == assistantMessageId ? errorMessage : m)
+          .toList();
+
+      conversation = conversation.copyWith(
+        messages: messages,
+        updatedAt: DateTime.now(),
+      );
+      await updateConversation(conversation);
+      yield conversation;
+    }
+  }
+
+  /// Sends a message using LM Studio inference.
+  Stream<Conversation> _sendMessageLmStudio(
+    String conversationId,
+    String text, {
+    bool addUserMessage = true,
+  }) async* {
+    final initialConversation = getConversation(conversationId);
+    if (initialConversation == null) {
+      throw Exception('Conversation not found');
+    }
+
+    if (_lmStudioLLMService == null) {
+      throw Exception('LM Studio service not configured');
+    }
+    if (!_lmStudioLLMService!.hasConfiguredConnection) {
+      throw Exception(
+        'LM Studio server removed. Choose another saved LM Studio server or add a new one in Settings.',
+      );
+    }
+
+    final isAvailable = await _lmStudioLLMService!.isAvailable();
+    if (!isAvailable) {
+      final connectionName = _lmStudioLLMService!.activeConnectionName;
+      throw Exception(
+        connectionName == null
+            ? 'LM Studio server unavailable. Check your connection settings.'
+            : 'LM Studio server unavailable. "$connectionName" is not responding right now.',
+      );
+    }
+
+    final modelId = initialConversation.modelName;
+    _log('LM Studio inference: model=$modelId');
+
+    final userMessage = Message(
+      id: const Uuid().v4(),
+      text: text,
+      isMe: true,
+      role: MessageRole.user,
+      timestamp: DateTime.now(),
+    );
+
+    var conversation = initialConversation;
+    if (addUserMessage) {
+      conversation = conversation.copyWith(
+        messages: [...conversation.messages, userMessage],
+        updatedAt: DateTime.now(),
+      );
+      await updateConversation(conversation);
+      yield conversation;
+    }
+
+    final assistantMessageId = const Uuid().v4();
+    final assistantMessage = Message(
+      id: assistantMessageId,
+      text: '',
+      isMe: false,
+      role: MessageRole.assistant,
+      timestamp: DateTime.now(),
+      isStreaming: true,
+    );
+
+    conversation = conversation.copyWith(
+      messages: [...conversation.messages, assistantMessage],
+      updatedAt: DateTime.now(),
+    );
+    await updateConversation(conversation);
+    yield conversation;
+
+    final buffer = StringBuffer();
+    try {
+      await for (final token in _lmStudioLLMService!.generateResponse(
+        prompt: text,
+        modelId: modelId,
+        conversationHistory: conversation.messages
+            .where(
+              (m) => m.id != assistantMessageId && m.role != MessageRole.system,
+            )
+            .toList(),
+        systemPrompt: conversation.systemPrompt,
+        attachments: _lastUserMessageAttachments(conversation, assistantMessageId),
+      )) {
+        buffer.write(token);
+        final updatedMessage = assistantMessage.copyWith(
+          text: buffer.toString(),
+        );
+
+        final messages = conversation.messages
+            .map((m) => m.id == assistantMessageId ? updatedMessage : m)
+            .toList();
+
+        conversation = conversation.copyWith(
+          messages: messages,
+          updatedAt: DateTime.now(),
+        );
+
+        _conversationUpdatesController.add(conversation);
+        yield conversation;
+      }
+
+      final finalMessage = assistantMessage.copyWith(
+        text: buffer.toString(),
+        isStreaming: false,
+      );
+
+      final finalMessages = conversation.messages
+          .map((m) => m.id == assistantMessageId ? finalMessage : m)
+          .toList();
+
+      conversation = conversation.copyWith(
+        messages: finalMessages,
+        updatedAt: DateTime.now(),
+      );
+
+      await updateConversation(conversation);
+      _log('LM Studio response complete: ${buffer.length} chars');
+    } catch (e) {
+      _log('LM Studio generation error: $e');
 
       final errorMessage = assistantMessage.copyWith(
         text: buffer.isEmpty
@@ -1308,11 +1492,16 @@ class ChatService {
     final isOpenCodeModel = UnifiedModelService.isOpenCodeModel(
       initialConversation.modelName,
     );
+    final isLmStudioModel = UnifiedModelService.isLmStudioModel(
+      initialConversation.modelName,
+    );
     _log(
       'sendMessageWithContext routing: model=${initialConversation.modelName}, '
       'isLocalModel=$isLocalModel, '
       'isOpenCodeModel=$isOpenCodeModel, '
+      'isLmStudioModel=$isLmStudioModel, '
       'inferenceMode=$currentInferenceMode, '
+      'lmStudioServiceReady=${_lmStudioLLMService != null}, '
       'onDeviceServiceReady=${_onDeviceLLMService != null}, '
       'isOnline=$isOnline',
     );
@@ -1352,8 +1541,33 @@ class ChatService {
           'OpenCode service is not configured. Please set up an OpenCode connection in Settings.',
         );
       }
+      if (!_openCodeLLMService!.hasConfiguredConnection) {
+        throw Exception(
+          'OpenCode server removed. Choose another saved OpenCode server or add a new one in Settings.',
+        );
+      }
       _log('Routing sendMessageWithContext to OpenCode inference');
       yield* _sendMessageOpenCode(
+        conversationId,
+        lastUserText(conversation),
+        addUserMessage: false,
+      );
+      return;
+    }
+
+    if (isLmStudioModel) {
+      if (_lmStudioLLMService == null) {
+        throw Exception(
+          'LM Studio is not configured. Please set up an LM Studio connection in Settings.',
+        );
+      }
+      if (!_lmStudioLLMService!.hasConfiguredConnection) {
+        throw Exception(
+          'LM Studio server removed. Choose another saved LM Studio server or add a new one in Settings.',
+        );
+      }
+      _log('Routing sendMessageWithContext to LM Studio inference');
+      yield* _sendMessageLmStudio(
         conversationId,
         lastUserText(conversation),
         addUserMessage: false,
@@ -2520,6 +2734,7 @@ class ChatService {
 
     // Dispose on-device LLM service if present
     _onDeviceLLMService?.dispose();
+    _lmStudioLLMService?.dispose();
     _openCodeLLMService?.dispose();
     _inferenceConfigService?.dispose();
   }

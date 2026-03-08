@@ -24,7 +24,8 @@ class OpenCodeLLMService implements LLMService {
   /// Maps conversation IDs to OpenCode session IDs.
   final Map<String, String> _sessionMap = {};
 
-  static const String _sessionMapKey = 'opencode_session_map';
+  static const String _sessionMapKeyPrefix = 'opencode_session_map';
+  String? _activeConnectionId;
 
   OpenCodeLLMService(
     this._connectionManager, {
@@ -38,6 +39,10 @@ class OpenCodeLLMService implements LLMService {
 
   @override
   bool isModelLoaded(String modelId) => _currentModelId == modelId;
+
+  bool get hasConfiguredConnection => _connectionManager.connection != null;
+
+  String? get activeConnectionName => _connectionManager.connection?.name;
 
   @override
   Future<bool> isAvailable() async {
@@ -56,6 +61,7 @@ class OpenCodeLLMService implements LLMService {
   Future<List<ModelInfo>> getAvailableModelsForSelection({
     bool applyProviderFilter = true,
   }) async {
+    await _ensureConnectionScopedState();
     final providers = await _fetchProviders();
     if (providers == null) {
       return [];
@@ -68,6 +74,7 @@ class OpenCodeLLMService implements LLMService {
 
   /// Get the raw provider response (for UI that needs provider grouping).
   Future<OpenCodeProviderResponse?> getProviders() async {
+    await _ensureConnectionScopedState();
     return _fetchProviders();
   }
 
@@ -76,6 +83,7 @@ class OpenCodeLLMService implements LLMService {
 
   @override
   Future<void> loadModel(String modelId) async {
+    await _ensureConnectionScopedState();
     _currentModelId = modelId;
     _log('Model set to: $modelId');
   }
@@ -95,6 +103,7 @@ class OpenCodeLLMService implements LLMService {
     int? maxTokens,
     List<Attachment>? attachments,
   }) async* {
+    await _ensureConnectionScopedState();
     _currentModelId = modelId;
 
     // Strip the opencode: prefix to get providerId/modelId
@@ -189,6 +198,7 @@ class OpenCodeLLMService implements LLMService {
 
   /// Get or create an OpenCode session for the current interaction.
   Future<String> _getOrCreateSession({String? conversationId}) async {
+    await _ensureConnectionScopedState();
     // Check for existing session
     final key = conversationId ?? '_default';
     if (_sessionMap.containsKey(key)) {
@@ -250,6 +260,7 @@ class OpenCodeLLMService implements LLMService {
   Future<OpenCodeProviderResponse?> _fetchProviders({
     bool allowCache = true,
   }) async {
+    await _ensureConnectionScopedState();
     try {
       final providers = await _connectionManager.client.getProviders();
       _cachedProviders = providers;
@@ -318,10 +329,31 @@ class OpenCodeLLMService implements LLMService {
 
   // ── Session map persistence ────────────────────────────────────
 
+  Future<void> _ensureConnectionScopedState() async {
+    final connectionId = _connectionManager.connection?.id;
+    if (_activeConnectionId == connectionId) {
+      return;
+    }
+
+    _activeConnectionId = connectionId;
+    _cachedProviders = null;
+    _sessionMap.clear();
+    await _loadSessionMap();
+  }
+
+  String? get _sessionMapKey {
+    final connectionId = _activeConnectionId;
+    if (connectionId == null || connectionId.isEmpty) return null;
+    return '$_sessionMapKeyPrefix:$connectionId';
+  }
+
   Future<void> _loadSessionMap() async {
     try {
+      final sessionMapKey = _sessionMapKey;
+      if (sessionMapKey == null) return;
+
       final prefs = await SharedPreferences.getInstance();
-      final json = prefs.getString(_sessionMapKey);
+      final json = prefs.getString(sessionMapKey);
       if (json == null || json.isEmpty) return;
 
       final decoded = jsonDecode(json);
@@ -337,9 +369,12 @@ class OpenCodeLLMService implements LLMService {
 
   Future<void> _saveSessionMap() async {
     try {
+      final sessionMapKey = _sessionMapKey;
+      if (sessionMapKey == null) return;
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
-        _sessionMapKey,
+        sessionMapKey,
         const JsonEncoder().convert(_sessionMap),
       );
     } catch (_) {}

@@ -24,6 +24,17 @@ void main() {
       expect(caps.supportsAudio, false);
     });
 
+    test('resolves LM Studio model capabilities conservatively', () {
+      final caps = ModelCapabilityResolver.getCapabilities(
+        'lmstudio:llava-1.6-7b',
+      );
+
+      expect(caps, isNotNull);
+      expect(caps!.supportsVision, true);
+      expect(caps.supportsToolCalling, false);
+      expect(caps.description, 'LM Studio model');
+    });
+
     test('returns unknown capabilities for unrecognized model', () {
       final caps = ModelCapabilityResolver.getCapabilitiesOrUnknown(
         'local:unknown-model',

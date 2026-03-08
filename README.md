@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-192%20Passing-brightgreen.svg)](test/)
 
-**Universal AI Chat Platform** - One app for all your AI models. Chat with on-device models (privacy), self-hosted Ollama (control), or cloud APIs (power). You choose your balance of privacy, performance, and cost.
+**Universal AI Chat Platform** - One app for all your AI models. Chat with on-device models (privacy), self-hosted Ollama or LM Studio servers (control), or cloud APIs (power). You choose your balance of privacy, performance, and cost.
 
 ## ✨ What Makes Us Different
 
@@ -13,7 +13,7 @@ Unlike single-provider apps (ChatGPT, Claude) or desktop-only tools (Jan.ai, LM 
 - 📱 **Mobile-First**: Native Android app, not a web wrapper
 - 🌍 **Universal Access**: Local models + Self-hosted + Cloud APIs (OpenAI, Anthropic, Google)
 - 🔒 **Privacy by Choice**: Use 100% local models, or cloud when you need them
-- 💰 **Cost Flexible**: Free local models, pay-per-use cloud APIs, or your own Ollama server
+- 💰 **Cost Flexible**: Free local models, pay-per-use cloud APIs, or your own Ollama or LM Studio server
 - ⚡ **Full Offline**: Chat with on-device models anywhere, no internet required
 - 🎯 **Smart Fallbacks**: Auto-switch to available providers when one fails
 
@@ -22,9 +22,9 @@ Unlike single-provider apps (ChatGPT, Claude) or desktop-only tools (Jan.ai, LM 
 ## ✨ Key Features
 
 ### v1.0 (Current)
-- 🔒 **Hybrid Architecture**: Local on-device models (LiteRT) + Self-hosted Ollama
+- 🔒 **Hybrid Architecture**: Local on-device models (LiteRT) + self-hosted Ollama or LM Studio
 - 📱 **Offline Mode**: Full functionality with local models, queue messages for remote
-- 🤖 **Multiple AI Models**: Access 30+ Ollama models + on-device Gemini/Gemma
+- 🤖 **Multiple AI Models**: Access self-hosted Ollama or LM Studio models + on-device Gemini/Gemma
 - 🔍 **Web Search**: LLMs can search the internet with real-time progress
 - 📚 **Source References**: Clickable links to web search sources
 - 💬 **Conversation Management**: Organize chats, view history, export conversations
@@ -49,7 +49,7 @@ Unlike single-provider apps (ChatGPT, Claude) or desktop-only tools (Jan.ai, LM 
 
 **For Users:**
 - Android device (7.0+, API 24+)
-- Optional: Ollama server for self-hosted models ([Get Ollama](https://ollama.ai))
+- Optional: Ollama or LM Studio server for self-hosted models ([Get Ollama](https://ollama.ai), [Get LM Studio](https://lmstudio.ai/))
 - Optional: API keys for cloud providers (OpenAI, Anthropic, Google AI)
 
 **For Developers:**
@@ -93,10 +93,12 @@ Choose your preferred setup:
 4. **No internet required after download**
 
 #### Option B: Self-Hosted (Control + Power) 🖥️
-1. Install Ollama on your server: `curl https://ollama.ai/install.sh | sh`
-2. Download models: `ollama pull llama3`
-3. In app: Settings → Ollama Connection → Enter server IP
+1. Install Ollama on your server or install LM Studio on your desktop/server
+2. Download a model in Ollama or LM Studio
+3. In app: Settings → Self-Hosted Servers → connect Ollama or LM Studio
 4. Chat with powerful models on your infrastructure
+
+See [docs/GUIDE_LM_STUDIO_SETUP.md](docs/GUIDE_LM_STUDIO_SETUP.md) for a focused LM Studio walkthrough.
 
 #### Option C: Cloud APIs (Convenience + Latest Models) ☁️
 1. Get API keys from [OpenAI](https://platform.openai.com/api-keys), [Anthropic](https://console.anthropic.com/), or [Google AI](https://makersuite.google.com/app/apikey)

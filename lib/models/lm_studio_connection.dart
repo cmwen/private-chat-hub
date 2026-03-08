@@ -1,38 +1,35 @@
-/// Represents a saved OpenCode server connection profile.
-class OpenCodeConnection {
+/// Represents a saved LM Studio server connection profile.
+class LmStudioConnection {
   final String id;
   final String name;
   final String host;
   final int port;
   final bool useHttps;
-  final String? username;
-  final String? password;
+  final String? apiToken;
   final bool isDefault;
   final DateTime createdAt;
   final DateTime? lastConnectedAt;
 
-  const OpenCodeConnection({
+  const LmStudioConnection({
     required this.id,
     required this.name,
     required this.host,
-    this.port = 4096,
+    this.port = 1234,
     this.useHttps = false,
-    this.username,
-    this.password,
+    this.apiToken,
     this.isDefault = false,
     required this.createdAt,
     this.lastConnectedAt,
   });
 
-  factory OpenCodeConnection.fromJson(Map<String, dynamic> json) {
-    return OpenCodeConnection(
+  factory LmStudioConnection.fromJson(Map<String, dynamic> json) {
+    return LmStudioConnection(
       id: json['id'] as String,
       name: json['name'] as String,
       host: json['host'] as String,
-      port: json['port'] as int? ?? 4096,
+      port: json['port'] as int? ?? 1234,
       useHttps: json['useHttps'] as bool? ?? false,
-      username: json['username'] as String?,
-      password: json['password'] as String?,
+      apiToken: json['apiToken'] as String?,
       isDefault: json['isDefault'] as bool? ?? false,
       createdAt: DateTime.parse(json['createdAt'] as String),
       lastConnectedAt: json['lastConnectedAt'] != null
@@ -48,42 +45,36 @@ class OpenCodeConnection {
       'host': host,
       'port': port,
       'useHttps': useHttps,
-      'username': username,
-      'password': password,
+      'apiToken': apiToken,
       'isDefault': isDefault,
       'createdAt': createdAt.toIso8601String(),
       'lastConnectedAt': lastConnectedAt?.toIso8601String(),
     };
   }
 
-  /// Gets the full URL for this connection.
   String get url => '${useHttps ? 'https' : 'http'}://$host:$port';
 
-  /// Whether HTTP basic auth is configured.
-  bool get hasAuth => password != null && password!.isNotEmpty;
+  bool get hasApiToken => apiToken != null && apiToken!.isNotEmpty;
 
-  OpenCodeConnection copyWith({
+  LmStudioConnection copyWith({
     String? id,
     String? name,
     String? host,
     int? port,
     bool? useHttps,
-    String? username,
-    bool clearUsername = false,
-    String? password,
-    bool clearPassword = false,
+    String? apiToken,
+    bool clearApiToken = false,
     bool? isDefault,
     DateTime? createdAt,
     DateTime? lastConnectedAt,
   }) {
-    return OpenCodeConnection(
+    return LmStudioConnection(
       id: id ?? this.id,
       name: name ?? this.name,
       host: host ?? this.host,
       port: port ?? this.port,
       useHttps: useHttps ?? this.useHttps,
-      username: clearUsername ? null : (username ?? this.username),
-      password: clearPassword ? null : (password ?? this.password),
+      apiToken: clearApiToken ? null : (apiToken ?? this.apiToken),
       isDefault: isDefault ?? this.isDefault,
       createdAt: createdAt ?? this.createdAt,
       lastConnectedAt: lastConnectedAt ?? this.lastConnectedAt,
@@ -93,7 +84,7 @@ class OpenCodeConnection {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is OpenCodeConnection &&
+      other is LmStudioConnection &&
           runtimeType == other.runtimeType &&
           id == other.id;
 

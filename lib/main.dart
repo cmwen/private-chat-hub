@@ -14,12 +14,16 @@ import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/inference_config_service.dart';
 import 'package:private_chat_hub/services/jina_search_service.dart';
+import 'package:private_chat_hub/services/lm_studio_connection_service.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/status_service.dart';
 import 'package:private_chat_hub/widgets/status_banner.dart';
+import 'package:private_chat_hub/services/lm_studio_connection_manager.dart';
+import 'package:private_chat_hub/services/lm_studio_llm_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/on_device_llm_service.dart';
 import 'package:private_chat_hub/services/opencode_connection_manager.dart';
+import 'package:private_chat_hub/services/opencode_connection_service.dart';
 import 'package:private_chat_hub/services/opencode_llm_service.dart';
 import 'package:private_chat_hub/services/opencode_model_visibility_service.dart';
 import 'package:private_chat_hub/services/project_service.dart';
@@ -197,6 +201,10 @@ class _HomeScreenState extends State<HomeScreen> {
   late final ProjectService _projectService;
   InferenceConfigService? _inferenceConfigService;
   OnDeviceLLMService? _onDeviceLLMService;
+  LmStudioConnectionService? _lmStudioConnectionService;
+  LmStudioConnectionManager? _lmStudioConnectionManager;
+  LmStudioLLMService? _lmStudioLLMService;
+  OpenCodeConnectionService? _openCodeConnectionService;
   OpenCodeConnectionManager? _openCodeConnectionManager;
   OpenCodeLLMService? _openCodeLLMService;
   OpenCodeModelVisibilityService? _openCodeVisibilityService;
@@ -331,9 +339,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Initialize OpenCode service
       try {
+        final lmStudioConnectionService = LmStudioConnectionService(prefs);
+        final lmStudioConnectionManager = LmStudioConnectionManager();
+        final savedLmStudioConnection = lmStudioConnectionService
+            .getDefaultConnection();
+
+        if (savedLmStudioConnection != null) {
+          await lmStudioConnectionManager.setConnection(savedLmStudioConnection);
+        }
+
+        final lmStudioLLMService = LmStudioLLMService(
+          lmStudioConnectionManager,
+        );
+
+        final openCodeConnectionService = OpenCodeConnectionService(prefs);
         final openCodeConnectionManager = OpenCodeConnectionManager();
-        final savedConnection = await openCodeConnectionManager
-            .loadConnection();
+        final savedConnection = openCodeConnectionService.getDefaultConnection();
 
         if (savedConnection != null) {
           await openCodeConnectionManager.setConnection(savedConnection);
@@ -347,15 +368,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
         if (!mounted) return;
         setState(() {
+          _lmStudioConnectionService = lmStudioConnectionService;
+          _lmStudioConnectionManager = lmStudioConnectionManager;
+          _lmStudioLLMService = lmStudioLLMService;
+          _openCodeConnectionService = openCodeConnectionService;
           _openCodeConnectionManager = openCodeConnectionManager;
           _openCodeLLMService = openCodeLLMService;
           _openCodeVisibilityService = visibilityService;
         });
 
+        _chatService.setLmStudioLLMService(lmStudioLLMService);
         _chatService.setOpenCodeLLMService(openCodeLLMService);
 
         print(
-          '[HomeScreen._initializeInferenceServices] OpenCode service initialized',
+          '[HomeScreen._initializeInferenceServices] Remote provider services initialized',
         );
       } catch (e) {
         print(
@@ -472,6 +498,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   chatService: _chatService,
                   connectionService: _connectionService,
                   ollamaManager: _ollamaManager,
+                  lmStudioLLMService: _lmStudioLLMService,
                   openCodeLLMService: _openCodeLLMService,
                   openCodeVisibilityService: _openCodeVisibilityService,
                   onConversationSelected: _onConversationSelected,
@@ -482,6 +509,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   chatService: _chatService,
                   connectionService: _connectionService,
                   ollamaManager: _ollamaManager,
+                  lmStudioLLMService: _lmStudioLLMService,
                   openCodeLLMService: _openCodeLLMService,
                   openCodeVisibilityService: _openCodeVisibilityService,
                   onConversationSelected: _onConversationSelected,
@@ -490,6 +518,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ollamaManager: _ollamaManager,
                   connectionService: _connectionService,
                   onDeviceLLMService: _onDeviceLLMService,
+                  lmStudioLLMService: _lmStudioLLMService,
                   openCodeLLMService: _openCodeLLMService,
                   openCodeVisibilityService: _openCodeVisibilityService,
                 ),
@@ -502,6 +531,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   storageService: widget.storageService,
                   projectService: _projectService,
                   onDeviceLLMService: _onDeviceLLMService,
+                  lmStudioConnectionService: _lmStudioConnectionService,
+                  lmStudioConnectionManager: _lmStudioConnectionManager,
+                  lmStudioLLMService: _lmStudioLLMService,
+                  openCodeConnectionService: _openCodeConnectionService,
                   openCodeConnectionManager: _openCodeConnectionManager,
                   openCodeLLMService: _openCodeLLMService,
                   openCodeVisibilityService: _openCodeVisibilityService,

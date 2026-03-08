@@ -5,6 +5,15 @@ All notable changes to Private Chat Hub will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **LM Studio REST Integration**: Connect to self-hosted LM Studio servers from Settings
+  - Added LM Studio model discovery via `/api/v1/models`
+  - Added LM Studio chat streaming via `/api/v1/chat`
+  - Added LM Studio model selection and provider badges across chat and model pickers
+  - Kept self-hosted setup aligned with existing Ollama-first UX
+
 ## [1.0.1] - 2026-01-05
 
 ### Fixed

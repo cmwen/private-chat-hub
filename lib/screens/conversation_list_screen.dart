@@ -4,6 +4,7 @@ import 'package:private_chat_hub/screens/search_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/llm_service.dart';
+import 'package:private_chat_hub/services/lm_studio_llm_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/opencode_llm_service.dart';
 import 'package:private_chat_hub/services/opencode_model_visibility_service.dart';
@@ -18,6 +19,7 @@ class ConversationListScreen extends StatefulWidget {
   final ChatService chatService;
   final ConnectionService connectionService;
   final OllamaConnectionManager ollamaManager;
+  final LmStudioLLMService? lmStudioLLMService;
   final OpenCodeLLMService? openCodeLLMService;
   final OpenCodeModelVisibilityService? openCodeVisibilityService;
   final Function(Conversation) onConversationSelected;
@@ -28,6 +30,7 @@ class ConversationListScreen extends StatefulWidget {
     required this.chatService,
     required this.connectionService,
     required this.ollamaManager,
+    this.lmStudioLLMService,
     this.openCodeLLMService,
     this.openCodeVisibilityService,
     required this.onConversationSelected,
@@ -87,6 +90,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
 
     final unifiedModelService = UnifiedModelService(
       onDeviceLLMService: widget.chatService.onDeviceLLMService,
+      lmStudioLLMService: widget.lmStudioLLMService,
       openCodeLLMService: widget.openCodeLLMService,
       visibilityService: widget.openCodeVisibilityService,
     );
@@ -785,7 +789,39 @@ class _ModelSelectorSheet extends StatelessWidget {
                             ),
                           ),
                         ],
+                        if (UnifiedModelService.isLmStudioModel(model.id)) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.teal.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: Colors.teal.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.memory, size: 14, color: Colors.teal),
+                                SizedBox(width: 4),
+                                Text(
+                                  'LM STUDIO',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.teal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         if (!model.isLocal &&
+                            !UnifiedModelService.isLmStudioModel(model.id) &&
                             !UnifiedModelService.isOpenCodeModel(model.id) &&
                             !isOllamaOnline) ...[
                           const SizedBox(width: 8),
@@ -843,6 +879,14 @@ class _ModelSelectorSheet extends StatelessWidget {
                               color: Colors.blue.shade700,
                             ),
                           )
+                        else if (UnifiedModelService.isLmStudioModel(model.id))
+                          Text(
+                            'Self-hosted model via LM Studio',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.teal.shade700,
+                            ),
+                          )
                         else
                           Text(model.sizeString),
                         const SizedBox(height: 4),
@@ -884,6 +928,7 @@ class _ModelSelectorSheet extends StatelessWidget {
   IconData _iconForModel(ModelInfo model) {
     if (model.isLocal) return Icons.phone_android;
     if (UnifiedModelService.isOpenCodeModel(model.id)) return Icons.public;
+    if (UnifiedModelService.isLmStudioModel(model.id)) return Icons.memory;
     return Icons.cloud;
   }
 }

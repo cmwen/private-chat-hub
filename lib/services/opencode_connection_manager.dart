@@ -1,22 +1,21 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:private_chat_hub/models/opencode_connection.dart';
 import 'package:private_chat_hub/services/opencode_api_client.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// Manages the OpenCode server connection lifecycle.
 ///
 /// Mirrors the pattern of [OllamaConnectionManager] for consistency.
 class OpenCodeConnectionManager {
-  final OpenCodeApiClient _client = OpenCodeApiClient();
-
-  static const String _connectionKey = 'opencode_connection';
+  final OpenCodeApiClient _client;
 
   OpenCodeConnection? _connection;
   bool _isConnected = false;
 
   final StreamController<bool> _connectionStatusController =
       StreamController<bool>.broadcast();
+
+  OpenCodeConnectionManager({OpenCodeApiClient? client})
+    : _client = client ?? OpenCodeApiClient();
 
   /// Stream of connection status changes.
   Stream<bool> get connectionStatusStream => _connectionStatusController.stream;
@@ -76,35 +75,6 @@ class OpenCodeConnectionManager {
     } finally {
       testClient.dispose();
     }
-  }
-
-  // ── Persistence ────────────────────────────────────────────────
-
-  /// Save the connection to SharedPreferences.
-  Future<void> saveConnection(OpenCodeConnection connection) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_connectionKey, jsonEncode(connection.toJson()));
-  }
-
-  /// Load the saved connection from SharedPreferences.
-  Future<OpenCodeConnection?> loadConnection() async {
-    final prefs = await SharedPreferences.getInstance();
-    final json = prefs.getString(_connectionKey);
-    if (json == null) return null;
-    try {
-      return OpenCodeConnection.fromJson(
-        jsonDecode(json) as Map<String, dynamic>,
-      );
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// Remove the saved connection.
-  Future<void> removeConnection() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_connectionKey);
-    clearConnection();
   }
 
   /// Dispose of resources.

@@ -2,17 +2,22 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:private_chat_hub/models/connection.dart';
+import 'package:private_chat_hub/models/lm_studio_connection.dart';
 import 'package:private_chat_hub/models/tool_models.dart';
 import 'package:private_chat_hub/ollama_toolkit/services/ollama_config_service.dart';
 import 'package:private_chat_hub/screens/on_device_models_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/inference_config_service.dart';
+import 'package:private_chat_hub/services/lm_studio_connection_manager.dart';
+import 'package:private_chat_hub/services/lm_studio_connection_service.dart';
+import 'package:private_chat_hub/services/lm_studio_llm_service.dart';
 import 'package:private_chat_hub/services/network_discovery_service.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/models/opencode_connection.dart';
 import 'package:private_chat_hub/services/opencode_connection_manager.dart';
+import 'package:private_chat_hub/services/opencode_connection_service.dart';
 import 'package:private_chat_hub/services/opencode_llm_service.dart';
 import 'package:private_chat_hub/services/opencode_model_visibility_service.dart';
 import 'package:private_chat_hub/services/project_service.dart';
@@ -33,6 +38,10 @@ class SettingsScreen extends StatefulWidget {
   final StorageService? storageService;
   final ProjectService? projectService;
   final dynamic onDeviceLLMService; // OnDeviceLLMService
+  final LmStudioConnectionService? lmStudioConnectionService;
+  final LmStudioConnectionManager? lmStudioConnectionManager;
+  final LmStudioLLMService? lmStudioLLMService;
+  final OpenCodeConnectionService? openCodeConnectionService;
   final OpenCodeConnectionManager? openCodeConnectionManager;
   final OpenCodeLLMService? openCodeLLMService;
   final OpenCodeModelVisibilityService? openCodeVisibilityService;
@@ -50,6 +59,10 @@ class SettingsScreen extends StatefulWidget {
     this.storageService,
     this.projectService,
     this.onDeviceLLMService,
+    this.lmStudioConnectionService,
+    this.lmStudioConnectionManager,
+    this.lmStudioLLMService,
+    this.openCodeConnectionService,
     this.openCodeConnectionManager,
     this.openCodeLLMService,
     this.openCodeVisibilityService,
@@ -495,8 +508,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
             )
           : ListView(
               children: [
-                // ── Ollama Connections ──────────────────────────────
-                _SectionHeader(title: 'Ollama Connections'),
+                // ── Self-hosted connections ─────────────────────────
+                _SectionHeader(title: 'Self-Hosted Servers'),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'Connect to Ollama or LM Studio to run models on your own server.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                  child: Text(
+                    'Ollama',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
                 if (_connections.isEmpty)
                   Card(
                     margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -511,7 +544,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           const SizedBox(height: 16),
                           const Text(
-                            'No connections configured',
+                            'No Ollama connections configured',
                             style: TextStyle(fontSize: 16),
                           ),
                           const SizedBox(height: 8),
@@ -552,11 +585,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       label: const Text('Add Connection'),
                     ),
                   ),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                  child: Text(
+                    'LM Studio',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                _LmStudioConnectionsList(
+                  connectionService: widget.lmStudioConnectionService,
+                  connectionManager: widget.lmStudioConnectionManager,
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'Connect to an LM Studio server to use models exposed over its REST API.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
                 const Divider(height: 32),
 
                 // ── OpenCode Connection ─────────────────────────────
-                _SectionHeader(title: 'OpenCode Connection'),
-                _OpenCodeConnectionCard(
+                _SectionHeader(title: 'OpenCode Servers'),
+                _OpenCodeConnectionsList(
+                  connectionService: widget.openCodeConnectionService,
                   connectionManager: widget.openCodeConnectionManager,
                 ),
                 const SizedBox(height: 8),
@@ -1784,117 +1843,663 @@ class _HuggingFaceTokenBannerState extends State<_HuggingFaceTokenBanner> {
   }
 }
 
-/// Card for managing OpenCode server connection in Settings.
-class _OpenCodeConnectionCard extends StatefulWidget {
+class _OpenCodeConnectionsList extends StatefulWidget {
+  final OpenCodeConnectionService? connectionService;
   final OpenCodeConnectionManager? connectionManager;
 
-  const _OpenCodeConnectionCard({this.connectionManager});
+  const _OpenCodeConnectionsList({
+    this.connectionService,
+    this.connectionManager,
+  });
 
   @override
-  State<_OpenCodeConnectionCard> createState() =>
-      _OpenCodeConnectionCardState();
+  State<_OpenCodeConnectionsList> createState() =>
+      _OpenCodeConnectionsListState();
 }
 
-class _OpenCodeConnectionCardState extends State<_OpenCodeConnectionCard> {
-  final _hostController = TextEditingController(text: '127.0.0.1');
-  final _portController = TextEditingController(text: '4096');
-  final _usernameController = TextEditingController(text: 'opencode');
-  final _passwordController = TextEditingController();
-  bool _useHttps = false;
-  bool _isTesting = false;
-  String? _testResult;
-  bool _isConnected = false;
+class _OpenCodeConnectionsListState extends State<_OpenCodeConnectionsList> {
+  List<OpenCodeConnection> _connections = [];
 
   @override
   void initState() {
     super.initState();
-    _loadExistingConnection();
+    _loadConnections();
   }
 
-  Future<void> _loadExistingConnection() async {
-    final manager = widget.connectionManager;
-    if (manager == null) return;
-
-    final conn = await manager.loadConnection();
-    if (conn != null && mounted) {
-      setState(() {
-        _hostController.text = conn.host;
-        _portController.text = conn.port.toString();
-        _useHttps = conn.useHttps;
-        _usernameController.text = conn.username ?? 'opencode';
-        _passwordController.text = conn.password ?? '';
-        _isConnected = manager.isConnected;
-      });
-    }
-  }
-
-  Future<void> _testAndSave() async {
-    final manager = widget.connectionManager;
-    if (manager == null) return;
-
+  void _loadConnections() {
     setState(() {
-      _isTesting = true;
-      _testResult = null;
+      _connections = widget.connectionService?.getConnections() ?? [];
     });
+  }
 
-    final connection = _buildConnection();
+  Future<void> _rebindDefaultConnection() async {
+    final manager = widget.connectionManager;
+    final service = widget.connectionService;
+    if (manager == null || service == null) return;
+
+    final defaultConnection = service.getDefaultConnection();
+    if (defaultConnection == null) {
+      manager.clearConnection();
+      return;
+    }
+
+    await manager.setConnection(defaultConnection);
+  }
+
+  Future<void> _saveConnection(OpenCodeConnectionDraft draft,
+      {OpenCodeConnection? existing}) async {
+    final service = widget.connectionService;
+    if (service == null) return;
+
+    if (existing == null) {
+      await service.addConnection(
+        name: draft.name,
+        host: draft.host,
+        port: draft.port,
+        useHttps: draft.useHttps,
+        username: draft.username,
+        password: draft.password,
+      );
+    } else {
+      await service.updateConnection(
+        existing.copyWith(
+          name: draft.name,
+          host: draft.host,
+          port: draft.port,
+          useHttps: draft.useHttps,
+          username: draft.username,
+          clearUsername: draft.username == null,
+          password: draft.password,
+          clearPassword: draft.password == null,
+        ),
+      );
+    }
+
+    await _rebindDefaultConnection();
+    _loadConnections();
+  }
+
+  Future<void> _showConnectionDialog({OpenCodeConnection? existing}) async {
+    final draft = await showDialog<OpenCodeConnectionDraft>(
+      context: context,
+      builder: (context) => _OpenCodeConnectionDialog(existing: existing),
+    );
+
+    if (draft == null) return;
+    await _saveConnection(draft, existing: existing);
+  }
+
+  Future<void> _testConnection(OpenCodeConnection connection) async {
+    final manager = widget.connectionManager;
+    final service = widget.connectionService;
+    if (manager == null || service == null) return;
+
     final result = await manager.testConnectionConfig(connection);
-
     if (!mounted) return;
 
     if (result.healthy) {
-      await manager.saveConnection(connection);
-      await manager.setConnection(connection);
-      setState(() {
-        _isTesting = false;
-        _isConnected = true;
-        _testResult =
-            'Connected! '
-            '${result.version != null ? "v${result.version}" : ""} '
-            '${result.modelCount != null ? "· ${result.modelCount} models" : ""}';
-      });
-    } else {
-      setState(() {
-        _isTesting = false;
-        _isConnected = false;
-        _testResult = 'Connection failed. Check host and port.';
-      });
+      await service.updateLastConnected(connection.id);
+      if (connection.isDefault) {
+        await manager.setConnection(connection);
+      }
+      _loadConnections();
     }
-  }
 
-  Future<void> _disconnect() async {
-    final manager = widget.connectionManager;
-    if (manager == null) return;
+    if (!mounted) return;
 
-    await manager.removeConnection();
-    if (mounted) {
-      setState(() {
-        _isConnected = false;
-        _testResult = null;
-      });
-    }
-  }
-
-  OpenCodeConnection _buildConnection() {
-    return OpenCodeConnection(
-      id: 'default',
-      name: 'OpenCode Server',
-      host: _hostController.text.trim(),
-      port: int.tryParse(_portController.text.trim()) ?? 4096,
-      useHttps: _useHttps,
-      username: _usernameController.text.trim().isNotEmpty
-          ? _usernameController.text.trim()
-          : null,
-      password: _passwordController.text.isNotEmpty
-          ? _passwordController.text
-          : null,
-      isDefault: true,
-      createdAt: DateTime.now(),
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.healthy
+              ? 'Connected${result.modelCount != null ? ' · ${result.modelCount} models' : ''}'
+              : 'OpenCode server unavailable. Check address, credentials, and network.',
+        ),
+        backgroundColor: result.healthy ? Colors.green : Colors.red,
+      ),
     );
+  }
+
+  Future<void> _deleteConnection(OpenCodeConnection connection) async {
+    final service = widget.connectionService;
+    if (service == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Server'),
+        content: Text(
+          'Delete "${connection.name}"? If this is the default server, another saved OpenCode server will become default.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await service.deleteConnection(connection.id);
+    await _rebindDefaultConnection();
+    _loadConnections();
+  }
+
+  Future<void> _setDefault(OpenCodeConnection connection) async {
+    final service = widget.connectionService;
+    if (service == null) return;
+
+    await service.setDefaultConnection(connection.id);
+    await _rebindDefaultConnection();
+    _loadConnections();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.connectionService == null || widget.connectionManager == null) {
+      return const SizedBox.shrink();
+    }
+
+    if (_connections.isEmpty) {
+      return _EmptyProviderConnectionsCard(
+        icon: Icons.hub,
+        title: 'No OpenCode servers',
+        subtitle:
+            'Add an OpenCode server to access hosted providers through your gateway.',
+        buttonLabel: 'Add Server',
+        onPressed: _showConnectionDialog,
+      );
+    }
+
+    return Column(
+      children: [
+        ..._connections.map(
+          (connection) => _SavedServerCard(
+            icon: Icons.hub,
+            accentColor: Colors.blue,
+            name: connection.name,
+            subtitle: connection.url,
+            isDefault: connection.isDefault,
+            lastConnectedAt: connection.lastConnectedAt,
+            onTest: () => _testConnection(connection),
+            onEdit: () => _showConnectionDialog(existing: connection),
+            onDelete: () => _deleteConnection(connection),
+            onSetDefault: connection.isDefault ? null : () => _setDefault(connection),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: _showConnectionDialog,
+              icon: const Icon(Icons.add),
+              label: const Text('Add Server'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LmStudioConnectionsList extends StatefulWidget {
+  final LmStudioConnectionService? connectionService;
+  final LmStudioConnectionManager? connectionManager;
+
+  const _LmStudioConnectionsList({
+    this.connectionService,
+    this.connectionManager,
+  });
+
+  @override
+  State<_LmStudioConnectionsList> createState() =>
+      _LmStudioConnectionsListState();
+}
+
+class _LmStudioConnectionsListState extends State<_LmStudioConnectionsList> {
+  List<LmStudioConnection> _connections = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadConnections();
+  }
+
+  void _loadConnections() {
+    setState(() {
+      _connections = widget.connectionService?.getConnections() ?? [];
+    });
+  }
+
+  Future<void> _rebindDefaultConnection() async {
+    final manager = widget.connectionManager;
+    final service = widget.connectionService;
+    if (manager == null || service == null) return;
+
+    final defaultConnection = service.getDefaultConnection();
+    if (defaultConnection == null) {
+      manager.clearConnection();
+      return;
+    }
+
+    await manager.setConnection(defaultConnection);
+  }
+
+  Future<void> _saveConnection(LmStudioConnectionDraft draft,
+      {LmStudioConnection? existing}) async {
+    final service = widget.connectionService;
+    if (service == null) return;
+
+    if (existing == null) {
+      await service.addConnection(
+        name: draft.name,
+        host: draft.host,
+        port: draft.port,
+        useHttps: draft.useHttps,
+        apiToken: draft.apiToken,
+      );
+    } else {
+      await service.updateConnection(
+        existing.copyWith(
+          name: draft.name,
+          host: draft.host,
+          port: draft.port,
+          useHttps: draft.useHttps,
+          apiToken: draft.apiToken,
+          clearApiToken: draft.apiToken == null,
+        ),
+      );
+    }
+
+    await _rebindDefaultConnection();
+    _loadConnections();
+  }
+
+  Future<void> _showConnectionDialog({LmStudioConnection? existing}) async {
+    final draft = await showDialog<LmStudioConnectionDraft>(
+      context: context,
+      builder: (context) => _LmStudioConnectionDialog(existing: existing),
+    );
+
+    if (draft == null) return;
+    await _saveConnection(draft, existing: existing);
+  }
+
+  Future<void> _testConnection(LmStudioConnection connection) async {
+    final manager = widget.connectionManager;
+    final service = widget.connectionService;
+    if (manager == null || service == null) return;
+
+    final result = await manager.testConnectionConfig(connection);
+    if (!mounted) return;
+
+    if (result.healthy) {
+      await service.updateLastConnected(connection.id);
+      if (connection.isDefault) {
+        await manager.setConnection(connection);
+      }
+      _loadConnections();
+    }
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.healthy
+              ? 'Connected${result.modelCount != null ? ' · ${result.modelCount} models' : ''}'
+              : 'LM Studio server unavailable. Check that LM Studio is running and reachable.',
+        ),
+        backgroundColor: result.healthy ? Colors.green : Colors.red,
+      ),
+    );
+  }
+
+  Future<void> _deleteConnection(LmStudioConnection connection) async {
+    final service = widget.connectionService;
+    if (service == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Server'),
+        content: Text(
+          'Delete "${connection.name}"? If this is the default server, another saved LM Studio server will become default.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await service.deleteConnection(connection.id);
+    await _rebindDefaultConnection();
+    _loadConnections();
+  }
+
+  Future<void> _setDefault(LmStudioConnection connection) async {
+    final service = widget.connectionService;
+    if (service == null) return;
+
+    await service.setDefaultConnection(connection.id);
+    await _rebindDefaultConnection();
+    _loadConnections();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.connectionService == null || widget.connectionManager == null) {
+      return const SizedBox.shrink();
+    }
+
+    if (_connections.isEmpty) {
+      return _EmptyProviderConnectionsCard(
+        icon: Icons.memory,
+        title: 'No LM Studio servers',
+        subtitle:
+            'Add an LM Studio server to browse and use its local models.',
+        buttonLabel: 'Add Server',
+        onPressed: _showConnectionDialog,
+      );
+    }
+
+    return Column(
+      children: [
+        ..._connections.map(
+          (connection) => _SavedServerCard(
+            icon: Icons.memory,
+            accentColor: Colors.teal,
+            name: connection.name,
+            subtitle: connection.url,
+            isDefault: connection.isDefault,
+            lastConnectedAt: connection.lastConnectedAt,
+            onTest: () => _testConnection(connection),
+            onEdit: () => _showConnectionDialog(existing: connection),
+            onDelete: () => _deleteConnection(connection),
+            onSetDefault: connection.isDefault ? null : () => _setDefault(connection),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: _showConnectionDialog,
+              icon: const Icon(Icons.add),
+              label: const Text('Add Server'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyProviderConnectionsCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String buttonLabel;
+  final VoidCallback onPressed;
+
+  const _EmptyProviderConnectionsCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.buttonLabel,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              size: 48,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+            const SizedBox(height: 16),
+            Text(title, style: const TextStyle(fontSize: 16)),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: onPressed,
+              icon: const Icon(Icons.add),
+              label: Text(buttonLabel),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SavedServerCard extends StatelessWidget {
+  final IconData icon;
+  final Color accentColor;
+  final String name;
+  final String subtitle;
+  final bool isDefault;
+  final DateTime? lastConnectedAt;
+  final VoidCallback onTest;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback? onSetDefault;
+
+  const _SavedServerCard({
+    required this.icon,
+    required this.accentColor,
+    required this.name,
+    required this.subtitle,
+    required this.isDefault,
+    required this.lastConnectedAt,
+    required this.onTest,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onSetDefault,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        children: [
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: isDefault
+                  ? accentColor
+                  : Theme.of(context).colorScheme.surfaceContainer,
+              child: Icon(
+                icon,
+                color: isDefault
+                    ? Colors.white
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            title: Row(
+              children: [
+                Expanded(child: Text(name)),
+                if (isDefault)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: accentColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Default',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            subtitle: Text(subtitle),
+            trailing: PopupMenuButton<String>(
+              onSelected: (value) {
+                switch (value) {
+                  case 'test':
+                    onTest();
+                    break;
+                  case 'edit':
+                    onEdit();
+                    break;
+                  case 'default':
+                    onSetDefault?.call();
+                    break;
+                  case 'delete':
+                    onDelete();
+                    break;
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'test',
+                  child: Text('Test Connection'),
+                ),
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Text('Edit'),
+                ),
+                if (onSetDefault != null)
+                  const PopupMenuItem(
+                    value: 'default',
+                    child: Text('Set as Default'),
+                  ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Delete'),
+                ),
+              ],
+            ),
+          ),
+          if (lastConnectedAt != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 72, right: 16, bottom: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle, size: 14, color: accentColor),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Last connected: ${_formatRelativeDate(lastConnectedAt!)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+String _formatRelativeDate(DateTime date) {
+  final now = DateTime.now();
+  final diff = now.difference(date);
+
+  if (diff.inMinutes < 1) return 'Just now';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+  if (diff.inHours < 24) return '${diff.inHours}h ago';
+  if (diff.inDays < 7) return '${diff.inDays}d ago';
+
+  return '${date.day}/${date.month}/${date.year}';
+}
+
+class OpenCodeConnectionDraft {
+  final String name;
+  final String host;
+  final int port;
+  final bool useHttps;
+  final String? username;
+  final String? password;
+
+  const OpenCodeConnectionDraft({
+    required this.name,
+    required this.host,
+    required this.port,
+    required this.useHttps,
+    this.username,
+    this.password,
+  });
+}
+
+class _OpenCodeConnectionDialog extends StatefulWidget {
+  final OpenCodeConnection? existing;
+
+  const _OpenCodeConnectionDialog({this.existing});
+
+  @override
+  State<_OpenCodeConnectionDialog> createState() =>
+      _OpenCodeConnectionDialogState();
+}
+
+class _OpenCodeConnectionDialogState extends State<_OpenCodeConnectionDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _hostController;
+  late final TextEditingController _portController;
+  late final TextEditingController _usernameController;
+  late final TextEditingController _passwordController;
+  late bool _useHttps;
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.existing;
+    _nameController = TextEditingController(text: existing?.name ?? 'OpenCode');
+    _hostController = TextEditingController(text: existing?.host ?? '127.0.0.1');
+    _portController = TextEditingController(
+      text: (existing?.port ?? 4096).toString(),
+    );
+    _usernameController = TextEditingController(
+      text: existing?.username ?? 'opencode',
+    );
+    _passwordController = TextEditingController(text: existing?.password ?? '');
+    _useHttps = existing?.useHttps ?? false;
   }
 
   @override
   void dispose() {
+    _nameController.dispose();
     _hostController.dispose();
     _portController.dispose();
     _usernameController.dispose();
@@ -1902,148 +2507,220 @@ class _OpenCodeConnectionCardState extends State<_OpenCodeConnectionCard> {
     super.dispose();
   }
 
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+    Navigator.pop(
+      context,
+      OpenCodeConnectionDraft(
+        name: _nameController.text.trim(),
+        host: _hostController.text.trim(),
+        port: int.tryParse(_portController.text.trim()) ?? 4096,
+        useHttps: _useHttps,
+        username: _usernameController.text.trim().isEmpty
+            ? null
+            : _usernameController.text.trim(),
+        password: _passwordController.text.isEmpty ? null : _passwordController.text,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.hub,
-                  color: _isConnected ? Colors.green : colorScheme.outline,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'OpenCode Server',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: _isConnected ? Colors.green : null,
-                  ),
-                ),
-                const Spacer(),
-                if (_isConnected)
-                  Chip(
-                    label: const Text('Connected'),
-                    backgroundColor: Colors.green.withValues(alpha: 0.1),
-                    side: const BorderSide(color: Colors.green),
-                    labelStyle: const TextStyle(
-                      color: Colors.green,
-                      fontSize: 12,
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: TextField(
-                    controller: _hostController,
-                    decoration: const InputDecoration(
-                      labelText: 'Host',
-                      hintText: '127.0.0.1',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _portController,
-                    decoration: const InputDecoration(
-                      labelText: 'Port',
-                      hintText: '4096',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: const Text('Use HTTPS', style: TextStyle(fontSize: 14)),
-              value: _useHttps,
-              onChanged: (v) => setState(() => _useHttps = v),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username (optional)',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Password (optional)',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (_testResult != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  _testResult!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _isConnected ? Colors.green : colorScheme.error,
-                  ),
+    final isEditing = widget.existing != null;
+    return AlertDialog(
+      title: Text(isEditing ? 'Edit OpenCode Server' : 'Add OpenCode Server'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(labelText: 'Server Name'),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty ? 'Enter a name' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _hostController,
+                decoration: const InputDecoration(labelText: 'Host'),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty ? 'Enter a host' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _portController,
+                decoration: const InputDecoration(labelText: 'Port'),
+                keyboardType: TextInputType.number,
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Use HTTPS'),
+                value: _useHttps,
+                onChanged: (value) => setState(() => _useHttps = value),
+              ),
+              TextFormField(
+                controller: _usernameController,
+                decoration: const InputDecoration(
+                  labelText: 'Username (optional)',
                 ),
               ),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: _isTesting ? null : _testAndSave,
-                    icon: _isTesting
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.check, size: 18),
-                    label: Text(_isTesting ? 'Testing...' : 'Test & Save'),
-                  ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Password (optional)',
                 ),
-                if (_isConnected) ...[
-                  const SizedBox(width: 8),
-                  OutlinedButton(
-                    onPressed: _disconnect,
-                    child: const Text('Disconnect'),
-                  ),
-                ],
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _save,
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+class LmStudioConnectionDraft {
+  final String name;
+  final String host;
+  final int port;
+  final bool useHttps;
+  final String? apiToken;
+
+  const LmStudioConnectionDraft({
+    required this.name,
+    required this.host,
+    required this.port,
+    required this.useHttps,
+    this.apiToken,
+  });
+}
+
+class _LmStudioConnectionDialog extends StatefulWidget {
+  final LmStudioConnection? existing;
+
+  const _LmStudioConnectionDialog({this.existing});
+
+  @override
+  State<_LmStudioConnectionDialog> createState() =>
+      _LmStudioConnectionDialogState();
+}
+
+class _LmStudioConnectionDialogState extends State<_LmStudioConnectionDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _hostController;
+  late final TextEditingController _portController;
+  late final TextEditingController _tokenController;
+  late bool _useHttps;
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.existing;
+    _nameController = TextEditingController(text: existing?.name ?? 'LM Studio');
+    _hostController = TextEditingController(text: existing?.host ?? '127.0.0.1');
+    _portController = TextEditingController(
+      text: (existing?.port ?? 1234).toString(),
+    );
+    _tokenController = TextEditingController(text: existing?.apiToken ?? '');
+    _useHttps = existing?.useHttps ?? false;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _hostController.dispose();
+    _portController.dispose();
+    _tokenController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+    Navigator.pop(
+      context,
+      LmStudioConnectionDraft(
+        name: _nameController.text.trim(),
+        host: _hostController.text.trim(),
+        port: int.tryParse(_portController.text.trim()) ?? 1234,
+        useHttps: _useHttps,
+        apiToken: _tokenController.text.trim().isEmpty
+            ? null
+            : _tokenController.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEditing = widget.existing != null;
+    return AlertDialog(
+      title: Text(isEditing ? 'Edit LM Studio Server' : 'Add LM Studio Server'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(labelText: 'Server Name'),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty ? 'Enter a name' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _hostController,
+                decoration: const InputDecoration(labelText: 'Host'),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty ? 'Enter a host' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _portController,
+                decoration: const InputDecoration(labelText: 'Port'),
+                keyboardType: TextInputType.number,
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Use HTTPS'),
+                value: _useHttps,
+                onChanged: (value) => setState(() => _useHttps = value),
+              ),
+              TextFormField(
+                controller: _tokenController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'API Token (optional)',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _save,
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }

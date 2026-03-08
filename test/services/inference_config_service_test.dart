@@ -54,7 +54,7 @@ void main() {
     });
 
     test('should provide mode description and label', () {
-      expect(service.modeDescription, 'Remote (Ollama Server)');
+      expect(service.modeDescription, 'Remote (Ollama or LM Studio)');
       expect(service.modeLabel, 'Remote');
     });
   });

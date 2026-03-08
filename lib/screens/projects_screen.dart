@@ -3,6 +3,7 @@ import 'package:private_chat_hub/models/project.dart';
 import 'package:private_chat_hub/screens/project_detail_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
+import 'package:private_chat_hub/services/lm_studio_llm_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/opencode_llm_service.dart';
 import 'package:private_chat_hub/services/opencode_model_visibility_service.dart';
@@ -15,6 +16,7 @@ class ProjectsScreen extends StatefulWidget {
   final ChatService chatService;
   final ConnectionService connectionService;
   final OllamaConnectionManager ollamaManager;
+  final LmStudioLLMService? lmStudioLLMService;
   final OpenCodeLLMService? openCodeLLMService;
   final OpenCodeModelVisibilityService? openCodeVisibilityService;
   final Function(Conversation) onConversationSelected;
@@ -25,6 +27,7 @@ class ProjectsScreen extends StatefulWidget {
     required this.chatService,
     required this.connectionService,
     required this.ollamaManager,
+    this.lmStudioLLMService,
     this.openCodeLLMService,
     this.openCodeVisibilityService,
     required this.onConversationSelected,
@@ -118,6 +121,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           chatService: widget.chatService,
           connectionService: widget.connectionService,
           ollamaManager: widget.ollamaManager,
+          lmStudioLLMService: widget.lmStudioLLMService,
           openCodeLLMService: widget.openCodeLLMService,
           openCodeVisibilityService: widget.openCodeVisibilityService,
           onConversationSelected: widget.onConversationSelected,

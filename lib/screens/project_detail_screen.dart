@@ -5,6 +5,7 @@ import 'package:private_chat_hub/models/project.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/llm_service.dart';
+import 'package:private_chat_hub/services/lm_studio_llm_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/services/opencode_llm_service.dart';
 import 'package:private_chat_hub/services/opencode_model_visibility_service.dart';
@@ -20,6 +21,7 @@ class ProjectDetailScreen extends StatefulWidget {
   final ChatService chatService;
   final ConnectionService connectionService;
   final OllamaConnectionManager ollamaManager;
+  final LmStudioLLMService? lmStudioLLMService;
   final OpenCodeLLMService? openCodeLLMService;
   final OpenCodeModelVisibilityService? openCodeVisibilityService;
   final Function(Conversation) onConversationSelected;
@@ -32,6 +34,7 @@ class ProjectDetailScreen extends StatefulWidget {
     required this.chatService,
     required this.connectionService,
     required this.ollamaManager,
+    this.lmStudioLLMService,
     this.openCodeLLMService,
     this.openCodeVisibilityService,
     required this.onConversationSelected,
@@ -64,6 +67,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
     final unifiedModelService = UnifiedModelService(
       onDeviceLLMService: widget.chatService.onDeviceLLMService,
+      lmStudioLLMService: widget.lmStudioLLMService,
       openCodeLLMService: widget.openCodeLLMService,
       visibilityService: widget.openCodeVisibilityService,
     );

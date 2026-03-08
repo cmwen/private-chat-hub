@@ -12,15 +12,27 @@ void main() {
     test('detects model source prefixes', () {
       expect(UnifiedModelService.isLocalModel('local:gemma-3n'), isTrue);
       expect(
+        UnifiedModelService.isLmStudioModel('lmstudio:gemma-3-270m-it-qat'),
+        isTrue,
+      );
+      expect(
         UnifiedModelService.isOpenCodeModel('opencode:openai/gpt-4o'),
         isTrue,
       );
       expect(UnifiedModelService.isLocalModel('llama3.2:latest'), isFalse);
+      expect(
+        UnifiedModelService.isLmStudioModel('llama3.2:latest'),
+        isFalse,
+      );
       expect(UnifiedModelService.isOpenCodeModel('llama3.2:latest'), isFalse);
     });
 
     test('normalizes display names by source', () {
       expect(UnifiedModelService.getDisplayName('local:gemma-3n'), 'gemma-3n');
+      expect(
+        UnifiedModelService.getDisplayName('lmstudio:gemma-3-270m-it-qat'),
+        'gemma-3-270m-it-qat',
+      );
       expect(
         UnifiedModelService.getDisplayName('opencode:openai/gpt-4o'),
         'openai/gpt-4o',
@@ -62,6 +74,15 @@ void main() {
           capabilities: ['text', 'tools'],
           isLocal: false,
         ),
+        const ModelInfo(
+          id: 'lmstudio:gemma-3-270m-it-qat',
+          name: 'Gemma 3 270m Instruct Qat',
+          description: 'LM Studio model',
+          sizeBytes: 300,
+          isDownloaded: true,
+          capabilities: ['text'],
+          isLocal: false,
+        ),
       ];
 
       await UnifiedModelService.cacheRemoteModels(allModels);
@@ -70,6 +91,7 @@ void main() {
       expect(cached.map((m) => m.id), [
         'llama3.2:latest',
         'opencode:openai/gpt-4o',
+        'lmstudio:gemma-3-270m-it-qat',
       ]);
       expect(cached.every((m) => m.isLocal == false), isTrue);
     });

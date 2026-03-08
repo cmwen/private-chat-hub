@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/llm_service.dart';
+import 'package:private_chat_hub/services/lm_studio_llm_service.dart';
 import 'package:private_chat_hub/services/on_device_llm_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
@@ -13,6 +14,7 @@ class ModelsScreen extends StatefulWidget {
   final OllamaConnectionManager ollamaManager;
   final ConnectionService connectionService;
   final OnDeviceLLMService? onDeviceLLMService;
+  final LmStudioLLMService? lmStudioLLMService;
   final OpenCodeLLMService? openCodeLLMService;
   final OpenCodeModelVisibilityService? openCodeVisibilityService;
 
@@ -21,6 +23,7 @@ class ModelsScreen extends StatefulWidget {
     required this.ollamaManager,
     required this.connectionService,
     this.onDeviceLLMService,
+    this.lmStudioLLMService,
     this.openCodeLLMService,
     this.openCodeVisibilityService,
   });
@@ -32,6 +35,7 @@ class ModelsScreen extends StatefulWidget {
 class _ModelsScreenState extends State<ModelsScreen> {
   List<OllamaModelInfo> _models = [];
   List<ModelInfo> _localModels = [];
+  List<ModelInfo> _lmStudioModels = [];
   List<ModelInfo> _openCodeModels = [];
   bool _isLoading = true;
   String? _error;
@@ -100,24 +104,38 @@ class _ModelsScreenState extends State<ModelsScreen> {
       }
     }();
 
+    final lmStudioF = () async {
+      if (widget.lmStudioLLMService == null) return <ModelInfo>[];
+      try {
+        return await widget.lmStudioLLMService!.getAvailableModels();
+      } catch (_) {
+        return <ModelInfo>[];
+      }
+    }();
+
     // Await all results — the futures are already running in parallel above
     final remoteModels = await remoteF;
     final localModels = await localF;
+    final lmStudioModels = await lmStudioF;
     final openCodeModels = await openCodeF;
 
     final hasAnyModel =
         remoteModels.isNotEmpty ||
         localModels.isNotEmpty ||
+        lmStudioModels.isNotEmpty ||
         openCodeModels.isNotEmpty;
     final selectedStillExists =
         _selectedModel != null &&
         (remoteModels.any((model) => model.name == _selectedModel) ||
             localModels.any((model) => model.id == _selectedModel) ||
+            lmStudioModels.any((model) => model.id == _selectedModel) ||
             openCodeModels.any((model) => model.id == _selectedModel));
 
     if ((!selectedStillExists || _selectedModel == null) && hasAnyModel) {
       _selectedModel = remoteModels.isNotEmpty
           ? remoteModels.first.name
+          : lmStudioModels.isNotEmpty
+          ? lmStudioModels.first.id
           : localModels.isNotEmpty
           ? localModels.first.id
           : openCodeModels.first.id;
@@ -127,6 +145,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
     setState(() {
       _models = remoteModels;
       _localModels = localModels;
+      _lmStudioModels = lmStudioModels;
       _openCodeModels = openCodeModels;
       _visibleModelIds = widget.openCodeVisibilityService?.getVisibleModelIds();
       _error = !hasAnyModel && remoteError != null ? remoteError : null;
@@ -138,6 +157,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
     return {
       ..._models.map((m) => m.name),
       ..._localModels.map((m) => m.id),
+      ..._lmStudioModels.map((m) => m.id),
       ..._openCodeModels.map((m) => m.id),
     };
   }
@@ -325,6 +345,10 @@ class _ModelsScreenState extends State<ModelsScreen> {
     await _setActiveModel(model.id, model.name);
   }
 
+  Future<void> _selectLmStudioModel(ModelInfo model) async {
+    await _setActiveModel(model.id, model.name);
+  }
+
   Future<void> _setActiveModel(String modelId, String displayName) async {
     await widget.connectionService.setSelectedModel(modelId);
     if (!mounted) return;
@@ -489,7 +513,10 @@ class _ModelsScreenState extends State<ModelsScreen> {
       );
     }
 
-    if (_models.isEmpty && _localModels.isEmpty && _openCodeModels.isEmpty) {
+    if (_models.isEmpty &&
+      _localModels.isEmpty &&
+      _lmStudioModels.isEmpty &&
+      _openCodeModels.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -621,6 +648,30 @@ class _ModelsScreenState extends State<ModelsScreen> {
                       onDelete: () => _deleteModel(model),
                       onToggleVisibility: (value) =>
                           _setModelVisibility(model.name, value),
+                    );
+                  }),
+                ],
+                if (_lmStudioModels.isNotEmpty) ...[
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Text(
+                      'LM Studio Models',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  ..._lmStudioModels.map((model) {
+                    final isSelected = model.id == _selectedModel;
+                    final isVisible = _isModelVisibleInApp(model.id);
+                    return _LmStudioModelCard(
+                      model: model,
+                      isSelected: isSelected,
+                      isVisibleInApp: isVisible,
+                      onSelect: () => _selectLmStudioModel(model),
+                      onToggleVisibility: (value) =>
+                          _setModelVisibility(model.id, value),
                     );
                   }),
                 ],
@@ -826,6 +877,74 @@ class _LocalModelCard extends StatelessWidget {
           onChanged: onToggleVisibility,
         ),
         onTap: onSelect,
+      ),
+    );
+  }
+}
+
+class _LmStudioModelCard extends StatelessWidget {
+  final ModelInfo model;
+  final bool isSelected;
+  final bool isVisibleInApp;
+  final VoidCallback onSelect;
+  final ValueChanged<bool> onToggleVisibility;
+
+  const _LmStudioModelCard({
+    required this.model,
+    required this.isSelected,
+    required this.isVisibleInApp,
+    required this.onSelect,
+    required this.onToggleVisibility,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: isSelected
+              ? Colors.teal
+              : colorScheme.surfaceContainerHighest,
+          child: Icon(
+            Icons.memory,
+            color: isSelected ? Colors.white : colorScheme.onSurfaceVariant,
+          ),
+        ),
+        title: Row(
+          children: [
+            Expanded(child: Text(model.name)),
+            if (isSelected)
+              const Icon(Icons.check_circle, color: Colors.green, size: 18),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              model.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              model.sizeString,
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        trailing: Switch(
+          value: isVisibleInApp,
+          onChanged: (value) => onToggleVisibility(value),
+        ),
+        onTap: onSelect,
+        isThreeLine: true,
       ),
     );
   }
