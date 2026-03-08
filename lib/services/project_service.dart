@@ -60,6 +60,7 @@ class ProjectService {
     String? instructions,
     int? colorValue,
     String? iconName,
+    String? modelName,
   }) async {
     final project = Project(
       id: const Uuid().v4(),
@@ -71,6 +72,7 @@ class ProjectService {
       iconName: iconName ?? 'folder',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
+      modelName: modelName,
     );
 
     final projects = getProjects();

@@ -12,6 +12,7 @@ class Project {
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isPinned;
+  final String? modelName;
 
   const Project({
     required this.id,
@@ -24,6 +25,7 @@ class Project {
     required this.createdAt,
     required this.updatedAt,
     this.isPinned = false,
+    this.modelName,
   });
 
   /// Gets the color for this project.
@@ -60,6 +62,7 @@ class Project {
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       isPinned: json['isPinned'] as bool? ?? false,
+      modelName: json['modelName'] as String?,
     );
   }
 
@@ -76,6 +79,7 @@ class Project {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'isPinned': isPinned,
+      'modelName': modelName,
     };
   }
 
@@ -91,6 +95,7 @@ class Project {
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isPinned,
+    Object? modelName = _sentinel,
   }) {
     return Project(
       id: id ?? this.id,
@@ -103,8 +108,13 @@ class Project {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isPinned: isPinned ?? this.isPinned,
+      modelName: modelName == _sentinel
+          ? this.modelName
+          : modelName as String?,
     );
   }
+
+  static const Object _sentinel = Object();
 
   /// Available project colors.
   static const List<int> availableColors = [

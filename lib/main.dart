@@ -8,6 +8,7 @@ import 'package:private_chat_hub/screens/chat_screen.dart';
 import 'package:private_chat_hub/screens/comparison_chat_screen.dart';
 import 'package:private_chat_hub/screens/conversation_list_screen.dart';
 import 'package:private_chat_hub/screens/models_screen.dart';
+import 'package:private_chat_hub/screens/project_detail_screen.dart';
 import 'package:private_chat_hub/screens/projects_screen.dart';
 import 'package:private_chat_hub/screens/settings_screen.dart';
 import 'package:private_chat_hub/services/chat_service.dart';
@@ -212,6 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   int _currentIndex = 0;
   Conversation? _selectedConversation;
+  final _projectsScreenKey = GlobalKey<ProjectsScreenState>();
 
   @override
   void initState() {
@@ -453,9 +455,40 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onBackFromChat() {
+    final projectId = _selectedConversation?.projectId;
     setState(() {
       _selectedConversation = null;
+      if (projectId != null) {
+        _currentIndex = 1; // Switch to Projects tab
+      }
     });
+
+    if (projectId != null) {
+      final project = _projectService.getProject(projectId);
+      if (project != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => ProjectDetailScreen(
+                  project: project,
+                  projectService: _projectService,
+                  chatService: _chatService,
+                  connectionService: _connectionService,
+                  ollamaManager: _ollamaManager,
+                  lmStudioLLMService: _lmStudioLLMService,
+                  openCodeLLMService: _openCodeLLMService,
+                  openCodeVisibilityService: _openCodeVisibilityService,
+                  onConversationSelected: _onConversationSelected,
+                  onProjectUpdated: () =>
+                      _projectsScreenKey.currentState?.loadProjects(),
+                ),
+              ),
+            );
+          }
+        });
+      }
+    }
   }
 
   @override
@@ -505,6 +538,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   onNewConversation: () {},
                 ),
                 ProjectsScreen(
+                  key: _projectsScreenKey,
                   projectService: _projectService,
                   chatService: _chatService,
                   connectionService: _connectionService,
