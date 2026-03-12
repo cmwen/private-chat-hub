@@ -34,10 +34,10 @@ class ProjectsScreen extends StatefulWidget {
   });
 
   @override
-  State<ProjectsScreen> createState() => _ProjectsScreenState();
+  State<ProjectsScreen> createState() => ProjectsScreenState();
 }
 
-class _ProjectsScreenState extends State<ProjectsScreen> {
+class ProjectsScreenState extends State<ProjectsScreen> {
   List<Project> _projects = [];
   bool _isLoading = true;
 
@@ -46,6 +46,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     super.initState();
     _loadProjects();
   }
+
+  /// Public refresh method — callers (e.g. HomeScreen via GlobalKey) use this
+  /// to reload the project list after external updates.
+  void loadProjects() => _loadProjects();
 
   void _loadProjects() {
     setState(() {

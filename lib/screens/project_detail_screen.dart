@@ -63,7 +63,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     setState(() => _isLoading = true);
 
     _conversations = widget.chatService.getProjectConversations(_project.id);
-    _selectedModel = widget.connectionService.getSelectedModel();
 
     final unifiedModelService = UnifiedModelService(
       onDeviceLLMService: widget.chatService.onDeviceLLMService,
@@ -91,16 +90,50 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
       }
     }
 
-    final selectedStillExists =
-        _selectedModel != null &&
-        _models.any((model) => model.id == _selectedModel);
-    if ((!selectedStillExists || _selectedModel == null) &&
-        _models.isNotEmpty) {
-      _selectedModel = _models.first.id;
-      await widget.connectionService.setSelectedModel(_selectedModel!);
+    // Prefer the project's configured model, then fall back to global selection
+    if (_project.modelName != null &&
+        _models.any((m) => m.id == _project.modelName)) {
+      _selectedModel = _project.modelName;
+    } else {
+      _selectedModel = widget.connectionService.getSelectedModel();
+      final selectedStillExists =
+          _selectedModel != null &&
+          _models.any((model) => model.id == _selectedModel);
+      if ((!selectedStillExists || _selectedModel == null) &&
+          _models.isNotEmpty) {
+        _selectedModel = _models.first.id;
+      }
     }
 
     setState(() => _isLoading = false);
+  }
+
+  Future<void> _saveProjectModel(String modelId) async {
+    final updatedProject = _project.copyWith(modelName: modelId);
+    await widget.projectService.updateProject(updatedProject);
+    if (!mounted) return;
+    setState(() {
+      _project = updatedProject;
+      _selectedModel = modelId;
+    });
+    widget.onProjectUpdated();
+  }
+
+  void _showModelSelector() {
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) => _ModelSelectorSheet(
+        models: _models,
+        selectedModel: _selectedModel,
+        onModelSelected: (model) async {
+          await _saveProjectModel(model.id);
+          if (sheetContext.mounted) Navigator.pop(sheetContext);
+        },
+        onRefresh: () async {
+          await _loadData();
+        },
+      ),
+    );
   }
 
   Future<void> _createConversation() async {
@@ -415,6 +448,60 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             )
           : Column(
               children: [
+                // Model selector
+                InkWell(
+                  onTap: _showModelSelector,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainer,
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.psychology, color: _project.color, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Project Model',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              Text(
+                                _selectedModelLabel(),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
                 // Context indicator
                 if (_project.fullContext != null)
                   Container(
@@ -425,7 +512,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                     color: _project.color.withAlpha(30),
                     child: Row(
                       children: [
-                        Icon(Icons.psychology, size: 16, color: _project.color),
+                        Icon(Icons.notes, size: 16, color: _project.color),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -486,6 +573,13 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
         backgroundColor: _project.color,
       ),
     );
+  }
+
+  String _selectedModelLabel() {
+    if (_selectedModel == null) return 'No model selected';
+    final match = _models.where((m) => m.id == _selectedModel);
+    if (match.isNotEmpty) return match.first.name;
+    return UnifiedModelService.getDisplayName(_selectedModel!);
   }
 
   Widget _buildEmptyState() {
@@ -894,5 +988,139 @@ class _EditProjectDialogState extends State<_EditProjectDialog> {
       default:
         return Icons.folder;
     }
+  }
+}
+
+class _ModelSelectorSheet extends StatelessWidget {
+  final List<ModelInfo> models;
+  final String? selectedModel;
+  final Function(ModelInfo) onModelSelected;
+  final VoidCallback onRefresh;
+
+  const _ModelSelectorSheet({
+    required this.models,
+    required this.selectedModel,
+    required this.onModelSelected,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                const Text(
+                  'Select Project Model',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: onRefresh,
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'New conversations in this project will use this model.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const Divider(),
+          if (models.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: Column(
+                children: [
+                  Icon(Icons.warning_amber, size: 48, color: Colors.orange),
+                  SizedBox(height: 16),
+                  Text('No models found', style: TextStyle(fontSize: 16)),
+                  SizedBox(height: 8),
+                  Text(
+                    'Make sure local models are downloaded or Ollama is running',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            )
+          else
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: models.length,
+                itemBuilder: (context, index) {
+                  final model = models[index];
+                  final isSelected = model.id == selectedModel;
+
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
+                      child: Icon(
+                        model.isLocal ? Icons.offline_bolt : Icons.cloud,
+                        color: isSelected
+                            ? Colors.white
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    title: Row(
+                      children: [
+                        Expanded(child: Text(model.name)),
+                        if (model.isLocal) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: Colors.green.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: const Text(
+                              'LOCAL',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    trailing: isSelected
+                        ? Icon(
+                            Icons.check_circle,
+                            color: Theme.of(context).colorScheme.primary,
+                          )
+                        : null,
+                    onTap: () => onModelSelected(model),
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
   }
 }
