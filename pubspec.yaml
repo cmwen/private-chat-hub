@@ -1,5 +1,5 @@
 name: private_chat_hub
-description: "A privacy-first Android app for chatting with self-hosted AI models via Ollama. Chat locally, stay private, switch models instantly."
+description: "Private Chat Hub - A privacy-first app for chatting with self-hosted and cloud AI models. Supports Android, Windows, macOS, and Linux."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
