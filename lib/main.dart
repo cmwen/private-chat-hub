@@ -632,10 +632,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  ({
-    List<NavigationRailDestination> rail,
-    List<NavigationDestination> bar,
-  }) _buildNavDestinations(bool useRail) {
+  ({List<NavigationRailDestination> rail, List<NavigationDestination> bar})
+  _buildNavDestinations(bool useRail) {
     return (
       rail: const [
         NavigationRailDestination(

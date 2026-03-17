@@ -7,8 +7,9 @@ const double desktopNavigationBreakpoint = 960;
 bool get isDesktopPlatform {
   if (kIsWeb) return false;
   return switch (defaultTargetPlatform) {
-    TargetPlatform.macOS || TargetPlatform.windows || TargetPlatform.linux =>
-      true,
+    TargetPlatform.macOS ||
+    TargetPlatform.windows ||
+    TargetPlatform.linux => true,
     _ => false,
   };
 }
