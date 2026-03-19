@@ -18,6 +18,7 @@ import 'package:private_chat_hub/services/jina_search_service.dart';
 import 'package:private_chat_hub/services/lm_studio_connection_service.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/status_service.dart';
+import 'package:private_chat_hub/utils/platform_utils.dart';
 import 'package:private_chat_hub/widgets/status_banner.dart';
 import 'package:private_chat_hub/services/lm_studio_connection_manager.dart';
 import 'package:private_chat_hub/services/lm_studio_llm_service.dart';
@@ -38,7 +39,7 @@ Future<void> _bootstrapApp() async {
   final storageService = StorageService();
   await storageService.init();
 
-  // Initialize notification service
+  // Initialize notification service (no-op on desktop)
   final notificationService = NotificationService();
   await notificationService.initialize();
 
@@ -521,103 +522,163 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     // Otherwise show the main navigation
-    return Scaffold(
-      body: Column(
-        mainAxisSize: MainAxisSize.max,
-        children: [
-          const StatusBanner(),
-          Expanded(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: [
-                ConversationListScreen(
-                  chatService: _chatService,
-                  connectionService: _connectionService,
-                  ollamaManager: _ollamaManager,
-                  lmStudioLLMService: _lmStudioLLMService,
-                  openCodeLLMService: _openCodeLLMService,
-                  openCodeVisibilityService: _openCodeVisibilityService,
-                  onConversationSelected: _onConversationSelected,
-                  onNewConversation: () {},
-                ),
-                ProjectsScreen(
-                  key: _projectsScreenKey,
-                  projectService: _projectService,
-                  chatService: _chatService,
-                  connectionService: _connectionService,
-                  ollamaManager: _ollamaManager,
-                  lmStudioLLMService: _lmStudioLLMService,
-                  openCodeLLMService: _openCodeLLMService,
-                  openCodeVisibilityService: _openCodeVisibilityService,
-                  onConversationSelected: _onConversationSelected,
-                ),
-                ModelsScreen(
-                  ollamaManager: _ollamaManager,
-                  connectionService: _connectionService,
-                  onDeviceLLMService: _onDeviceLLMService,
-                  lmStudioLLMService: _lmStudioLLMService,
-                  openCodeLLMService: _openCodeLLMService,
-                  openCodeVisibilityService: _openCodeVisibilityService,
-                ),
-                SettingsScreen(
-                  connectionService: _connectionService,
-                  ollamaManager: _ollamaManager,
-                  chatService: _chatService,
-                  toolConfigService: widget.toolConfigService,
-                  inferenceConfigService: _inferenceConfigService,
-                  storageService: widget.storageService,
-                  projectService: _projectService,
-                  onDeviceLLMService: _onDeviceLLMService,
-                  lmStudioConnectionService: _lmStudioConnectionService,
-                  lmStudioConnectionManager: _lmStudioConnectionManager,
-                  lmStudioLLMService: _lmStudioLLMService,
-                  openCodeConnectionService: _openCodeConnectionService,
-                  openCodeConnectionManager: _openCodeConnectionManager,
-                  openCodeLLMService: _openCodeLLMService,
-                  openCodeVisibilityService: _openCodeVisibilityService,
-                  onThemeModeChanged: widget.onThemeModeChanged,
-                  currentThemeMode: widget.currentThemeMode,
-                  onToolConfigChanged: _onToolConfigChanged,
-                ),
-              ],
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useRail = isWideLayout(constraints.maxWidth);
+        return _buildMainScaffold(useRail);
+      },
+    );
+  }
+
+  Widget _buildMainScaffold(bool useRail) {
+    final destinations = _buildNavDestinations(useRail);
+
+    final body = Column(
+      mainAxisSize: MainAxisSize.max,
+      children: [
+        const StatusBanner(),
+        Expanded(
+          child: IndexedStack(
+            index: _currentIndex,
+            children: [
+              ConversationListScreen(
+                chatService: _chatService,
+                connectionService: _connectionService,
+                ollamaManager: _ollamaManager,
+                lmStudioLLMService: _lmStudioLLMService,
+                openCodeLLMService: _openCodeLLMService,
+                openCodeVisibilityService: _openCodeVisibilityService,
+                onConversationSelected: _onConversationSelected,
+                onNewConversation: () {},
+              ),
+              ProjectsScreen(
+                key: _projectsScreenKey,
+                projectService: _projectService,
+                chatService: _chatService,
+                connectionService: _connectionService,
+                ollamaManager: _ollamaManager,
+                lmStudioLLMService: _lmStudioLLMService,
+                openCodeLLMService: _openCodeLLMService,
+                openCodeVisibilityService: _openCodeVisibilityService,
+                onConversationSelected: _onConversationSelected,
+              ),
+              ModelsScreen(
+                ollamaManager: _ollamaManager,
+                connectionService: _connectionService,
+                onDeviceLLMService: _onDeviceLLMService,
+                lmStudioLLMService: _lmStudioLLMService,
+                openCodeLLMService: _openCodeLLMService,
+                openCodeVisibilityService: _openCodeVisibilityService,
+              ),
+              SettingsScreen(
+                connectionService: _connectionService,
+                ollamaManager: _ollamaManager,
+                chatService: _chatService,
+                toolConfigService: widget.toolConfigService,
+                inferenceConfigService: _inferenceConfigService,
+                storageService: widget.storageService,
+                projectService: _projectService,
+                onDeviceLLMService: _onDeviceLLMService,
+                lmStudioConnectionService: _lmStudioConnectionService,
+                lmStudioConnectionManager: _lmStudioConnectionManager,
+                lmStudioLLMService: _lmStudioLLMService,
+                openCodeConnectionService: _openCodeConnectionService,
+                openCodeConnectionManager: _openCodeConnectionManager,
+                openCodeLLMService: _openCodeLLMService,
+                openCodeVisibilityService: _openCodeVisibilityService,
+                onThemeModeChanged: widget.onThemeModeChanged,
+                currentThemeMode: widget.currentThemeMode,
+                onToolConfigChanged: _onToolConfigChanged,
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
+    );
+
+    if (useRail) {
+      return Scaffold(
+        body: Row(
+          children: [
+            NavigationRail(
+              selectedIndex: _currentIndex,
+              extended: true,
+              onDestinationSelected: _onNavDestinationSelected,
+              destinations: destinations.rail,
+            ),
+            const VerticalDivider(thickness: 1, width: 1),
+            Expanded(child: body),
+          ],
+        ),
+      );
+    }
+
+    return Scaffold(
+      body: body,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          // Refresh connection when switching tabs
-          if (index == 0 || index == 1 || index == 2) {
-            _setupConnection();
-          }
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
-            label: 'Chats',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.folder_outlined),
-            selectedIcon: Icon(Icons.folder),
-            label: 'Projects',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.psychology_outlined),
-            selectedIcon: Icon(Icons.psychology),
-            label: 'Models',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
+        onDestinationSelected: _onNavDestinationSelected,
+        destinations: destinations.bar,
       ),
+    );
+  }
+
+  void _onNavDestinationSelected(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+    if (index == 0 || index == 1 || index == 2) {
+      _setupConnection();
+    }
+  }
+
+  ({List<NavigationRailDestination> rail, List<NavigationDestination> bar})
+  _buildNavDestinations(bool useRail) {
+    return (
+      rail: const [
+        NavigationRailDestination(
+          icon: Icon(Icons.chat_bubble_outline),
+          selectedIcon: Icon(Icons.chat_bubble),
+          label: Text('Chats'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.folder_outlined),
+          selectedIcon: Icon(Icons.folder),
+          label: Text('Projects'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.psychology_outlined),
+          selectedIcon: Icon(Icons.psychology),
+          label: Text('Models'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.settings_outlined),
+          selectedIcon: Icon(Icons.settings),
+          label: Text('Settings'),
+        ),
+      ],
+      bar: const [
+        NavigationDestination(
+          icon: Icon(Icons.chat_bubble_outline),
+          selectedIcon: Icon(Icons.chat_bubble),
+          label: 'Chats',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.folder_outlined),
+          selectedIcon: Icon(Icons.folder),
+          label: 'Projects',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.psychology_outlined),
+          selectedIcon: Icon(Icons.psychology),
+          label: 'Models',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.settings_outlined),
+          selectedIcon: Icon(Icons.settings),
+          label: 'Settings',
+        ),
+      ],
     );
   }
 }

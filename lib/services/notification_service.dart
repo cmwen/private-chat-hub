@@ -2,6 +2,8 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../utils/platform_utils.dart';
+
 /// Notification behavior modes.
 enum NotificationMode {
   /// Only notify when user is not viewing the response (default).
@@ -72,8 +74,16 @@ class NotificationService with WidgetsBindingObserver {
   }
 
   /// Initialize the notification service.
+  ///
+  /// No-op on desktop platforms where [flutter_local_notifications] is not
+  /// supported (Windows) or not needed.
   Future<void> initialize() async {
     if (_initialized) return;
+    if (isDesktopPlatform) {
+      await _loadNotificationMode();
+      _initialized = true;
+      return;
+    }
 
     const androidSettings = AndroidInitializationSettings(
       '@mipmap/ic_launcher',
@@ -129,7 +139,11 @@ class NotificationService with WidgetsBindingObserver {
   }
 
   /// Request notification permissions (required for Android 13+).
+  ///
+  /// Returns false on desktop platforms where this is not applicable.
   Future<bool> requestPermissions() async {
+    if (isDesktopPlatform) return false;
+
     final androidPlugin = _notifications
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
@@ -154,6 +168,7 @@ class NotificationService with WidgetsBindingObserver {
     required String conversationTitle,
     required String responsePreview,
   }) async {
+    if (isDesktopPlatform) return;
     if (!_initialized) {
       await initialize();
     }
@@ -208,6 +223,7 @@ class NotificationService with WidgetsBindingObserver {
     required String title,
     required String message,
   }) async {
+    if (isDesktopPlatform) return;
     if (!_initialized) await initialize();
 
     // Get or assign a notification id using the same counter

@@ -1,18 +1,35 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+
+import '../utils/platform_utils.dart';
 
 /// Callback function type for TTS state changes
 typedef OnTtsStateChanged = void Function();
 
 /// Service for managing text-to-speech functionality.
 ///
-/// Provides methods to speak text using Android's native TTS engine,
+/// Provides methods to speak text using the native TTS engine,
 /// with support for both complete messages and streaming mode.
+/// TTS is supported on Android, iOS, macOS, and Linux. On Windows,
+/// [flutter_tts] is unavailable so all calls are no-ops.
 class TtsService {
   final FlutterTts _flutterTts = FlutterTts();
   bool _isInitialized = false;
   bool _isSpeaking = false;
   String? _currentMessageId;
   OnTtsStateChanged? _onStateChanged;
+
+  /// Whether TTS is supported on the current platform.
+  bool get _isSupportedPlatform {
+    if (!isDesktopPlatform) return true; // mobile always supported
+    // flutter_tts supports macOS and Linux but NOT Windows
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.windows:
+        return false;
+      default:
+        return true;
+    }
+  }
 
   /// Set callback to be notified when TTS state changes
   void setOnStateChanged(OnTtsStateChanged? callback) {
@@ -22,6 +39,7 @@ class TtsService {
   /// Initialize the TTS engine with default settings.
   Future<void> initialize() async {
     if (_isInitialized) return;
+    if (!_isSupportedPlatform) return;
 
     try {
       // Set language to English (US)
@@ -65,6 +83,7 @@ class TtsService {
   ///
   /// Returns true if speech started successfully, false otherwise.
   Future<bool> speak(String text, {String? messageId, double? speed}) async {
+    if (!_isSupportedPlatform) return false;
     if (!_isInitialized) {
       await initialize();
       if (!_isInitialized) return false;
