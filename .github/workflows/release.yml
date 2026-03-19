@@ -234,3 +234,251 @@ jobs:
         rm -f android/app/release-keystore.jks
         rm -f android/key.properties
         rm -rf build/signing-credentials
+
+  release-macos:
+    name: Build & Release macOS
+    runs-on: macos-latest
+    timeout-minutes: 45
+    needs: release
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Determine version
+      id: version
+      run: |
+        if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
+          TAG_VERSION="${{ github.ref_name }}"
+          VERSION="${TAG_VERSION#v}"
+        elif [[ -n "${{ inputs.version }}" ]]; then
+          VERSION="${{ inputs.version }}"
+          VERSION="${VERSION#v}"
+        else
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1)
+        fi
+        if [[ "$VERSION" == *"+"* ]]; then
+          BUILD_NUMBER="${VERSION#*+}"
+          VERSION="${VERSION%+*}"
+        else
+          BUILD_NUMBER="${{ github.run_number }}"
+        fi
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+        echo "tag_name=v$VERSION" >> "$GITHUB_OUTPUT"
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.38.3'
+        channel: 'stable'
+        cache: true
+
+    - name: Get dependencies
+      run: flutter pub get
+
+    - name: Build macOS
+      run: flutter build macos --release --build-name=${{ steps.version.outputs.version }} --build-number=${{ steps.version.outputs.build_number }}
+
+    - name: Sign macOS app with self-signed certificate
+      run: |
+        APP_PATH="build/macos/Build/Products/Release/private_chat_hub.app"
+
+        # Generate self-signed certificate and key
+        openssl req -x509 -newkey rsa:4096 \
+          -keyout /tmp/macos-sign-key.pem \
+          -out /tmp/macos-sign-cert.pem \
+          -days 365 -nodes \
+          -subj "/CN=Private Chat Hub/O=Private Chat Hub/C=US"
+
+        # Export to PKCS12 format
+        openssl pkcs12 -export \
+          -out /tmp/macos-sign.p12 \
+          -inkey /tmp/macos-sign-key.pem \
+          -in /tmp/macos-sign-cert.pem \
+          -passout pass:""
+
+        # Set up a temporary keychain
+        security create-keychain -p "" build.keychain
+        security default-keychain -s build.keychain
+        security unlock-keychain -p "" build.keychain
+        security set-keychain-settings -t 3600 -u build.keychain
+
+        # Import certificate into keychain
+        security import /tmp/macos-sign.p12 \
+          -k build.keychain \
+          -P "" \
+          -T /usr/bin/codesign
+
+        # Allow codesign to access the key without password prompt
+        security set-key-partition-list \
+          -S apple-tool:,apple:,codesign: \
+          -s -k "" build.keychain
+
+        # Sign the app (deep sign all nested bundles/frameworks)
+        CERT_IDENTITY=$(security find-identity -v -p codesigning build.keychain \
+          | grep "Private Chat Hub" | awk '{print $2}' | head -1)
+        codesign --force --deep --sign "$CERT_IDENTITY" "$APP_PATH"
+
+        echo "macOS app signed successfully"
+
+    - name: Package macOS app
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        BUILD_NUMBER="${{ steps.version.outputs.build_number }}"
+        APP_NAME="private-chat-hub"
+        mkdir -p build/artifacts
+        cd "build/macos/Build/Products/Release"
+        zip -r "${GITHUB_WORKSPACE}/build/artifacts/${APP_NAME}-macos-${VERSION}+${BUILD_NUMBER}.zip" \
+          "private_chat_hub.app"
+
+    - name: Upload macOS artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: macos-release-${{ steps.version.outputs.version }}
+        path: build/artifacts/*.zip
+        retention-days: 90
+
+    - name: Add macOS build to GitHub Release
+      if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.create_tag)
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.version.outputs.tag_name }}
+        files: build/artifacts/*.zip
+
+  release-windows:
+    name: Build & Release Windows
+    runs-on: windows-latest
+    timeout-minutes: 45
+    needs: release
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Determine version
+      id: version
+      shell: bash
+      run: |
+        if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
+          TAG_VERSION="${{ github.ref_name }}"
+          VERSION="${TAG_VERSION#v}"
+        elif [[ -n "${{ inputs.version }}" ]]; then
+          VERSION="${{ inputs.version }}"
+          VERSION="${VERSION#v}"
+        else
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1)
+        fi
+        if [[ "$VERSION" == *"+"* ]]; then
+          BUILD_NUMBER="${VERSION#*+}"
+          VERSION="${VERSION%+*}"
+        else
+          BUILD_NUMBER="${{ github.run_number }}"
+        fi
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+        echo "tag_name=v$VERSION" >> "$GITHUB_OUTPUT"
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.38.3'
+        channel: 'stable'
+        cache: true
+
+    - name: Get dependencies
+      run: flutter pub get
+
+    - name: Build Windows
+      run: flutter build windows --release --build-name=${{ steps.version.outputs.version }} --build-number=${{ steps.version.outputs.build_number }}
+
+    - name: Create self-signed certificate and sign Windows executable
+      shell: powershell
+      run: |
+        # Create a self-signed code-signing certificate
+        $cert = New-SelfSignedCertificate `
+          -Type Custom `
+          -Subject "CN=Private Chat Hub, O=Private Chat Hub" `
+          -KeyUsage DigitalSignature `
+          -FriendlyName "Private Chat Hub" `
+          -CertStoreLocation "Cert:\CurrentUser\My" `
+          -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+
+        # Generate a random password for the PFX export
+        $pfxPassword = [System.Web.Security.Membership]::GeneratePassword(24, 4)
+        if (-not $pfxPassword) {
+          $pfxPassword = -join ((65..90) + (97..122) + (48..57) | Get-Random -Count 24 | ForEach-Object {[char]$_})
+        }
+
+        # Export certificate to PFX
+        $password = ConvertTo-SecureString -String $pfxPassword -Force -AsPlainText
+        $pfxPath = "$env:TEMP\private-chat-hub-sign.pfx"
+        Export-PfxCertificate -Cert "Cert:\CurrentUser\My\$($cert.Thumbprint)" `
+          -FilePath $pfxPath -Password $password
+
+        # Store the path and password in environment for later steps
+        Add-Content -Path $env:GITHUB_ENV -Value "PFX_PATH=$pfxPath"
+        Add-Content -Path $env:GITHUB_ENV -Value "PFX_PASSWORD=$pfxPassword"
+
+        # Locate signtool.exe
+        $signtool = Get-ChildItem `
+          -Path "C:\Program Files (x86)\Windows Kits\10\bin" `
+          -Recurse -Filter "signtool.exe" -ErrorAction SilentlyContinue `
+          | Where-Object { $_.FullName -like "*x64*" } `
+          | Select-Object -Last 1
+
+        if (-not $signtool) {
+          $signtool = Get-ChildItem `
+            -Path "C:\Program Files (x86)\Windows Kits\10\bin" `
+            -Recurse -Filter "signtool.exe" -ErrorAction SilentlyContinue `
+            | Select-Object -Last 1
+        }
+
+        if (-not $signtool) {
+          Write-Warning "signtool.exe not found, skipping Windows code signing"
+          exit 0
+        }
+
+        Write-Host "Using signtool: $($signtool.FullName)"
+
+        # Sign the main executable
+        $exePath = "build\windows\x64\runner\Release\private_chat_hub.exe"
+        & $signtool.FullName sign `
+          /f $pfxPath `
+          /p $pfxPassword `
+          /fd SHA256 `
+          /t "http://timestamp.digicert.com" `
+          "$exePath"
+
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "Windows executable signed successfully"
+        } else {
+          Write-Warning "Signing completed with exit code $LASTEXITCODE (timestamp server may be unreachable; signature applied)"
+        }
+
+        # Clean up PFX
+        Remove-Item -Path $pfxPath -Force
+
+    - name: Package Windows build
+      shell: powershell
+      run: |
+        $VERSION = "${{ steps.version.outputs.version }}"
+        $BUILD_NUMBER = "${{ steps.version.outputs.build_number }}"
+        $APP_NAME = "private-chat-hub"
+        New-Item -ItemType Directory -Force -Path "build\artifacts" | Out-Null
+        $source = "build\windows\x64\runner\Release\"
+        $dest = "build\artifacts\${APP_NAME}-windows-${VERSION}+${BUILD_NUMBER}.zip"
+        Compress-Archive -Path "$source*" -DestinationPath $dest
+        Write-Host "Packaged Windows build: $dest"
+
+    - name: Upload Windows artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: windows-release-${{ steps.version.outputs.version }}
+        path: build/artifacts/*.zip
+        retention-days: 90
+
+    - name: Add Windows build to GitHub Release
+      if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.create_tag)
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.version.outputs.tag_name }}
+        files: build/artifacts/*.zip
