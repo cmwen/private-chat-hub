@@ -135,5 +135,13 @@ flutter_launcher_icons:
   image_path: "assets/icon/app_icon.png"
   adaptive_icon_background: "#2196F3"
   adaptive_icon_foreground: "assets/icon/app_icon.png"
-  # For details regarding fonts from package dependencies,
-  # see https://flutter.dev/to/font-from-package
+  windows:
+    generate: true
+    image_path: "assets/icon/app_icon.png"
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: "assets/icon/app_icon.png"
+  linux:
+    generate: true
+    image_path: "assets/icon/app_icon.png"
