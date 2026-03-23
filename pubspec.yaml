@@ -66,12 +66,12 @@ dependencies:
   flutter_tts: ^4.2.0
   
   # Local notifications for background task completion
-  flutter_local_notifications: ^20.1.0
+  flutter_local_notifications: ^21.0.0
   
   # Network connectivity monitoring for offline mode
   connectivity_plus: ^7.0.0
   flutter_markdown_latex: ^0.3.4
-  markdown: ^7.3.0
+  markdown: ^7.3.1
 
 dev_dependencies:
   flutter_test:
