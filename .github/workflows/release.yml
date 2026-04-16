@@ -219,7 +219,7 @@ jobs:
     
     - name: Publish GitHub Release
       if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.create_tag)
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         name: ${{ steps.version.outputs.tag_name }}
         tag_name: ${{ steps.version.outputs.tag_name }}
@@ -340,7 +340,7 @@ jobs:
 
     - name: Add macOS build to GitHub Release
       if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.create_tag)
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         tag_name: ${{ steps.version.outputs.tag_name }}
         files: build/artifacts/*.zip
@@ -478,7 +478,7 @@ jobs:
 
     - name: Add Windows build to GitHub Release
       if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.create_tag)
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         tag_name: ${{ steps.version.outputs.tag_name }}
         files: build/artifacts/*.zip
