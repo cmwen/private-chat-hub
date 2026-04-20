@@ -15,6 +15,7 @@ import 'package:private_chat_hub/services/chat_service.dart';
 import 'package:private_chat_hub/services/connection_service.dart';
 import 'package:private_chat_hub/services/inference_config_service.dart';
 import 'package:private_chat_hub/services/jina_search_service.dart';
+import 'package:private_chat_hub/services/knowledge_store_service.dart';
 import 'package:private_chat_hub/services/lm_studio_connection_service.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/status_service.dart';
@@ -38,6 +39,7 @@ Future<void> _bootstrapApp() async {
   // Initialize services
   final storageService = StorageService();
   await storageService.init();
+  final knowledgeStoreService = await KnowledgeStoreService.initialize();
 
   // Initialize notification service (no-op on desktop)
   final notificationService = NotificationService();
@@ -51,7 +53,11 @@ Future<void> _bootstrapApp() async {
   final toolConfigService = ToolConfigService(prefs);
 
   runApp(
-    MyApp(storageService: storageService, toolConfigService: toolConfigService),
+    MyApp(
+      storageService: storageService,
+      toolConfigService: toolConfigService,
+      knowledgeStoreService: knowledgeStoreService,
+    ),
   );
 }
 
@@ -86,11 +92,13 @@ void main() {
 class MyApp extends StatefulWidget {
   final StorageService storageService;
   final ToolConfigService toolConfigService;
+  final KnowledgeStoreService knowledgeStoreService;
 
   const MyApp({
     super.key,
     required this.storageService,
     required this.toolConfigService,
+    required this.knowledgeStoreService,
   });
 
   @override
@@ -170,6 +178,7 @@ class _MyAppState extends State<MyApp> {
       home: HomeScreen(
         storageService: widget.storageService,
         toolConfigService: widget.toolConfigService,
+        knowledgeStoreService: widget.knowledgeStoreService,
         onThemeModeChanged: _updateThemeMode,
         currentThemeMode: _themeMode,
       ),
@@ -181,6 +190,7 @@ class _MyAppState extends State<MyApp> {
 class HomeScreen extends StatefulWidget {
   final StorageService storageService;
   final ToolConfigService toolConfigService;
+  final KnowledgeStoreService knowledgeStoreService;
   final Function(ThemeMode) onThemeModeChanged;
   final ThemeMode currentThemeMode;
 
@@ -188,6 +198,7 @@ class HomeScreen extends StatefulWidget {
     super.key,
     required this.storageService,
     required this.toolConfigService,
+    required this.knowledgeStoreService,
     required this.onThemeModeChanged,
     required this.currentThemeMode,
   });
@@ -220,7 +231,10 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _ollamaManager = OllamaConnectionManager();
-    _connectionService = ConnectionService(widget.storageService);
+    _connectionService = ConnectionService(
+      widget.storageService,
+      knowledgeStoreService: widget.knowledgeStoreService,
+    );
 
     // Initialize tool executor with proper config from settings
     final toolConfig = widget.toolConfigService.getConfig();
@@ -230,7 +244,10 @@ class _HomeScreenState extends State<HomeScreen> {
     StatusService().showTransient(toolConfigMsg);
 
     // Initialize project service before creating tool executor
-    _projectService = ProjectService(widget.storageService);
+    _projectService = ProjectService(
+      widget.storageService,
+      knowledgeStoreService: widget.knowledgeStoreService,
+    );
 
     final toolExecutor = toolConfig.enabled
         ? ToolExecutorService(
@@ -252,6 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
       widget.storageService,
       toolExecutor: toolExecutor,
       toolConfig: toolConfig,
+      knowledgeStoreService: widget.knowledgeStoreService,
     );
 
     // Load developer mode preference and sync it to StatusService so all

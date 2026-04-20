@@ -46,6 +46,7 @@ dependencies:
   shared_preferences: ^2.5.4
   # Access to device file system paths (documents, cache, temp directories)
   path_provider: ^2.1.0
+  path: ^1.9.1
   
   # UUID generation for unique identifiers
   uuid: ^4.5.3

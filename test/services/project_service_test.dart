@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:private_chat_hub/services/knowledge_store_service.dart';
 import 'package:private_chat_hub/services/project_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,12 +9,31 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   late StorageService storageService;
   late ProjectService projectService;
+  late KnowledgeStoreService knowledgeStoreService;
+  late Directory tempDirectory;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     storageService = StorageService();
     await storageService.init();
-    projectService = ProjectService(storageService);
+    tempDirectory = await Directory.systemTemp.createTemp(
+      'project-service-test',
+    );
+    KnowledgeStoreService.resetForTesting();
+    knowledgeStoreService = await KnowledgeStoreService.initialize(
+      overrideRoot: tempDirectory,
+    );
+    projectService = ProjectService(
+      storageService,
+      knowledgeStoreService: knowledgeStoreService,
+    );
+  });
+
+  tearDown(() async {
+    if (tempDirectory.existsSync()) {
+      await tempDirectory.delete(recursive: true);
+    }
+    KnowledgeStoreService.resetForTesting();
   });
 
   group('ProjectService', () {
@@ -29,6 +51,15 @@ void main() {
       expect(project.name, 'Test Project');
       expect(project.description, 'A test project');
       expect(project.id, isNotEmpty);
+      expect(
+        knowledgeStoreService
+            .listMarkdownFiles(
+              knowledgeStoreService.projectsRoot,
+              recursive: true,
+            )
+            .isNotEmpty,
+        isTrue,
+      );
     });
 
     test('should get project by ID', () async {
