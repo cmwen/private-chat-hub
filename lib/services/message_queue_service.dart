@@ -1,6 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
+
 import 'package:private_chat_hub/models/queue_item.dart';
+import 'package:private_chat_hub/repositories/queue_repository.dart';
+import 'package:private_chat_hub/services/knowledge_store_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:uuid/uuid.dart';
 
@@ -9,29 +11,30 @@ import 'package:uuid/uuid.dart';
 /// Handles queuing messages when offline, retry logic with exponential backoff,
 /// and FIFO processing when connection is restored.
 class MessageQueueService {
-  final StorageService _storage;
-  static const String _queueKey = 'message_queue';
+  final QueueRepository _repository;
   static const int _maxQueueSize = 50;
   static const List<int> _retryDelays = [3, 10, 30]; // seconds
 
   // Stream controller for queue updates
   final _queueUpdateController = StreamController<List<QueueItem>>.broadcast();
 
-  MessageQueueService(this._storage);
+  MessageQueueService(
+    StorageService _, {
+    QueueRepository? repository,
+    KnowledgeStoreService? knowledgeStoreService,
+  }) : _repository =
+           repository ??
+           MarkdownQueueRepository(
+             knowledgeStoreService ?? KnowledgeStoreService.instance,
+           );
 
   /// Stream of queue updates.
   Stream<List<QueueItem>> get queueUpdates => _queueUpdateController.stream;
 
   /// Gets all queued items.
   List<QueueItem> getQueue() {
-    final jsonString = _storage.getString(_queueKey);
-    if (jsonString == null || jsonString.isEmpty) return [];
-
     try {
-      final List<dynamic> jsonList = jsonDecode(jsonString);
-      return jsonList
-          .map((json) => QueueItem.fromJson(json as Map<String, dynamic>))
-          .toList();
+      return _repository.getQueueItems();
     } catch (e) {
       debugPrint('[MessageQueueService] Error loading queue: $e');
       return [];
@@ -204,8 +207,7 @@ class MessageQueueService {
 
   /// Saves the queue to storage.
   Future<void> _saveQueue(List<QueueItem> queue) async {
-    final jsonString = jsonEncode(queue.map((item) => item.toJson()).toList());
-    await _storage.setString(_queueKey, jsonString);
+    await _repository.saveQueueItems(queue);
 
     // Notify listeners of queue update
     if (!_queueUpdateController.isClosed) {

@@ -4,12 +4,14 @@ import 'package:private_chat_hub/models/comparison_conversation.dart';
 import 'package:private_chat_hub/models/conversation.dart';
 import 'package:private_chat_hub/models/message.dart';
 import 'package:private_chat_hub/models/queue_item.dart';
+import 'package:private_chat_hub/repositories/conversation_repository.dart';
 import 'package:private_chat_hub/models/tool_models.dart' as app_tools;
 import 'package:private_chat_hub/ollama_toolkit/ollama_toolkit.dart';
 import 'package:private_chat_hub/services/connectivity_service.dart';
 import 'package:private_chat_hub/services/inference_config_service.dart';
 import 'package:private_chat_hub/services/llm_service.dart';
 import 'package:private_chat_hub/services/lm_studio_llm_service.dart';
+import 'package:private_chat_hub/services/knowledge_store_service.dart';
 import 'package:private_chat_hub/services/message_queue_service.dart';
 import 'package:private_chat_hub/services/notification_service.dart';
 import 'package:private_chat_hub/services/ollama_connection_manager.dart';
@@ -28,6 +30,7 @@ import 'package:uuid/uuid.dart';
 class ChatService {
   final OllamaConnectionManager _ollamaManager;
   final StorageService _storage;
+  final ConversationRepository _conversationRepository;
   ToolExecutorService? _toolExecutor;
   app_tools.ToolConfig? _toolConfig;
   final OllamaConfigService _configService = OllamaConfigService();
@@ -48,7 +51,6 @@ class ChatService {
   late final MessageQueueService _queueService;
   bool _isProcessingQueue = false;
 
-  static const String _conversationsKey = 'conversations';
   static const String _currentConversationKey = 'current_conversation_id';
   static const bool _debugLogging = true; // Set to false to disable debug logs
 
@@ -67,13 +69,27 @@ class ChatService {
     app_tools.ToolConfig? toolConfig,
     InferenceConfigService? inferenceConfigService,
     OnDeviceLLMService? onDeviceLLMService,
+    ConversationRepository? conversationRepository,
+    KnowledgeStoreService? knowledgeStoreService,
+    MessageQueueService? queueService,
   }) : _toolExecutor = toolExecutor,
        _toolConfig = toolConfig,
        _inferenceConfigService = inferenceConfigService,
-       _onDeviceLLMService = onDeviceLLMService {
+       _onDeviceLLMService = onDeviceLLMService,
+       _conversationRepository =
+           conversationRepository ??
+           MarkdownConversationRepository(
+             knowledgeStoreService ?? KnowledgeStoreService.instance,
+           ) {
     // Initialize offline mode services
     _connectivityService = ConnectivityService(_ollamaManager);
-    _queueService = MessageQueueService(_storage);
+    _queueService =
+        queueService ??
+        MessageQueueService(
+          _storage,
+          knowledgeStoreService:
+              knowledgeStoreService ?? KnowledgeStoreService.instance,
+        );
 
     // Listen for connectivity changes and process queue when network is available.
     // Triggers when:
@@ -208,34 +224,18 @@ class ChatService {
     String? projectId,
     bool excludeProjectConversations = false,
   }) {
-    final jsonString = _storage.getString(_conversationsKey);
-    if (jsonString == null) return [];
+    var conversations = _conversationRepository.getConversations();
 
-    try {
-      final List<dynamic> jsonList = jsonDecode(jsonString);
-      var conversations = jsonList.map((json) {
-        final jsonMap = json as Map<String, dynamic>;
-        if (jsonMap['isComparisonMode'] == true) {
-          return ComparisonConversation.fromJson(jsonMap);
-        }
-        return Conversation.fromJson(jsonMap);
-      }).toList();
-
-      if (projectId != null) {
-        conversations = conversations
-            .where((c) => c.projectId == projectId)
-            .toList();
-      } else if (excludeProjectConversations) {
-        conversations = conversations
-            .where((c) => c.projectId == null)
-            .toList();
-      }
-
-      conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-      return conversations;
-    } catch (e) {
-      return [];
+    if (projectId != null) {
+      conversations = conversations
+          .where((c) => c.projectId == projectId)
+          .toList();
+    } else if (excludeProjectConversations) {
+      conversations = conversations.where((c) => c.projectId == null).toList();
     }
+
+    conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return conversations;
   }
 
   /// Gets conversations for a specific project.
@@ -248,14 +248,6 @@ class ChatService {
     return getProjectConversations(projectId).length;
   }
 
-  /// Saves conversations to storage.
-  Future<void> _saveConversations(List<Conversation> conversations) async {
-    final jsonString = jsonEncode(
-      conversations.map((c) => c.toJson()).toList(),
-    );
-    await _storage.setString(_conversationsKey, jsonString);
-  }
-
   /// Creates a new conversation.
   Future<Conversation> createConversation({
     required String modelName,
@@ -263,19 +255,18 @@ class ChatService {
     String? systemPrompt,
     String? projectId,
   }) async {
+    final now = DateTime.now();
     final conversation = Conversation(
       id: const Uuid().v4(),
       title: title ?? 'New Conversation',
       modelName: modelName,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
+      createdAt: now,
+      updatedAt: now,
       systemPrompt: systemPrompt,
       projectId: projectId,
     );
 
-    final conversations = getConversations();
-    conversations.insert(0, conversation);
-    await _saveConversations(conversations);
+    await _conversationRepository.saveConversation(conversation);
     await setCurrentConversation(conversation.id);
 
     return conversation;
@@ -288,19 +279,18 @@ class ChatService {
     String? title,
     String? systemPrompt,
   }) async {
+    final now = DateTime.now();
     final conversation = ComparisonConversation(
       id: const Uuid().v4(),
       title: title ?? 'Compare: $model1Name vs $model2Name',
       modelName: model1Name,
       model2Name: model2Name,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
+      createdAt: now,
+      updatedAt: now,
       systemPrompt: systemPrompt,
     );
 
-    final conversations = getConversations();
-    conversations.insert(0, conversation);
-    await _saveConversations(conversations);
+    await _conversationRepository.saveConversation(conversation);
     await setCurrentConversation(conversation.id);
 
     return conversation;
@@ -308,39 +298,25 @@ class ChatService {
 
   /// Gets a conversation by ID.
   Conversation? getConversation(String id) {
-    final conversations = getConversations();
-    try {
-      return conversations.firstWhere((c) => c.id == id);
-    } catch (_) {
-      return null;
-    }
+    return _conversationRepository.getConversation(id);
   }
 
   /// Updates a conversation.
   Future<void> updateConversation(Conversation conversation) async {
-    final conversations = getConversations();
-    final index = conversations.indexWhere((c) => c.id == conversation.id);
+    if (_conversationRepository.getConversation(conversation.id) == null) {
+      return;
+    }
 
-    if (index != -1) {
-      conversations[index] = conversation;
-      await _saveConversations(conversations);
+    await _conversationRepository.saveConversation(conversation);
 
-      if (!_conversationUpdatesController.isClosed) {
-        _conversationUpdatesController.add(conversation);
-      }
+    if (!_conversationUpdatesController.isClosed) {
+      _conversationUpdatesController.add(conversation);
     }
   }
 
   /// Imports a conversation (inserts if not present, replaces if already exists).
   Future<void> importConversation(Conversation conversation) async {
-    final conversations = getConversations();
-    final index = conversations.indexWhere((c) => c.id == conversation.id);
-    if (index != -1) {
-      conversations[index] = conversation;
-    } else {
-      conversations.insert(0, conversation);
-    }
-    await _saveConversations(conversations);
+    await _conversationRepository.saveConversation(conversation);
     if (!_conversationUpdatesController.isClosed) {
       _conversationUpdatesController.add(conversation);
     }
@@ -348,11 +324,7 @@ class ChatService {
 
   /// Deletes a conversation.
   Future<void> deleteConversation(String id) async {
-    final conversations = getConversations();
-    final updatedConversations = conversations
-        .where((c) => c.id != id)
-        .toList();
-    await _saveConversations(updatedConversations);
+    await _conversationRepository.deleteConversation(id);
 
     if (getCurrentConversationId() == id) {
       await _storage.remove(_currentConversationKey);
@@ -361,11 +333,10 @@ class ChatService {
 
   /// Deletes all conversations in a project.
   Future<void> deleteProjectConversations(String projectId) async {
-    final conversations = getConversations();
-    final updatedConversations = conversations
-        .where((c) => c.projectId != projectId)
-        .toList();
-    await _saveConversations(updatedConversations);
+    final conversations = getProjectConversations(projectId);
+    for (final conversation in conversations) {
+      await _conversationRepository.deleteConversation(conversation.id);
+    }
   }
 
   /// Moves a conversation to a project.
@@ -373,16 +344,16 @@ class ChatService {
     String conversationId,
     String? projectId,
   ) async {
-    final conversations = getConversations();
-    final index = conversations.indexWhere((c) => c.id == conversationId);
+    final conversation = getConversation(conversationId);
 
-    if (index != -1) {
-      conversations[index] = conversations[index].copyWith(
-        projectId: projectId,
-        clearProjectId: projectId == null,
-        updatedAt: DateTime.now(),
+    if (conversation != null) {
+      await _conversationRepository.saveConversation(
+        conversation.copyWith(
+          projectId: projectId,
+          clearProjectId: projectId == null,
+          updatedAt: DateTime.now(),
+        ),
       );
-      await _saveConversations(conversations);
     }
   }
 
@@ -417,7 +388,7 @@ class ChatService {
 
   /// Deletes all conversations.
   Future<void> deleteAllConversations() async {
-    await _storage.remove(_conversationsKey);
+    await _conversationRepository.deleteAllConversations();
     await _storage.remove(_currentConversationKey);
   }
 

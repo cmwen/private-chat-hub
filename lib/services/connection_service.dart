@@ -1,36 +1,40 @@
-import 'dart:convert';
 import 'package:private_chat_hub/models/connection.dart';
+import 'package:private_chat_hub/repositories/connection_profile_repository.dart';
+import 'package:private_chat_hub/services/knowledge_store_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:uuid/uuid.dart';
 
 /// Service for managing Ollama connection profiles.
 class ConnectionService {
-  final StorageService _storage;
-  static const String _connectionsKey = 'ollama_connections';
-  static const String _defaultConnectionKey = 'default_connection_id';
-  static const String _selectedModelKey = 'selected_model';
+  final ConnectionProfileRepository _repository;
 
-  ConnectionService(this._storage);
+  ConnectionService(
+    StorageService _, {
+    ConnectionProfileRepository? repository,
+    KnowledgeStoreService? knowledgeStoreService,
+  }) : _repository =
+           repository ??
+           MarkdownConnectionProfileRepository(
+             knowledgeStoreService ?? KnowledgeStoreService.instance,
+           );
 
   /// Gets all saved connections.
   List<Connection> getConnections() {
-    final jsonString = _storage.getString(_connectionsKey);
-    if (jsonString == null) return [];
-
-    try {
-      final List<dynamic> jsonList = jsonDecode(jsonString);
-      return jsonList
-          .map((json) => Connection.fromJson(json as Map<String, dynamic>))
-          .toList();
-    } catch (e) {
-      return [];
-    }
+    return _repository.getConnections();
   }
 
   /// Saves connections to storage.
   Future<void> _saveConnections(List<Connection> connections) async {
-    final jsonString = jsonEncode(connections.map((c) => c.toJson()).toList());
-    await _storage.setString(_connectionsKey, jsonString);
+    final existingIds = _repository.getConnections().map((c) => c.id).toSet();
+    final updatedIds = connections.map((c) => c.id).toSet();
+
+    for (final connection in connections) {
+      await _repository.saveConnection(connection);
+    }
+
+    for (final staleId in existingIds.difference(updatedIds)) {
+      await _repository.deleteConnection(staleId);
+    }
   }
 
   /// Adds a new connection profile.
@@ -64,10 +68,6 @@ class ConnectionService {
     updatedConnections.add(connection);
     await _saveConnections(updatedConnections);
 
-    if (isDefault) {
-      await _storage.setString(_defaultConnectionKey, connection.id);
-    }
-
     return connection;
   }
 
@@ -95,7 +95,6 @@ class ConnectionService {
     // If we deleted the default, make the first remaining one default
     if (deletedConnection.isDefault && connections.isNotEmpty) {
       connections[0] = connections[0].copyWith(isDefault: true);
-      await _storage.setString(_defaultConnectionKey, connections[0].id);
     }
 
     await _saveConnections(connections);
@@ -109,7 +108,6 @@ class ConnectionService {
     }).toList();
 
     await _saveConnections(updatedConnections);
-    await _storage.setString(_defaultConnectionKey, id);
   }
 
   /// Gets the default connection, or null if none set.
@@ -141,11 +139,11 @@ class ConnectionService {
 
   /// Gets the currently selected model name.
   String? getSelectedModel() {
-    return _storage.getString(_selectedModelKey);
+    return _repository.getSelectedModel();
   }
 
   /// Sets the selected model name.
   Future<void> setSelectedModel(String modelName) async {
-    await _storage.setString(_selectedModelKey, modelName);
+    await _repository.setSelectedModel(modelName);
   }
 }

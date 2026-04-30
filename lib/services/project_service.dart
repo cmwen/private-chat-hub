@@ -1,55 +1,37 @@
-import 'dart:convert';
 import 'package:private_chat_hub/models/project.dart';
+import 'package:private_chat_hub/repositories/project_repository.dart';
+import 'package:private_chat_hub/services/knowledge_store_service.dart';
 import 'package:private_chat_hub/services/storage_service.dart';
 import 'package:uuid/uuid.dart';
 
 /// Service for managing projects.
 class ProjectService {
-  final StorageService _storage;
-  static const String _projectsKey = 'projects';
+  final ProjectRepository _repository;
 
-  ProjectService(this._storage);
+  ProjectService(
+    StorageService _, {
+    ProjectRepository? repository,
+    KnowledgeStoreService? knowledgeStoreService,
+  }) : _repository =
+           repository ??
+           MarkdownProjectRepository(
+             knowledgeStoreService ?? KnowledgeStoreService.instance,
+           );
 
   /// Gets all saved projects.
   List<Project> getProjects() {
-    final jsonString = _storage.getString(_projectsKey);
-    if (jsonString == null) return [];
-
-    try {
-      final List<dynamic> jsonList = jsonDecode(jsonString);
-      final projects = jsonList
-          .map((json) => Project.fromJson(json as Map<String, dynamic>))
-          .toList();
-
-      // Sort: pinned first, then by updated date
-      projects.sort((a, b) {
-        if (a.isPinned && !b.isPinned) return -1;
-        if (!a.isPinned && b.isPinned) return 1;
-        return b.updatedAt.compareTo(a.updatedAt);
-      });
-
-      return projects;
-    } catch (e) {
-      return [];
-    }
-  }
-
-  /// Saves projects to storage.
-  Future<void> _saveProjects(List<Project> projects) async {
-    final jsonString = jsonEncode(projects.map((p) => p.toJson()).toList());
-    await _storage.setString(_projectsKey, jsonString);
+    final projects = _repository.getProjects();
+    projects.sort((a, b) {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return b.updatedAt.compareTo(a.updatedAt);
+    });
+    return projects;
   }
 
   /// Imports a project (inserts if not present, replaces if already exists).
   Future<void> importProject(Project project) async {
-    final projects = getProjects();
-    final index = projects.indexWhere((p) => p.id == project.id);
-    if (index != -1) {
-      projects[index] = project;
-    } else {
-      projects.insert(0, project);
-    }
-    await _saveProjects(projects);
+    await _repository.saveProject(project);
   }
 
   /// Creates a new project.
@@ -62,6 +44,7 @@ class ProjectService {
     String? iconName,
     String? modelName,
   }) async {
+    final now = DateTime.now();
     final project = Project(
       id: const Uuid().v4(),
       name: name,
@@ -70,58 +53,40 @@ class ProjectService {
       instructions: instructions,
       colorValue: colorValue ?? Project.availableColors[0],
       iconName: iconName ?? 'folder',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
+      createdAt: now,
+      updatedAt: now,
       modelName: modelName,
     );
 
-    final projects = getProjects();
-    projects.insert(0, project);
-    await _saveProjects(projects);
-
+    await _repository.saveProject(project);
     return project;
   }
 
   /// Gets a project by ID.
   Project? getProject(String id) {
-    final projects = getProjects();
-    try {
-      return projects.firstWhere((p) => p.id == id);
-    } catch (_) {
-      return null;
-    }
+    return _repository.getProject(id);
   }
 
   /// Updates an existing project.
   Future<void> updateProject(Project project) async {
-    final projects = getProjects();
-    final index = projects.indexWhere((p) => p.id == project.id);
-
-    if (index != -1) {
-      projects[index] = project.copyWith(updatedAt: DateTime.now());
-      await _saveProjects(projects);
-    }
+    await _repository.saveProject(project.copyWith(updatedAt: DateTime.now()));
   }
 
   /// Deletes a project by ID.
   Future<void> deleteProject(String id) async {
-    final projects = getProjects();
-    final updatedProjects = projects.where((p) => p.id != id).toList();
-    await _saveProjects(updatedProjects);
+    await _repository.deleteProject(id);
   }
 
   /// Toggles the pinned status of a project.
   Future<void> togglePinned(String id) async {
-    final projects = getProjects();
-    final index = projects.indexWhere((p) => p.id == id);
-
-    if (index != -1) {
-      projects[index] = projects[index].copyWith(
-        isPinned: !projects[index].isPinned,
-        updatedAt: DateTime.now(),
-      );
-      await _saveProjects(projects);
+    final project = getProject(id);
+    if (project == null) {
+      return;
     }
+
+    await _repository.saveProject(
+      project.copyWith(isPinned: !project.isPinned, updatedAt: DateTime.now()),
+    );
   }
 
   /// Gets the count of projects.
