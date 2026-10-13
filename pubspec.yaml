@@ -33,7 +33,7 @@ dependencies:
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.9
+  cupertino_icons: ^2.0.0
 
   # Date formatting
   intl: ^0.20.3
@@ -43,24 +43,24 @@ dependencies:
 
   # Opinionated defaults for storage
   # Simple key-value storage for user preferences and small data
-  shared_preferences: ^2.5.5
+  shared_preferences: ^2.5.6
   # Access to device file system paths (documents, cache, temp directories)
   path_provider: ^2.1.6
   
   # UUID generation for unique identifiers
-  uuid: ^4.5.3
+  uuid: ^4.6.0
   
   # Package info for app version
-  package_info_plus: ^9.0.1
+  package_info_plus: ^10.2.2
   
   # Markdown rendering for AI responses
   flutter_markdown: ^0.7.5+1
   
   # Image picker for photo attachments (vision models)
-  image_picker: ^1.2.2
+  image_picker: ^1.2.4
   
   # File picker for document attachments
-  file_picker: ^11.0.2
+  file_picker: ^12.0.0-beta.1
   
   # Text-to-speech for reading AI responses
   flutter_tts: ^4.2.0
@@ -69,7 +69,7 @@ dependencies:
   flutter_local_notifications: ^22.0.1
   
   # Network connectivity monitoring for offline mode
-  connectivity_plus: ^7.2.0
+  connectivity_plus: ^7.3.1
   flutter_markdown_latex: ^0.3.4
   markdown: ^7.3.1
 
