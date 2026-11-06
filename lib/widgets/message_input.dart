@@ -185,7 +185,7 @@ class _MessageInputState extends State<MessageInput> {
 
   Future<void> _pickAudioFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: _supportedAudioExtensions,
         allowMultiple: true,
@@ -208,7 +208,7 @@ class _MessageInputState extends State<MessageInput> {
 
   Future<void> _pickFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: _supportedTextExtensions,
         allowMultiple: true,
